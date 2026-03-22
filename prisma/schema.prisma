@@ -1,0 +1,41 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// جدول الأعمال (أفلام، مسلسلات، أنمي، كتب)
+model MediaItem {
+  id             String   @id @default(cuid())
+  title          String
+  originalTitle  String?
+  year           String
+  type           String
+  poster         String?
+  rating         String?
+  overview       String?
+  genres         String
+  episodes       Int?
+  seasons        Int?
+  duration       String?
+  status         String?
+  author         String?
+  pages          Int?
+  tags           String   @default("[]")
+  notes          String?  @default("")
+  favorite       Boolean  @default(false)
+  watched        Boolean  @default(false)
+  watchedAt      String?
+  userRating     Int?
+  addedAt        DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([type])
+  @@index([watched])
+  @@index([favorite])
+}
