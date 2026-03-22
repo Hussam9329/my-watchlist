@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-// GET - جلب عنصر واحد
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,18 +8,20 @@ export async function GET(
   try {
     const { id } = await params
     const item = await prisma.mediaItem.findUnique({ where: { id } })
-    
     if (!item) {
       return NextResponse.json({ error: 'العنصر غير موجود' }, { status: 404 })
     }
-    
-    return NextResponse.json(item)
+    const formattedItem = {
+      ...item,
+      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
+      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+    }
+    return NextResponse.json(formattedItem)
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 })
   }
 }
 
-// PUT - تحديث عنصر
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,29 +40,34 @@ export async function PUT(
         poster: body.poster,
         rating: body.rating ? String(body.rating) : null,
         overview: body.overview,
-        genres: body.genres || [],
+        genres: Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || ''),
         episodes: body.episodes ? parseInt(body.episodes) : null,
         seasons: body.seasons ? parseInt(body.seasons) : null,
         duration: body.duration,
         status: body.status,
         author: body.author,
         pages: body.pages ? parseInt(body.pages) : null,
-        tags: body.tags || [],
+        tags: Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || ''),
         notes: body.notes,
         favorite: body.favorite,
         watched: body.watched,
-        watchedAt: body.watchedAt ? new Date(body.watchedAt) : null,
+        watchedAt: body.watchedAt ? String(body.watchedAt) : null,
         userRating: body.userRating ? parseFloat(body.userRating) : null,
       }
     })
     
-    return NextResponse.json(item)
+    const formattedItem = {
+      ...item,
+      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
+      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+    }
+    
+    return NextResponse.json(formattedItem)
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }
 }
 
-// DELETE - حذف عنصر
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -75,7 +81,6 @@ export async function DELETE(
   }
 }
 
-// PATCH - تحديث جزئي
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -83,11 +88,25 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
+    
+    // تحويل watchedAt إلى string إذا كان موجوداً
+    const updateData = { ...body }
+    if (body.watchedAt) {
+      updateData.watchedAt = String(body.watchedAt)
+    }
+    
     const item = await prisma.mediaItem.update({
       where: { id },
-      data: body
+      data: updateData
     })
-    return NextResponse.json(item)
+    
+    const formattedItem = {
+      ...item,
+      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
+      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+    }
+    
+    return NextResponse.json(formattedItem)
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }
