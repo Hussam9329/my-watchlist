@@ -1,146 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
-import ZAI from 'z-ai-web-dev-sdk'
-
-interface SearchResult {
-  title: string
-  originalTitle: string
-  year: string
-  rating: string
-  overview: string
-  genres: string[]
-  episodes?: number
-  seasons?: number
-  duration?: string
-  status?: string
-  author?: string
-  pages?: number
-}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { query, type } = body as { query: string; type: 'movie' | 'series' | 'anime' | 'book' }
+    const title = body.title || body.query
+    const type = body.type || 'movie'
 
-    if (!query || !query.trim()) {
-      return NextResponse.json({ error: 'يرجى إدخال نص البحث' }, { status: 400 })
+    if (!title) {
+      return NextResponse.json({ error: 'العنوان مطلوب' }, { status: 400 })
     }
 
-    console.log(`[Metadata API] Searching for: "${query}" (${type})`)
-
-    const zai = await ZAI.create()
-
-    // Build search query based on type
-    let searchQuery = query
-    if (type === 'movie') {
-      searchQuery = `${query} movie film IMDB rating`
-    } else if (type === 'series') {
-      searchQuery = `${query} TV series seasons episodes IMDB rating`
-    } else if (type === 'anime') {
-      searchQuery = `${query} anime MyAnimeList MAL rating episodes`
-    } else if (type === 'book') {
-      searchQuery = `${query} book novel author Goodreads pages`
-    }
-
-    // Search the web
-    let searchResult: Array<{ name: string; snippet: string; url: string }> = []
-    try {
-      const rawResult = await zai.functions.invoke("web_search", {
-        query: searchQuery,
-        num: 10
-      })
-      searchResult = rawResult as Array<{ name: string; snippet: string; url: string }>
-    } catch (searchError) {
-      console.error('[Metadata API] Web search failed:', searchError)
-      return NextResponse.json({ error: 'فشل البحث. جرب بالاسم الإنجليزي.' }, { status: 500 })
-    }
-
-    if (!searchResult || searchResult.length === 0) {
-      return NextResponse.json({ error: 'لم يتم العثور على نتائج' }, { status: 404 })
-    }
-
-    const searchContext = searchResult.slice(0, 5).map((r) => ({
-      title: r.name,
-      snippet: r.snippet,
-      url: r.url
-    }))
-
-    let results: SearchResult[] = []
-
-    try {
-      const prompt = `Based on these search results for "${query}" (${type}), extract information and return a JSON array.
-
-Search Results:
- ${JSON.stringify(searchContext, null, 2)}
-
-Return a JSON array with this structure (no markdown, just JSON):
-[
-  {
-    "title": "Arabic title if available",
-    "originalTitle": "Original title",
-    "year": "Release year",
-    "rating": "Rating out of 10",
-    "overview": "Brief summary in Arabic",
-    "genres": ["Genre1", "Genre2"],
-    "episodes": number or null,
-    "seasons": number or null,
-    "duration": "Duration or null",
-    "status": "For series: ongoing or ended",
-    "author": "For books: author name",
-    "pages": number or null
-  }
-]`
-
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'system', content: 'You extract media information and return valid JSON only.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3
-      })
-
-      const responseText = completion.choices[0]?.message?.content || ''
-      let cleanedResponse = responseText.trim()
-
-      if (cleanedResponse.startsWith('```json')) {
-        cleanedResponse = cleanedResponse.slice(7)
-      } else if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(3)
-      }
-      if (cleanedResponse.endsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(0, -3)
-      }
-      cleanedResponse = cleanedResponse.trim()
-
-      results = JSON.parse(cleanedResponse)
-    } catch (aiError) {
-      console.error('[Metadata API] AI failed, using fallback:', aiError)
+    // الكتب - استخدام Google Books API
+    if (type === 'book') {
+      const response = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=10&orderBy=relevance&printType=books`,
+        { cache: 'no-store' }
+      )
       
-      results = searchResult.slice(0, 5).map((r) => {
-        const yearMatch = r.snippet?.match(/\b(19|20)\d{2}\b/)
-        const year = yearMatch ? yearMatch[0] : new Date().getFullYear().toString()
-        const ratingMatch = r.snippet?.match(/(\d+\.?\d*)\s*\/\s*10/)
-        const rating = ratingMatch ? ratingMatch[1] : ''
-
-        return {
-          title: r.name,
-          originalTitle: r.name,
-          year: year,
-          rating: rating,
-          overview: r.snippet || '',
-          genres: [],
-        }
-      })
+      const data = await response.json()
+      
+      if (data.items && data.items.length > 0) {
+        const results = data.items.map((item: any) => {
+          const info = item.volumeInfo || {}
+          return {
+            title: info.title,
+            originalTitle: info.title,
+            year: info.publishedDate ? info.publishedDate.split('-')[0] : '',
+            poster: info.imageLinks?.thumbnail?.replace('http://', 'https://') || null,
+            overview: info.description || 'لا يوجد وصف',
+            rating: info.averageRating ? info.averageRating.toFixed(1) : null,
+            type: 'book',
+            author: info.authors?.join(', ') || 'غير معروف',
+            pages: info.pageCount || null,
+            genres: info.categories || []
+          }
+        })
+        return NextResponse.json({ results })
+      }
+      
+      return NextResponse.json({ results: [] })
     }
 
-    const validResults = results.filter(r => r.originalTitle || r.title)
+    // الأفلام والمسلسلات والأنمي - استخدام TMDB API
+    const tmdbType = type === 'movie' ? 'movie' : 'tv'
+    
+    const response = await fetch(
+      `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=2dca580c2a14b55200e784d157207b4d`,
+      { cache: 'no-store' }
+    )
+    
+    const data = await response.json()
 
-    if (validResults.length === 0) {
-      return NextResponse.json({ error: 'لم يتم العثور على نتائج صالحة' }, { status: 404 })
+    if (data.results && data.results.length > 0) {
+      const results = data.results.slice(0, 5).map((result: any) => ({
+        title: result.title || result.name,
+        originalTitle: result.original_title || result.original_name,
+        year: (result.release_date || result.first_air_date || '').split('-')[0],
+        poster: result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null,
+        overview: result.overview || 'لا يوجد وصف',
+        rating: result.vote_average ? result.vote_average.toFixed(1) : null,
+        type: type,
+        genres: []
+      }))
+      
+      return NextResponse.json({ results })
     }
 
-    return NextResponse.json({ results: validResults })
+    return NextResponse.json({ results: [] })
+
   } catch (error) {
-    console.error('[Metadata API] Error:', error)
+    console.error('[API] Error:', error)
     return NextResponse.json({ error: 'حدث خطأ أثناء البحث' }, { status: 500 })
   }
 }
