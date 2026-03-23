@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         notes: body.notes || '',
         favorite: body.favorite || false,
         watched: body.watched || false,
-        watchedAt: body.watchedAt ? new Date(body.watchedAt) : null,
+        watchedAt: body.watchedAt ? String(body.watchedAt) : null,
         userRating: body.userRating ? parseFloat(body.userRating) : null,
       }
     })
