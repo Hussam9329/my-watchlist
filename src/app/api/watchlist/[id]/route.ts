@@ -89,7 +89,6 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     
-    // تحويل watchedAt إلى string إذا كان موجوداً
     const updateData = { ...body }
     if (body.watchedAt) {
       updateData.watchedAt = String(body.watchedAt)
