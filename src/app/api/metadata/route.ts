@@ -12,11 +12,10 @@ export async function POST(request: NextRequest) {
 
     // الكتب - استخدام Google Books API
     if (type === 'book') {
-      const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=10&orderBy=relevance&printType=books`,
-        { cache: 'no-store' }
-      )
+      const apiKey = process.env.GOOGLE_BOOKS_API_KEY || 'AIzaSyB7JLp8QJzHch9I1qeCc4PQ2rzZ7qfQyl8'
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=10&orderBy=relevance&printType=books&key=${apiKey}`
       
+      const response = await fetch(url, { cache: 'no-store' })
       const data = await response.json()
       
       if (data.items && data.items.length > 0) {
