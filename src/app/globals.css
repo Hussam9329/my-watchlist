@@ -180,3 +180,25 @@ input:focus, textarea:focus {
   border-color: #d4af37 !important;
   outline: none;
 }
+
+/* خط Cairo للعربي */
+.font-cairo {
+  font-family: 'Cairo', sans-serif;
+}
+
+/* خط Inter للإنجليزي */
+.font-inter {
+  font-family: var(--font-inter), 'Cairo', sans-serif;
+}
+
+/* تحسينات عامة */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* العناوين الإنجليزية */
+.english-title {
+  font-family: var(--font-inter), sans-serif;
+  letter-spacing: -0.01em;
+}
