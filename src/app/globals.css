@@ -202,3 +202,12 @@ body {
   font-family: var(--font-inter), sans-serif;
   letter-spacing: -0.01em;
 }
+/* تحسين الخطوط للعربية والإنكليزية */
+html {
+  font-family: var(--font-tajawal), var(--font-inter), sans-serif;
+}
+
+/* دعم RTL */
+[dir="rtl"] {
+  font-family: var(--font-tajawal), var(--font-inter), sans-serif;
+}
