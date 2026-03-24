@@ -1,27 +1,43 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { Toaster } from '@/components/ui/toaster'
-import '@/app/globals.css'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Tajawal } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  subsets: ["arabic"],
+  weight: ["300", "400", "500", "700", "800"],
+});
 
 export const metadata: Metadata = {
-  title: 'أرشيفي - قائمة المشاهدات والقراءة',
-  description: 'تتبع أفلامك ومسلسلاتك وأنمياتك وكتبك المفضلة',
-}
+  title: "أرشيفي - قائمة المشاهدات والقراءة",
+  description: "تتبع أفلامك ومسلسلاتك وأنمياتك وكتبك في مكان واحد",
+  keywords: ["أرشيفي", "قائمة", "أفلام", "مسلسلات", "أنمي", "كتب"],
+  authors: [{ name: "أرشيفي" }],
+  icons: {
+    icon: "/logo.svg",
+  },
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="ar" dir="rtl">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className={`${inter.variable} font-cairo antialiased`}>
+    <html lang="ar" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} ${tajawal.variable} font-tajawal antialiased bg-[#0a0a0a] text-white`}
+      >
         {children}
         <Toaster />
       </body>
     </html>
-  )
+  );
 }
