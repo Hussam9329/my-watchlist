@@ -64,8 +64,14 @@ const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.
   })
 }
 
+// كلمة المرور - يمكنك تغييرها
+const APP_PASSWORD = '20262026'
+
 export default function WatchListPage() {
   const { toast } = useToast()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [showLogin, setShowLogin] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('all')
   const [watchList, setWatchList] = useState<MediaItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,7 +123,14 @@ export default function WatchListPage() {
       setWatchList([])
     } finally { setIsLoading(false) }
   }, [])
-
+// التحقق من تسجيل الدخول
+useEffect(() => {
+  const auth = localStorage.getItem('watchlist_auth')
+  if (auth === 'true') {
+    setIsAuthenticated(true)
+    setShowLogin(false)
+  }
+}, [])
   useEffect(() => { fetchWatchList() }, [fetchWatchList])
   useEffect(() => { if (activeTab !== 'all') setAddType(activeTab as typeof addType) }, [activeTab])
 
@@ -311,15 +324,65 @@ export default function WatchListPage() {
 
   const exportData = () => { const d = JSON.stringify(watchList, null, 2); const b = new Blob([d], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `watchlist_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(u); toast({ title: '📤 تم التصدير', description: 'تم تصدير البيانات بنجاح' }) }
   const importData = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = async (ev) => { try { const imp = JSON.parse(ev.target?.result as string); if (Array.isArray(imp)) { for (const item of imp) { await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }) } fetchWatchList(); toast({ title: '📥 تم الاستيراد', description: `تم استيراد ${imp.length} عنصر` }) } } catch {} }; r.readAsText(f) } }
+  const handleLogin = () => {
+  if (passwordInput === APP_PASSWORD) {
+    setIsAuthenticated(true)
+    setShowLogin(false)
+    localStorage.setItem('watchlist_auth', 'true')
+    toast({ title: '✅ مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
+  } else {
+    toast({ title: '❌ خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
+  }
+}
+
+const handleLogout = () => {
+  setIsAuthenticated(false)
+  setShowLogin(true)
+  localStorage.removeItem('watchlist_auth')
+  setPasswordInput('')
+}
   const clearFilters = () => { setSearchQuery(''); setFilterYear('all'); setFilterRating([0, 10]); setFilterStatus('all'); setFilterGenre('all'); setFilterType('all') }
 
   const TypeIcon = TYPE_CONFIG[activeTab].icon
   const currentType = editingItem?.type || addType
 
-  if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
+
+// شاشة تسجيل الدخول
+if (showLogin && !isAuthenticated) {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+      <div className="w-full max-w-sm px-6">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#d4af37]/20">
+            <Bookmark className="w-10 h-10 text-[#0a0a0a]" />
+          </div>
+          <h1 className="text-3xl font-bold mb-2">أرشيفي</h1>
+          <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
+        </div>
+        <div className="space-y-4">
+          <Input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            placeholder="كلمة المرور"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-12 text-center text-lg"
+          />
+          <Button
+            onClick={handleLogin}
+            className="w-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold h-12"
+          >
+            دخول
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <div className="min-h-screen bg-[#0a0a0a] text-white">
       <div className="fixed inset-0 pointer-events-none"><div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-[#d4af37]/5 to-transparent rounded-full blur-3xl" /><div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-[#b8960f]/5 to-transparent rounded-full blur-3xl" /></div>
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-8" dir="rtl">
         <header className="flex items-center justify-between mb-6">
