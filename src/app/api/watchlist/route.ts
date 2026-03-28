@@ -28,7 +28,24 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
+    // التحقق من وجود العنصر مسبقاً
+const existing = await prisma.mediaItem.findFirst({
+  where: {
+    type: body.type,
+    year: body.year,
+    OR: [
+      { title: body.title },
+      ...(body.originalTitle ? [{ originalTitle: body.originalTitle }] : [])
+    ]
+  }
+})
+
+if (existing) {
+  return NextResponse.json(
+    { error: 'هذا العمل موجود مسبقاً في الأرشيف!', duplicate: true, existingItem: existing },
+    { status: 409 }  // 409 = Conflict
+  )
+}
     const item = await prisma.mediaItem.create({
       data: {
         title: body.title,
