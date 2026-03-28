@@ -230,43 +230,43 @@ useEffect(() => {
     }
   }
 
-  const handleAddItem = async () => {
-    if (!formData.originalTitle.trim() && !formData.title.trim()) return
-    try {
-      const response = await fetch('/api/watchlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          originalTitle: formData.originalTitle,
-          year: formData.year,
-          type: addType,
-          poster: formData.poster,
-          rating: formData.rating,
-          overview: formData.overview,
-          genres: formData.genres,
-          episodes: formData.episodes,
-          seasons: formData.seasons,
-          duration: formData.duration,
-          status: formData.status,
-          author: formData.author,
-          pages: formData.pages,
-          tags: formData.tags,
-          notes: formData.notes,
-        })
-      })
-      const newItem = await response.json()
-      if (newItem && newItem.id) {
-        setWatchList(prev => [newItem, ...prev])
-        setShowAddDialog(false)
-        resetForm()
-        toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${formData.originalTitle || formData.title}" بنجاح` })
-      }
-    } catch (error) {
-      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' })
-    }
-  }
-
+const handleAddItem = async () => {                          // سطر 1
+    if (!formData.originalTitle.trim() && !formData.title.trim()) return   // سطر 2
+    try {                                                     // سطر 3
+      const response = await fetch('/api/watchlist', {        // سطر 4
+        method: 'POST',                                       // سطر 5
+        headers: { 'Content-Type': 'application/json' },      // سطر 6
+        body: JSON.stringify({                                // سطر 7
+          title: formData.title,                              // سطر 8
+          originalTitle: formData.originalTitle,               // سطر 9
+          year: formData.year,                                 // سطر 10
+          type: addType,                                       // سطر 11
+          poster: formData.poster,                             // سطر 12
+          rating: formData.rating,                             // سطر 13
+          overview: formData.overview,                         // سطر 14
+          genres: formData.genres,                             // سطر 15
+          episodes: formData.episodes,                         // سطر 16
+          seasons: formData.seasons,                           // سطر 17
+          duration: formData.duration,                         // سطر 18
+          status: formData.status,                             // سطر 19
+          author: formData.author,                             // سطر 20
+          pages: formData.pages,                               // سطر 21
+          tags: formData.tags,                                 // سطر 22
+          notes: formData.notes,                               // سطر 23
+        })                                                    // سطر 24
+      })                                                      // سطر 25
+      const newItem = await response.json()                   // سطر 26
+      if (newItem && newItem.id) {                            // سطر 27
+        setWatchList(prev => [newItem, ...prev])              // سطر 28
+        setShowAddDialog(false)                               // سطر 29
+        resetForm()                                           // سطر 30
+        toast({ title: '✅ تمت الإضافة', ... })              // سطر 31
+      }                                                       // سطر 32
+    } catch (error) {                                         // سطر 33
+      toast({ title: '❌ خطأ', ... })                        // سطر 34
+    }                                                         // سطر 35
+  }                                                           // سطر 36
+  
   const resetForm = () => { setMetaSearchQuery(''); setSearchResults([]); setShowResults(false); setSearchError(''); setFormData({ title: '', originalTitle: '', year: new Date().getFullYear().toString(), rating: '', overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '', author: '', pages: '', tags: '', notes: '', poster: '' }) }
 
   const openEditDialog = (item: MediaItem) => { setEditingItem(item); setFormData({ title: item.title, originalTitle: item.originalTitle || '', year: item.year, rating: item.rating, overview: item.overview, genres: item.genres?.join(', ') || '', episodes: item.episodes?.toString() || '', seasons: item.seasons?.toString() || '', duration: item.duration || '', status: item.status || '', author: item.author || '', pages: item.pages?.toString() || '', tags: item.tags?.join(', ') || '', notes: item.notes, poster: item.poster }); setShowDetails(false); setShowEditDialog(true) }
