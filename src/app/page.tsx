@@ -123,14 +123,16 @@ export default function WatchListPage() {
       setWatchList([])
     } finally { setIsLoading(false) }
   }, [])
-// التحقق من تسجيل الدخول
-useEffect(() => {
-  const auth = localStorage.getItem('watchlist_auth')
-  if (auth === 'true') {
-    setIsAuthenticated(true)
-    setShowLogin(false)
-  }
-}, [])
+
+  // التحقق من تسجيل الدخول
+  useEffect(() => {
+    const auth = localStorage.getItem('watchlist_auth')
+    if (auth === 'true') {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+    }
+  }, [])
+
   useEffect(() => { fetchWatchList() }, [fetchWatchList])
   useEffect(() => { if (activeTab !== 'all') setAddType(activeTab as typeof addType) }, [activeTab])
 
@@ -192,27 +194,33 @@ useEffect(() => {
     setSearchError('')
   }
 
+  // إضافة سريعة من نتائج البحث مع فحص التكرار
   const selectAndAdd = async (r: SearchResult) => {
     try {
       const response = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: r.title,
+          title: r.originalTitle || r.title,
           originalTitle: r.originalTitle || r.title,
           year: r.year,
           type: addType,
-          poster: r.poster,
-          rating: r.rating,
-          overview: r.overview,
+          poster: r.poster || '',
+          rating: r.rating || '',
+          overview: r.overview || '',
           genres: r.genres?.join(', ') || '',
-          episodes: r.episodes,
-          seasons: r.seasons,
-          author: r.author,
-          pages: r.pages,
+          episodes: r.episodes || null,
+          seasons: r.seasons || null,
+          duration: r.duration || '',
+          status: r.status || '',
+          author: r.author || '',
+          pages: r.pages || null,
+          tags: '',
+          notes: '',
         })
       })
       const newItem = await response.json()
+      // فحص التكرار
       if (response.status === 409) {
         toast({ title: '⚠️ موجود مسبقاً!', description: newItem.error, variant: 'destructive' })
         return
@@ -220,8 +228,6 @@ useEffect(() => {
       if (newItem && newItem.id) {
         setWatchList(prev => [newItem, ...prev])
         setShowAddDialog(false)
-        setSearchResults([])
-        setShowResults(false)
         resetForm()
         toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${r.originalTitle || r.title}" بنجاح` })
       }
@@ -230,43 +236,49 @@ useEffect(() => {
     }
   }
 
-const handleAddItem = async () => {                          // سطر 1
-    if (!formData.originalTitle.trim() && !formData.title.trim()) return   // سطر 2
-    try {                                                     // سطر 3
-      const response = await fetch('/api/watchlist', {        // سطر 4
-        method: 'POST',                                       // سطر 5
-        headers: { 'Content-Type': 'application/json' },      // سطر 6
-        body: JSON.stringify({                                // سطر 7
-          title: formData.title,                              // سطر 8
-          originalTitle: formData.originalTitle,               // سطر 9
-          year: formData.year,                                 // سطر 10
-          type: addType,                                       // سطر 11
-          poster: formData.poster,                             // سطر 12
-          rating: formData.rating,                             // سطر 13
-          overview: formData.overview,                         // سطر 14
-          genres: formData.genres,                             // سطر 15
-          episodes: formData.episodes,                         // سطر 16
-          seasons: formData.seasons,                           // سطر 17
-          duration: formData.duration,                         // سطر 18
-          status: formData.status,                             // سطر 19
-          author: formData.author,                             // سطر 20
-          pages: formData.pages,                               // سطر 21
-          tags: formData.tags,                                 // سطر 22
-          notes: formData.notes,                               // سطر 23
-        })                                                    // سطر 24
-      })                                                      // سطر 25
-      const newItem = await response.json()                   // سطر 26
-      if (newItem && newItem.id) {                            // سطر 27
-        setWatchList(prev => [newItem, ...prev])              // سطر 28
-        setShowAddDialog(false)                               // سطر 29
-        resetForm()                                           // سطر 30
-        toast({ title: '✅ تمت الإضافة', ... })              // سطر 31
-      }                                                       // سطر 32
-    } catch (error) {                                         // سطر 33
-      toast({ title: '❌ خطأ', ... })                        // سطر 34
-    }                                                         // سطر 35
-  }                                                           // سطر 36
-  
+  // إضافة يدوية من النموذج مع فحص التكرار
+  const handleAddItem = async () => {
+    if (!formData.originalTitle.trim() && !formData.title.trim()) return
+    try {
+      const response = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formData.title,
+          originalTitle: formData.originalTitle,
+          year: formData.year,
+          type: addType,
+          poster: formData.poster,
+          rating: formData.rating,
+          overview: formData.overview,
+          genres: formData.genres,
+          episodes: formData.episodes,
+          seasons: formData.seasons,
+          duration: formData.duration,
+          status: formData.status,
+          author: formData.author,
+          pages: formData.pages,
+          tags: formData.tags,
+          notes: formData.notes,
+        })
+      })
+      const newItem = await response.json()
+      // فحص التكرار
+      if (response.status === 409) {
+        toast({ title: '⚠️ موجود مسبقاً!', description: newItem.error, variant: 'destructive' })
+        return
+      }
+      if (newItem && newItem.id) {
+        setWatchList(prev => [newItem, ...prev])
+        setShowAddDialog(false)
+        resetForm()
+        toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${formData.originalTitle || formData.title}" بنجاح` })
+      }
+    } catch (error) {
+      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' })
+    }
+  }
+
   const resetForm = () => { setMetaSearchQuery(''); setSearchResults([]); setShowResults(false); setSearchError(''); setFormData({ title: '', originalTitle: '', year: new Date().getFullYear().toString(), rating: '', overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '', author: '', pages: '', tags: '', notes: '', poster: '' }) }
 
   const openEditDialog = (item: MediaItem) => { setEditingItem(item); setFormData({ title: item.title, originalTitle: item.originalTitle || '', year: item.year, rating: item.rating, overview: item.overview, genres: item.genres?.join(', ') || '', episodes: item.episodes?.toString() || '', seasons: item.seasons?.toString() || '', duration: item.duration || '', status: item.status || '', author: item.author || '', pages: item.pages?.toString() || '', tags: item.tags?.join(', ') || '', notes: item.notes, poster: item.poster }); setShowDetails(false); setShowEditDialog(true) }
@@ -328,65 +340,67 @@ const handleAddItem = async () => {                          // سطر 1
 
   const exportData = () => { const d = JSON.stringify(watchList, null, 2); const b = new Blob([d], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `watchlist_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(u); toast({ title: '📤 تم التصدير', description: 'تم تصدير البيانات بنجاح' }) }
   const importData = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = async (ev) => { try { const imp = JSON.parse(ev.target?.result as string); if (Array.isArray(imp)) { for (const item of imp) { await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }) } fetchWatchList(); toast({ title: '📥 تم الاستيراد', description: `تم استيراد ${imp.length} عنصر` }) } } catch {} }; r.readAsText(f) } }
-  const handleLogin = () => {
-  if (passwordInput === APP_PASSWORD) {
-    setIsAuthenticated(true)
-    setShowLogin(false)
-    localStorage.setItem('watchlist_auth', 'true')
-    toast({ title: '✅ مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
-  } else {
-    toast({ title: '❌ خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
-  }
-}
 
-const handleLogout = () => {
-  setIsAuthenticated(false)
-  setShowLogin(true)
-  localStorage.removeItem('watchlist_auth')
-  setPasswordInput('')
-}
+  const handleLogin = () => {
+    if (passwordInput === APP_PASSWORD) {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+      localStorage.setItem('watchlist_auth', 'true')
+      toast({ title: '✅ مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
+    } else {
+      toast({ title: '❌ خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
+    }
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setShowLogin(true)
+    localStorage.removeItem('watchlist_auth')
+    setPasswordInput('')
+  }
+
   const clearFilters = () => { setSearchQuery(''); setFilterYear('all'); setFilterRating([0, 10]); setFilterStatus('all'); setFilterGenre('all'); setFilterType('all') }
 
   const TypeIcon = TYPE_CONFIG[activeTab].icon
   const currentType = editingItem?.type || addType
 
-
-// شاشة تسجيل الدخول
-if (showLogin && !isAuthenticated) {
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
-      <div className="w-full max-w-sm px-6">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#d4af37]/20">
-            <Bookmark className="w-10 h-10 text-[#0a0a0a]" />
+  // شاشة تسجيل الدخول
+  if (showLogin && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+        <div className="w-full max-w-sm px-6">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#d4af37]/20">
+              <Bookmark className="w-10 h-10 text-[#0a0a0a]" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">أرشيفي</h1>
+            <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
           </div>
-          <h1 className="text-3xl font-bold mb-2">أرشيفي</h1>
-          <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
-        </div>
-        <div className="space-y-4">
-          <Input
-            type="password"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            placeholder="كلمة المرور"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-12 text-center text-lg"
-          />
-          <Button
-            onClick={handleLogin}
-            className="w-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold h-12"
-          >
-            دخول
-          </Button>
+          <div className="space-y-4">
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="كلمة المرور"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-12 text-center text-lg"
+            />
+            <Button
+              onClick={handleLogin}
+              className="w-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold h-12"
+            >
+              دخول
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
-  )
-}
-if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
+    )
+  }
+
+  if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
 
   return (
-      <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       <div className="fixed inset-0 pointer-events-none"><div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-[#d4af37]/5 to-transparent rounded-full blur-3xl" /><div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-[#b8960f]/5 to-transparent rounded-full blur-3xl" /></div>
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-8" dir="rtl">
         <header className="flex items-center justify-between mb-6">
