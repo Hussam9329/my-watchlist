@@ -213,6 +213,10 @@ useEffect(() => {
         })
       })
       const newItem = await response.json()
+      if (response.status === 409) {
+        toast({ title: '⚠️ موجود مسبقاً!', description: newItem.error, variant: 'destructive' })
+        return
+      }
       if (newItem && newItem.id) {
         setWatchList(prev => [newItem, ...prev])
         setShowAddDialog(false)
