@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Sparkles, Construction, BookOpen, Lightbulb } from 'lucide-react'
+import { ArrowLeft, Sparkles, BookOpen, Lightbulb } from 'lucide-react'
 
 export default function HussamVisionHome() {
   const [mounted, setMounted] = useState(false)
@@ -165,11 +165,13 @@ export default function HussamVisionHome() {
               </motion.a>
 
               {/* بطاقة أفكاري */}
-              <motion.div
+              <motion.a
+                href="/ideas"
                 onHoverStart={() => setHoveredCard('ideas')}
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
-                className="group relative rounded-2xl overflow-hidden border border-purple-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+                whileTap={{ scale: 0.98 }}
+                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-purple-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b from-purple-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'ideas' ? 'opacity-100' : 'opacity-0'}`} />
                 <div className={`absolute -inset-1 bg-gradient-to-b from-purple-500/20 to-pink-500/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'ideas' ? 'opacity-50' : 'opacity-0'}`} />
@@ -190,12 +192,15 @@ export default function HussamVisionHome() {
                     دوّن أفكارك وخطط لمشاريعك المستقبلية
                   </p>
 
-                  <div className="mt-4 flex items-center justify-center gap-2 text-purple-400/60 text-sm">
-                    <Construction className="w-4 h-4" />
-                    <span>قيد التنفيذ</span>
-                  </div>
+                  <motion.div
+                    animate={{ x: hoveredCard === 'ideas' ? -5 : 0 }}
+                    className="mt-4 flex items-center justify-center gap-1 text-purple-400 text-sm"
+                  >
+                    <span>ادخل الآن</span>
+                    <ArrowLeft className="w-4 h-4" />
+                  </motion.div>
                 </div>
-              </motion.div>
+              </motion.a>
             </motion.div>
           )}
         </AnimatePresence>
