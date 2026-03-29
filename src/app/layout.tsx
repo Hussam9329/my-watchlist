@@ -16,12 +16,12 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "أرشيفي - قائمة المشاهدات والقراءة",
-  description: "تتبع أفلامك ومسلسلاتك وأنمياتك وكتبك في مكان واحد",
-  keywords: ["أرشيفي", "قائمة", "أفلام", "مسلسلات", "أنمي", "كتب"],
-  authors: [{ name: "أرشيفي" }],
+  title: "HussamVision",
+  description: "PRECISION ANALYTICS • STRATEGIC FORESIGHT - أرشيفي وأفكاري",
+  keywords: ["HussamVision", "أرشيفي", "أفكاري", "أفلام", "مسلسلات", "أنمي", "كتب"],
+  authors: [{ name: "Hussam" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/favicon.ico",
   },
 };
 
@@ -33,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="ar" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${tajawal.variable} font-tajawal antialiased bg-[#0a0a0a] text-white`}
+        className={`${inter.variable} ${tajawal.variable} font-tajawal antialiased bg-[#030712] text-white`}
       >
         {children}
         <Toaster />
