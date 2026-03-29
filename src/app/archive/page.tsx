@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, BookOpen, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff } from 'lucide-react'
-
+import { Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, BookOpen, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight } from 'lucide-react'
 interface MediaItem { id: string; title: string; originalTitle?: string; year: string; type: 'anime' | 'series' | 'movie' | 'book'; poster: string; rating: string; overview: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number; tags: string[]; notes: string; favorite: boolean; addedAt: string; watchedAt?: string; watched: boolean; userRating?: number }
 interface SearchResult { title: string; originalTitle: string; year: string; rating: string; overview: string; poster?: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number }
 type TabType = 'all' | 'anime' | 'series' | 'movie' | 'book'
