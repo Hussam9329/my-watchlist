@@ -104,10 +104,10 @@ export default function WatchListPage() {
       const response = await fetch('/api/watchlist')
       const data = await response.json()
       if (data.items && Array.isArray(data.items)) { 
-        setWatchList(data.items.filter(i => i.type !== 'book'))
+        setWatchList(data.items.filter((i: any) => i.type !== 'book'))
         setSyncStatus('synced')
       } else if (Array.isArray(data)) {
-        setWatchList(data.filter(i => i.type !== 'book'))
+        setWatchList(data.filter((i: any) => i.type !== 'book'))
         setSyncStatus('synced')
       } else {
         setWatchList([])
