@@ -98,8 +98,15 @@ const formatDate = (dateStr: string) => {
 
 // ===================== Component =====================
 
+const APP_PASSWORD = '3333'
+
 export default function IdeasPage() {
   const { toast } = useToast()
+
+  // Login
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [showLogin, setShowLogin] = useState(true)
 
   // Navigation
   const [activeView, setActiveView] = useState<NavView>('ideas')
@@ -1422,6 +1429,67 @@ export default function IdeasPage() {
   )
 
   // ===================== Main Render =====================
+
+  // Auth check
+  useEffect(() => {
+    const auth = localStorage.getItem('ideas_auth')
+    if (auth === 'true') {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+    }
+  }, [])
+
+  const handleLogin = () => {
+    if (passwordInput === APP_PASSWORD) {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+      localStorage.setItem('ideas_auth', 'true')
+      toast({ title: '✅ مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
+    } else {
+      toast({ title: '❌ خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
+    }
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setShowLogin(true)
+    localStorage.removeItem('ideas_auth')
+    setPasswordInput('')
+  }
+
+  // Login screen
+  if (showLogin && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+        <div className="w-full max-w-sm px-6">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
+              <Lightbulb className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">أفكاري</h1>
+            <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
+          </div>
+          <div className="space-y-4">
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="كلمة المرور"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-purple-500 h-12 text-center text-lg"
+            />
+            <Button
+              onClick={handleLogin}
+              className="w-full bg-gradient-to-br from-purple-500 to-blue-500 text-white font-bold h-12"
+            >
+              دخول
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
 
   return (
     <div

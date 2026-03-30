@@ -64,7 +64,7 @@ const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.
 }
 
 // كلمة المرور - يمكنك تغييرها
-const APP_PASSWORD = '20262028'
+const APP_PASSWORD = '9999'
 
 export default function WatchListPage() {
   const { toast } = useToast()
