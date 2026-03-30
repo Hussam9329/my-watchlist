@@ -17,9 +17,12 @@ type ViewMode = 'grid' | 'list'
 type SortBy = 'addedAt' | 'title' | 'year' | 'rating' | 'userRating'
 type SortOrder = 'asc' | 'desc'
 
-const TYPE_CONFIG: Record<TabType, { icon: typeof Film; label: string; plural: string; color: string; bgColor: string }> = {
+const TYPE_CONFIG: Record<TabType | 'movie' | 'anime' | 'series', { icon: typeof Film; label: string; plural: string; color: string; bgColor: string }> = {
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الكتب', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
-  book: { icon: BookOpen, label: 'كتاب', plural: 'كتب', color: 'from-[#f0d77a] to-[#d4af37]', bgColor: 'bg-[#f0d77a]/10' }
+  book: { icon: BookOpen, label: 'كتاب', plural: 'كتب', color: 'from-[#f0d77a] to-[#d4af37]', bgColor: 'bg-[#f0d77a]/10' },
+  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
+  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
+  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' }
 }
 
 const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
