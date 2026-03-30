@@ -17,7 +17,8 @@ type ViewMode = 'grid' | 'list'
 type SortBy = 'addedAt' | 'title' | 'year' | 'rating' | 'userRating'
 type SortOrder = 'asc' | 'desc'
 
-const TYPE_CONFIG: Record<TabType, { icon: typeof Film; label: string; plural: string; color: string; bgColor: string }> = {
+const TYPE_CONFIG: Record<TabType | 'book', { icon: typeof Film; label: string; plural: string; color: string; bgColor: string }> = {
+  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
   series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
