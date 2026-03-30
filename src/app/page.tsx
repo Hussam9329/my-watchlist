@@ -124,9 +124,9 @@ export default function HussamVisionHome() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1, duration: 0.7 }}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 w-full max-w-2xl"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 w-full max-w-3xl"
             >
-              {/* بطاقة أرشيفي */}
+              {/* بطاقة أريد مشاهدته */}
               <motion.a
                 href="/archive"
                 onHoverStart={() => setHoveredCard('archive')}
@@ -148,15 +148,53 @@ export default function HussamVisionHome() {
                   </motion.div>
 
                   <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
-                    أرشيفي
+                    أريد مشاهدته
                   </h3>
                   <p className="text-sm text-neutral-400 leading-relaxed">
-                    تتبع أفلامك ومسلسلاتك وأنمياتك وكتبك
+                    تتبع أفلامك ومسلسلاتك وأنمياتك
                   </p>
 
                   <motion.div
                     animate={{ x: hoveredCard === 'archive' ? -5 : 0 }}
                     className="mt-4 flex items-center justify-center gap-1 text-blue-400 text-sm"
+                  >
+                    <span>ادخل الآن</span>
+                    <ArrowLeft className="w-4 h-4" />
+                  </motion.div>
+                </div>
+              </motion.a>
+
+              {/* بطاقة أريد قرائته */}
+              <motion.a
+                href="/books"
+                onHoverStart={() => setHoveredCard('books')}
+                onHoverEnd={() => setHoveredCard(null)}
+                whileHover={{ scale: 1.03, y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-emerald-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'books' ? 'opacity-100' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-emerald-500/20 to-emerald-700/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'books' ? 'opacity-50' : 'opacity-0'}`} />
+                
+                <div className="relative z-10">
+                  <motion.div
+                    animate={{ rotateY: hoveredCard === 'books' ? -5 : 0 }}
+                    transition={{ type: 'spring', stiffness: 300 }}
+                    className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-gradient-to-br from-emerald-500/15 to-emerald-700/10 border border-emerald-500/25 shadow-lg shadow-emerald-500/10"
+                  >
+                    <BookOpen className="w-11 h-11 text-emerald-400" />
+                  </motion.div>
+
+                  <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
+                    أريد قرائته
+                  </h3>
+                  <p className="text-sm text-neutral-400 leading-relaxed">
+                    تتبع كتبك ومؤلفاتك المفضلة
+                  </p>
+
+                  <motion.div
+                    animate={{ x: hoveredCard === 'books' ? -5 : 0 }}
+                    className="mt-4 flex items-center justify-center gap-1 text-emerald-400 text-sm"
                   >
                     <span>ادخل الآن</span>
                     <ArrowLeft className="w-4 h-4" />
