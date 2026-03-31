@@ -40,26 +40,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
-    // الألعاب - استخدام RAWG API
+    // الألعاب - استخدام Steam Store API (مثل TMDB للأفلام)
     if (type === 'game') {
-      const rawgResponse = await fetch(
-        `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY || 'e41a59e5e5d34e8eb6c32d3cfaa8b15c'}&search=${encodeURIComponent(title)}&page_size=8&page=1`,
-        { cache: 'no-store' }
+      const steamResponse = await fetch(
+        `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(title)}&cc=us&l=english&count=10`,
+        { 
+          cache: 'no-store',
+          headers: { 'Accept-Language': 'en-US,en;q=0.9' }
+        }
       )
-      const rawgData = await rawgResponse.json()
+      const steamData = await steamResponse.json()
 
-      if (rawgData.results && rawgData.results.length > 0) {
-        const results = rawgData.results.map((game: any) => {
-          const platformNames = (game.platforms || []).map((p: any) => p.platform?.name || '').filter(Boolean).slice(0, 3).join(', ')
+      if (steamData.items && steamData.items.length > 0) {
+        const results = steamData.items.map((item: any) => {
+          const appId = item.id
+          const platformList: string[] = []
+          if (item.platforms) {
+            if (item.platforms.windows) platformList.push('PC')
+            if (item.platforms.mac) platformList.push('Mac')
+            if (item.platforms.linux) platformList.push('Linux')
+          }
+          // بوستر رسمي من Steam (صورة عمودية 600x900 - نفس نسبة TMDB)
+          const posterUrl = appId 
+            ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`
+            : null
+          // صورة صغيرة للعرض في نتائج البحث
+          const smallPoster = item.tiny_image 
+            ? item.tiny_image.replace('capsule_231x87', 'capsule_616x353')
+            : posterUrl
+
           return {
-            title: game.name,
-            originalTitle: game.name,
-            year: game.released ? game.released.split('-')[0] : '',
-            poster: game.background_image || null,
-            overview: (game.description_raw || game.description || '').slice(0, 300),
-            rating: game.rating ? game.rating.toFixed(1) : null,
-            genres: (game.genres || []).map((g: any) => g.name),
-            platform: platformNames || ''
+            title: item.name,
+            originalTitle: item.name,
+            year: '',
+            poster: posterUrl,
+            smallPoster: smallPoster,
+            overview: '',
+            rating: item.metascore ? (parseInt(item.metascore) / 10).toFixed(1) : null,
+            genres: [],
+            platform: platformList.length > 0 ? platformList.join(', ') : ''
           }
         })
         return NextResponse.json({ results })

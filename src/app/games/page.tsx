@@ -730,21 +730,22 @@ export default function GamesPage() {
               {showResults && searchResults.length > 0 && (
                 <div className="rounded-xl border border-teal-500/30 overflow-hidden">
                   <div className="bg-teal-500/10 px-3 py-2 border-b border-teal-500/20"><p className="text-sm text-teal-400">اختر اللعبة المناسبة:</p></div>
-                  <div className="divide-y divide-[#2a2a2a] max-h-[200px] overflow-y-auto">
+                  <div className="divide-y divide-[#2a2a2a] max-h-[300px] overflow-y-auto">
                     {searchResults.map((r, i) => (
-                      <div key={i} className="w-full p-3 flex items-center justify-between hover:bg-teal-500/10">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            {r.poster && <img src={r.poster} alt="" className="w-8 h-10 rounded object-cover" />}
-                            <span className="text-sm text-teal-400 bg-teal-500/20 px-2 py-0.5 rounded">{r.year}</span>
-                            <span className="font-medium text-sm">{r.originalTitle || r.title}</span>
-                            {r.rating && <Badge className="bg-teal-500/20 text-teal-300 text-xs"><Star className="w-2.5 h-2.5 ml-0.5" />{r.rating}</Badge>}
+                      <div key={i} className="w-full p-3 flex items-center gap-3 hover:bg-teal-500/10">
+                        <div className="w-10 h-14 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">
+                          <img src={(r as any).smallPoster || r.poster || ''} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm truncate">{r.originalTitle || r.title}</span>
+                            {r.rating && <Badge className="bg-teal-500/20 text-teal-300 text-xs flex-shrink-0"><Star className="w-2.5 h-2.5 ml-0.5" />{r.rating}</Badge>}
                           </div>
                           {r.platform && <p className="text-xs text-neutral-500 mt-0.5">{r.platform}</p>}
                         </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => selectGameResult(r)} variant="outline" className="border-[#2a2a2a] text-xs h-7">تعديل</Button>
-                          <Button size="sm" onClick={() => selectAndAddGame(r)} className="bg-teal-500 text-white text-xs h-7">إضافة</Button>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Button size="sm" onClick={() => selectGameResult(r)} variant="outline" className="border-[#2a2a2a] text-xs h-7 px-2">تعديل</Button>
+                          <Button size="sm" onClick={() => selectAndAddGame(r)} className="bg-teal-500 text-white text-xs h-7 px-2">إضافة</Button>
                         </div>
                       </div>
                     ))}
