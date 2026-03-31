@@ -21,7 +21,7 @@ import {
 
 type IdeaCategory = 'design' | 'code' | 'art' | 'text' | 'cooking' | 'other'
 type IdeaPriority = 'high' | 'medium' | 'low'
-type NavView = 'ideas' | 'tasks' | 'reports'
+type NavView = 'ideas' | 'tasks' | 'reports' | 'ai'
 
 interface Idea {
   id: string
@@ -220,18 +220,26 @@ export default function IdeasPage() {
     setAiAction('expand')
     setAiInput('')
     setAiContext('')
-    setShowAiDialog(true)
+    setActiveView('ai')
+  }
+
+  const openAiChat = () => {
+    setAiMessages([])
+    setAiAction('chat')
+    setAiInput('')
+    setSelectedIdeaForAi(null)
+    setActiveView('ai')
   }
 
   const sendAiMessage = async () => {
     if (!aiInput.trim() && aiAction !== 'suggest') return
 
-    const newMessages = [...aiMessages, { role: 'user' as const, content: aiInput }]
+    const newMessages = [...aiMessages, { role: 'user' as const, content: aiInput || 'اقترح فكرة جديدة' }]
     setAiMessages(newMessages)
     setAiInput('')
     setIsLoadingAi(true)
 
-    let payload: Record<string, string> = {}
+    let payload: Record<string, string | Array<{role: string; content: string}>> = {}
 
     if (aiAction === 'suggest') {
       payload = {
@@ -251,12 +259,31 @@ export default function IdeasPage() {
         ideaCategory: selectedIdeaForAi?.category || 'other',
       }
     } else if (aiAction === 'chat') {
-      payload = { conversation: aiInput }
+      // Multi-turn: send full conversation history
+      payload = {
+        action: 'chat',
+        conversation: newMessages[newMessages.length - 1].content,
+        messages: newMessages,
+      }
     }
 
-    const response = await fetchAi(aiAction, payload)
-    setAiMessages(prev => [...prev, { role: 'ai' as const, content: response }])
-    setIsLoadingAi(false)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      let responseText = 'عذراً، حدث خطأ. حاول مجدداً.'
+      if (data.success && data.response) {
+        responseText = data.response
+      }
+      setAiMessages(prev => [...prev, { role: 'ai' as const, content: responseText }])
+    } catch {
+      setAiMessages(prev => [...prev, { role: 'ai' as const, content: 'عذراً، حدث خطأ في الاتصال. حاول مجدداً.' }])
+    } finally {
+      setIsLoadingAi(false)
+    }
   }
 
   const quickAiAction = async (action: 'suggest' | 'expand' | 'improve', idea?: Idea) => {
@@ -265,7 +292,7 @@ export default function IdeasPage() {
     setAiAction(action)
     setAiInput('')
     setIsLoadingAi(true)
-    setShowAiDialog(true)
+    setActiveView('ai')
 
     let payload: Record<string, string> = {}
     if (action === 'suggest') {
@@ -542,11 +569,11 @@ export default function IdeasPage() {
               </button>
             </div>
             <button
-              onClick={() => { setAiMessages([]); setAiAction('suggest'); setAiInput(''); setSelectedIdeaForAi(null); setShowAiDialog(true) }}
+              onClick={() => { setAiMessages([]); setAiAction('suggest'); setAiInput(''); setSelectedIdeaForAi(null); setActiveView('ai'); setSidebarOpen(false) }}
               className="w-full flex items-center justify-center gap-2 text-xs py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 transition-all"
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              محادثة مع الذكاء الاصطناعي
+              فتح المساعد الذكي
             </button>
           </div>
         </div>
@@ -557,6 +584,7 @@ export default function IdeasPage() {
           <nav className="space-y-1">
             {([
               { key: 'ideas' as NavView, label: 'أفكاري', icon: Lightbulb },
+              { key: 'ai' as NavView, label: 'مساعد الذكاء', icon: Brain, highlight: true },
               { key: 'tasks' as NavView, label: 'المهام', icon: Target },
               { key: 'reports' as NavView, label: 'التقارير', icon: BarChart3 },
             ]).map(item => (
@@ -568,7 +596,7 @@ export default function IdeasPage() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                   activeView === item.key
-                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                    ? (item.highlight ? 'bg-purple-500/15 text-purple-300 border border-purple-500/25' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20')
                     : 'text-gray-400 hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -1530,101 +1558,203 @@ export default function IdeasPage() {
     </Dialog>
   )
 
-  // ===================== Render: AI Dialog =====================
+  // ===================== Render: AI Chat Panel (full view) =====================
 
-  const renderAiDialog = () => (
-    <Dialog open={showAiDialog} onOpenChange={(open) => { if (!open) { setShowAiDialog(false); setAiMessages([]); setSelectedIdeaForAi(null) } }}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl bg-[#0f1629] border border-purple-500/20 max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader className="pb-3 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <DialogTitle className="text-lg text-white">مساعد الذكاء الاصطناعي</DialogTitle>
-              <DialogDescription className="text-xs text-gray-400">
-                {selectedIdeaForAi ? `تحليل: ${selectedIdeaForAi.title}` : 'احصل على أفكار إبداعية'}
-              </DialogDescription>
+  const aiMessagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [aiMessages, isLoadingAi])
+
+  const renderAiView = () => {
+    if (activeView !== 'ai') return null
+
+    return (
+      <div className="flex flex-col h-[calc(100vh-65px)]">
+        {/* AI Header with action buttons */}
+        <div className="flex-shrink-0 border-b border-white/10 bg-[#030712]/50">
+          {/* Inspiration card */}
+          <div className="p-4">
+            <div className="rounded-xl p-4 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-indigo-500/5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
+                  <Sparkles className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-xs font-bold text-purple-300">إلهام اليوم</span>
+                <button
+                  onClick={() => refreshSuggestion()}
+                  disabled={isLoadingAi}
+                  className="mr-auto p-1 rounded-lg hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+                >
+                  <svg className={`w-3.5 h-3.5 text-purple-300 ${isLoadingAi ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-gray-200 leading-relaxed mb-2">
+                {aiSuggestion || '...'}
+              </p>
+              <button
+                onClick={addSuggestionAsIdea}
+                className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg bg-purple-500/20 text-purple-200 hover:bg-purple-500/30 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                حفظ كفكرة
+              </button>
             </div>
           </div>
-        </DialogHeader>
 
-        {/* Action buttons */}
-        <div className="flex gap-2 px-6 py-3 border-b border-white/5 overflow-x-auto">
-          <button
-            onClick={() => { setAiAction('suggest'); setAiMessages([]); setSelectedIdeaForAi(null) }}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${aiAction === 'suggest' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            فكرة جديدة
-          </button>
+          {/* Action tabs */}
+          <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
+            <button
+              onClick={() => { setAiAction('suggest'); setAiMessages([]); setSelectedIdeaForAi(null) }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiAction === 'suggest' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/5' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              اقتراح فكرة
+            </button>
+            <button
+              onClick={() => { setAiAction('expand'); setAiMessages([]); setSelectedIdeaForAi(null) }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiAction === 'expand' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/5' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+              توسيع فكرة
+            </button>
+            <button
+              onClick={() => { setAiAction('improve'); setAiMessages([]); setSelectedIdeaForAi(null) }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiAction === 'improve' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/5' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              تحسين فكرة
+            </button>
+            <button
+              onClick={() => { setAiAction('chat'); setAiMessages([]); setSelectedIdeaForAi(null) }}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all ${aiAction === 'chat' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/5' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              محادثة حرة
+            </button>
+            {selectedIdeaForAi && (
+              <button
+                onClick={() => { setSelectedIdeaForAi(null); setAiMessages([]) }}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs text-gray-500 hover:text-white hover:bg-white/5 border border-transparent transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+                إلغاء التحديد
+              </button>
+            )}
+          </div>
+
+          {/* Selected idea info */}
           {selectedIdeaForAi && (
-            <>
-              <button
-                onClick={() => quickAiAction('expand', selectedIdeaForAi)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${aiAction === 'expand' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
-              >
-                <ArrowRight className="w-3.5 h-3.5" />
-                توسيع
-              </button>
-              <button
-                onClick={() => quickAiAction('improve', selectedIdeaForAi)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${aiAction === 'improve' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
-              >
-                <TrendingUp className="w-3.5 h-3.5" />
-                تحسين
-              </button>
-            </>
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[#0f1629] border border-white/10">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_CONFIG[selectedIdeaForAi.category]?.color }} />
+                <span className="text-xs text-gray-400">الفكرة المحددة:</span>
+                <span className="text-xs text-white font-medium truncate">{selectedIdeaForAi.title}</span>
+              </div>
+            </div>
           )}
-          <button
-            onClick={() => { setAiAction('chat'); setAiMessages([]) }}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${aiAction === 'chat' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            محادثة
-          </button>
         </div>
 
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 min-h-[200px]">
+        {/* Messages area - full height */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {aiMessages.length === 0 && !isLoadingAi && (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-3">
-                <Brain className="w-7 h-7 text-purple-400/60" />
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-indigo-500/10 flex items-center justify-center mb-4 border border-purple-500/10">
+                <Brain className="w-10 h-10 text-purple-400/60" />
               </div>
-              <p className="text-sm text-gray-400 mb-1">
-                {aiAction === 'suggest' ? 'اكتب موضوعاً أو اضغط فكرة جديدة' : aiAction === 'chat' ? 'ابدأ محادثة مع المساعد الذكي' : 'اختر إجراء من الأعلى'}
+              <h3 className="text-lg font-bold text-white mb-2">
+                {aiAction === 'suggest' ? 'اقتراح فكرة جديدة' : aiAction === 'chat' ? 'محادثة حرة' : aiAction === 'expand' ? 'توسيع فكرة' : 'تحسين فكرة'}
+              </h3>
+              <p className="text-sm text-gray-400 mb-6 max-w-sm">
+                {aiAction === 'suggest' ? 'اكتب موضوعاً أو وصفاً للحصول على فكرة إبداعية جديدة. يمكنك أيضاً تحديد فكرة موجودة من بطاقات الأفكار والضغط على أيقونة ✨'
+                  : aiAction === 'chat' ? 'تحدث بحرية مع المساعد الذكي حول أي موضوع. اسأله عن أفكارك أو اطلب نصائح إبداعية'
+                  : aiAction === 'expand' ? 'اختر فكرة من بطاقات الأفكار (اضغط ✨) أو اكتب عنوان الفكرة ووصفها هنا'
+                  : 'اختر فكرة من بطاقات الأفكار (اضغط ✨) أو اكتب الفكرة للحصول على اقتراحات تحسين'}
               </p>
-              <p className="text-xs text-gray-600">الذكاء الاصطناعي سيساعدك في تطوير أفكارك</p>
+              {/* Quick suggestions for chat mode */}
+              {aiAction === 'chat' && (
+                <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                  {['ما هي أفكار مشاريع برمجية للمبتدئين؟', 'كيف أطور مهاراتي الإبداعية؟', 'أحتاج فكرة لتطبيق موبايل', 'نصائح لتحسين الإنتاجية'].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setAiInput(q); setTimeout(() => { setAiInput(q) }, 0) }}
+                      className="px-3 py-2 rounded-xl text-xs text-gray-400 bg-white/5 border border-white/5 hover:border-purple-500/30 hover:text-purple-300 hover:bg-purple-500/5 transition-all"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {aiMessages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-300`}>
               {msg.role === 'ai' && (
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 mt-1">
-                  <Brain className="w-3.5 h-3.5 text-white" />
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 mt-1 shadow-lg shadow-purple-500/20">
+                  <Brain className="w-4 h-4 text-white" />
                 </div>
               )}
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+              <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
-                  ? 'bg-purple-600/20 text-purple-200 border border-purple-500/20'
+                  ? 'bg-purple-600/20 text-purple-100 border border-purple-500/20'
                   : 'bg-[#1a1f3a] text-gray-200 border border-white/5'
               }`}>
                 {msg.content}
+                {msg.role === 'ai' && (
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                    <button
+                      onClick={() => {
+                        const title = msg.content.split('\n')[0].replace(/^[-*#\d.\s]+/, '').slice(0, 50)
+                        const newIdea: Idea = {
+                          id: genId(),
+                          title: title || '✨ فكرة من الذكاء الاصطناعي',
+                          content: msg.content,
+                          category: 'other',
+                          priority: 'medium',
+                          progress: 0,
+                          reminderDate: '',
+                          reminderTime: '',
+                          externalLink: '',
+                          relatedIdeas: [],
+                          favorite: false,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                        }
+                        setIdeas(prev => [newIdea, ...prev])
+                        toast({ title: '✅ تمت الإضافة', description: 'تم حفظ الرد كفكرة جديدة' })
+                      }}
+                      className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-purple-300 transition-colors"
+                    >
+                      <Bookmark className="w-3 h-3" />
+                      حفظ كفكرة
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content)
+                        toast({ title: '📋 تم النسخ', description: 'تم نسخ الرد إلى الحافظة' })
+                      }}
+                      className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-purple-300 transition-colors"
+                    >
+                      نسخ
+                    </button>
+                  </div>
+                )}
               </div>
               {msg.role === 'user' && (
-                <div className="w-7 h-7 rounded-lg bg-gray-600 flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-xs">أنت</span>
+                <div className="w-8 h-8 rounded-xl bg-gray-600 flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-xs font-bold">ح</span>
                 </div>
               )}
             </div>
           ))}
           {isLoadingAi && (
-            <div className="flex gap-3">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-                <Brain className="w-3.5 h-3.5 text-white" />
+            <div className="flex gap-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/20">
+                <Brain className="w-4 h-4 text-white" />
               </div>
-              <div className="bg-[#1a1f3a] border border-white/5 rounded-2xl px-4 py-3">
+              <div className="bg-[#1a1f3a] border border-white/5 rounded-2xl px-5 py-4">
                 <div className="flex items-center gap-2 text-gray-400 text-sm">
                   <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
                   يفكر...
@@ -1632,11 +1762,12 @@ export default function IdeasPage() {
               </div>
             </div>
           )}
+          <div ref={aiMessagesEndRef} />
         </div>
 
-        {/* Input area */}
+        {/* Input area - sticky bottom */}
         {aiAction === 'suggest' && !selectedIdeaForAi && (
-          <div className="px-6 pb-2">
+          <div className="flex-shrink-0 px-4 pb-2">
             <Input
               value={aiContext}
               onChange={e => setAiContext(e.target.value)}
@@ -1645,7 +1776,7 @@ export default function IdeasPage() {
             />
           </div>
         )}
-        <div className="flex gap-2 px-6 py-4 border-t border-white/5">
+        <div className="flex-shrink-0 flex gap-2 px-4 py-3 border-t border-white/10 bg-[#030712]/80 backdrop-blur-xl">
           <Input
             value={aiInput}
             onChange={e => setAiInput(e.target.value)}
@@ -1653,27 +1784,27 @@ export default function IdeasPage() {
             placeholder={
               aiAction === 'suggest' ? 'اكتب وصفاً لفكرتك...'
               : aiAction === 'chat' ? 'اكتب رسالتك...'
-              : 'اطرح سؤالك عن الفكرة...'
+              : 'اكتب الفكرة أو اطرح سؤالك...'
             }
-            className="flex-1 bg-[#1a1f3a] border-white/10 focus:border-purple-500/50 h-10 text-sm text-white placeholder-gray-500"
+            className="flex-1 bg-[#1a1f3a] border-white/10 focus:border-purple-500/50 h-11 text-sm text-white placeholder-gray-500"
           />
           <Button
             onClick={sendAiMessage}
             disabled={isLoadingAi || (!aiInput.trim() && aiAction !== 'suggest')}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white h-10 px-4 disabled:opacity-50"
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white h-11 px-5 disabled:opacity-50 shadow-lg shadow-purple-500/20"
           >
             {isLoadingAi ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             )}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
-  )
+      </div>
+    )
+  }
 
   // ===================== Main Render =====================
 
@@ -1774,9 +1905,8 @@ export default function IdeasPage() {
         {activeView === 'ideas' && renderIdeasView()}
         {renderTasksView()}
         {renderReportsView()}
+        {renderAiView()}
         {renderDialog()}
-        {/* AI Dialog */}
-        {renderAiDialog()}
       </div>
 
       {/* Custom scrollbar styles */}
