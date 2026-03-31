@@ -243,17 +243,20 @@ export default function IdeasPage() {
 
     if (aiAction === 'suggest') {
       payload = {
+        action: 'suggest',
         context: aiInput || 'أفكار عامة',
         ideaCategory: formData.category || 'other',
       }
     } else if (aiAction === 'expand') {
       payload = {
+        action: 'expand',
         ideaTitle: selectedIdeaForAi?.title || aiInput,
         ideaContent: selectedIdeaForAi?.content || '',
         ideaCategory: selectedIdeaForAi?.category || 'other',
       }
     } else if (aiAction === 'improve') {
       payload = {
+        action: 'improve',
         ideaTitle: selectedIdeaForAi?.title || aiInput,
         ideaContent: selectedIdeaForAi?.content || '',
         ideaCategory: selectedIdeaForAi?.category || 'other',
