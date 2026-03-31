@@ -270,7 +270,7 @@ export default function GamesPage() {
       developer: '',
       tags: item.tags || '',
       notes: item.notes,
-      poster: item.poster
+      poster: item.poster || ''
     })
     setShowDetails(false)
     setShowEditDialog(true)
