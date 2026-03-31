@@ -40,6 +40,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
+    // الألعاب - استخدام RAWG API
+    if (type === 'game') {
+      const rawgResponse = await fetch(
+        `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY || 'e41a59e5e5d34e8eb6c32d3cfaa8b15c'}&search=${encodeURIComponent(title)}&page_size=8&page=1`,
+        { cache: 'no-store' }
+      )
+      const rawgData = await rawgResponse.json()
+
+      if (rawgData.results && rawgData.results.length > 0) {
+        const results = rawgData.results.map((game: any) => {
+          const platformNames = (game.platforms || []).map((p: any) => p.platform?.name || '').filter(Boolean).slice(0, 3).join(', ')
+          return {
+            title: game.name,
+            originalTitle: game.name,
+            year: game.released ? game.released.split('-')[0] : '',
+            poster: game.background_image || null,
+            overview: (game.description_raw || game.description || '').slice(0, 300),
+            rating: game.rating ? game.rating.toFixed(1) : null,
+            genres: (game.genres || []).map((g: any) => g.name),
+            platform: platformNames || ''
+          }
+        })
+        return NextResponse.json({ results })
+      }
+
+      return NextResponse.json({ results: [] })
+    }
+
     // الأفلام والمسلسلات والأنمي - استخدام TMDB API
     const tmdbType = type === 'movie' ? 'movie' : 'tv'
     

@@ -11,7 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight, Gamepad2, Monitor, Smartphone } from 'lucide-react'
 
-interface GameItem { id: string; title: string; originalTitle?: string; year: string; type: 'game' | 'anime' | 'series' | 'movie' | 'book'; poster: string; rating: string; overview: string; genres: string; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number; tags: string; notes: string; favorite: boolean; addedAt: string; watchedAt?: string; watched: boolean; userRating?: number }
+interface GameItem { id: string; title: string; originalTitle?: string; year: string; type: 'game' | 'anime' | 'series' | 'movie' | 'book'; poster: string | null; rating: string; overview: string; genres: string | string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string | null; pages?: number; tags: string; notes: string; favorite: boolean; addedAt: string; watchedAt?: string; watched: boolean; userRating?: number }
+interface GameSearchResult { title: string; originalTitle: string; year: string; rating: string; overview: string; poster: string | null; genres: string[]; platform: string }
 
 type TabType = 'all' | 'pc' | 'console' | 'mobile'
 type ViewMode = 'grid' | 'list'
@@ -84,6 +85,11 @@ export default function GamesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [metaSearchQuery, setMetaSearchQuery] = useState('')
+  const [isFetching, setIsFetching] = useState(false)
+  const [searchResults, setSearchResults] = useState<GameSearchResult[]>([])
+  const [showResults, setShowResults] = useState(false)
+  const [searchError, setSearchError] = useState('')
 
   const fetchGameList = useCallback(async () => {
     try {
@@ -180,6 +186,36 @@ export default function GamesPage() {
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false) }, [])
   const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); handlePosterUpload(e.dataTransfer.files[0]) }, [handlePosterUpload])
 
+  const fetchGameMetadata = async () => {
+    if (!metaSearchQuery.trim()) return
+    setIsFetching(true); setSearchResults([]); setSearchError('')
+    try {
+      const res = await fetch('/api/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: metaSearchQuery, type: 'game' }) })
+      const data = await res.json()
+      if (data.results?.length > 0) { setSearchResults(data.results); setShowResults(true) }
+      else setSearchError('لم يتم العثور على نتائج')
+    } catch { setSearchError('حدث خطأ') }
+    finally { setIsFetching(false) }
+  }
+
+  const selectGameResult = (r: GameSearchResult) => {
+    setFormData(p => ({ ...p, originalTitle: r.originalTitle || r.title, title: r.title, year: r.year || p.year, rating: r.rating || '', overview: r.overview || '', poster: r.poster || '', genres: Array.isArray(r.genres) ? r.genres.join(', ') : (r.genres || ''), platform: r.platform || '' }))
+    setSearchResults([]); setShowResults(false); setSearchError('')
+  }
+
+  const selectAndAddGame = async (r: GameSearchResult) => {
+    try {
+      const response = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: r.title, originalTitle: r.originalTitle || r.title, year: r.year, type: 'game', poster: r.poster || '', rating: r.rating || '', overview: r.overview || '', genres: Array.isArray(r.genres) ? r.genres.join(', ') : (r.genres || ''), author: r.platform || '', tags: '', notes: '' })
+      })
+      const newItem = await response.json()
+      if (response.status === 409) { toast({ title: '⚠️ موجود مسبقاً!', description: newItem.error, variant: 'destructive' }); return }
+      if (newItem && newItem.id) { setGameList(prev => [newItem, ...prev]); setShowAddDialog(false); resetForm(); toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${r.originalTitle || r.title}" بنجاح` }) }
+    } catch { toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' }) }
+  }
+
   const handleAddItem = async () => {
     if (!formData.originalTitle.trim() && !formData.title.trim()) return
     try {
@@ -217,6 +253,7 @@ export default function GamesPage() {
   }
 
   const resetForm = () => {
+    setMetaSearchQuery(''); setSearchResults([]); setShowResults(false); setSearchError('')
     setFormData({ title: '', originalTitle: '', year: new Date().getFullYear().toString(), rating: '', overview: '', genres: '', platform: '', developer: '', tags: '', notes: '', poster: '' })
   }
 
@@ -681,6 +718,39 @@ export default function GamesPage() {
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePosterUpload(f) }} />
               </div>
+              {/* بحث تلقائي عن الألعاب */}
+              <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+                <label className="text-sm text-neutral-400 mb-2 block">ابحث لجلب معلومات اللعبة تلقائياً</label>
+                <div className="flex gap-2">
+                  <Input value={metaSearchQuery} onChange={(e) => setMetaSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchGameMetadata()} placeholder="ابحث عن لعبة..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-teal-500 h-10 flex-1" />
+                  <Button onClick={fetchGameMetadata} disabled={isFetching || !metaSearchQuery.trim()} className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white px-4">{isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}</Button>
+                </div>
+                {searchError && <p className="text-sm text-red-400 mt-2">{searchError}</p>}
+              </div>
+              {showResults && searchResults.length > 0 && (
+                <div className="rounded-xl border border-teal-500/30 overflow-hidden">
+                  <div className="bg-teal-500/10 px-3 py-2 border-b border-teal-500/20"><p className="text-sm text-teal-400">اختر اللعبة المناسبة:</p></div>
+                  <div className="divide-y divide-[#2a2a2a] max-h-[200px] overflow-y-auto">
+                    {searchResults.map((r, i) => (
+                      <div key={i} className="w-full p-3 flex items-center justify-between hover:bg-teal-500/10">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            {r.poster && <img src={r.poster} alt="" className="w-8 h-10 rounded object-cover" />}
+                            <span className="text-sm text-teal-400 bg-teal-500/20 px-2 py-0.5 rounded">{r.year}</span>
+                            <span className="font-medium text-sm">{r.originalTitle || r.title}</span>
+                            {r.rating && <Badge className="bg-teal-500/20 text-teal-300 text-xs"><Star className="w-2.5 h-2.5 ml-0.5" />{r.rating}</Badge>}
+                          </div>
+                          {r.platform && <p className="text-xs text-neutral-500 mt-0.5">{r.platform}</p>}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => selectGameResult(r)} variant="outline" className="border-[#2a2a2a] text-xs h-7">تعديل</Button>
+                          <Button size="sm" onClick={() => selectAndAddGame(r)} className="bg-teal-500 text-white text-xs h-7">إضافة</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs text-neutral-400 mb-1 block">اسم اللعبة *</label>
