@@ -175,8 +175,10 @@ export default function IdeasPage() {
       if (data.success) {
         return data.response
       }
+      console.error('fetchAi error:', data.error)
       return 'عذراً، حدث خطأ. حاول مجدداً.'
-    } catch {
+    } catch (err) {
+      console.error('fetchAi catch:', err)
       return 'عذراً، حدث خطأ في الاتصال. حاول مجدداً.'
     } finally {
       setIsLoadingAi(false)
@@ -280,9 +282,12 @@ export default function IdeasPage() {
       let responseText = 'عذراً، حدث خطأ. حاول مجدداً.'
       if (data.success && data.response) {
         responseText = data.response
+      } else {
+        console.error('sendAiMessage error response:', data)
       }
       setAiMessages(prev => [...prev, { role: 'ai' as const, content: responseText }])
-    } catch {
+    } catch (err) {
+      console.error('sendAiMessage catch:', err)
       setAiMessages(prev => [...prev, { role: 'ai' as const, content: 'عذراً، حدث خطأ في الاتصال. حاول مجدداً.' }])
     } finally {
       setIsLoadingAi(false)
