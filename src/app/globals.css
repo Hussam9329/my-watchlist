@@ -88,19 +88,6 @@ html {
   font-family: var(--font-tajawal), var(--font-inter), sans-serif;
 }
 
-/* تحسين اللمس على الهواتف */
-@media (max-width: 640px) {
-  button, [role="button"], input, select, textarea {
-    -webkit-tap-highlight-color: transparent;
-    font-size: 16px !important;
-  }
-  
-  /* منع zoom عند التركيز على input */
-  input, select, textarea {
-    font-size: 16px !important;
-  }
-}
-
 /* تحسين التمرير السلس */
 * {
   -webkit-overflow-scrolling: touch;
@@ -112,22 +99,108 @@ html {
   font-family: var(--font-tajawal), sans-serif !important;
 }
 
-/* تأثيرات اللمس */
-.touch-active:active {
-  transform: scale(0.98);
-  transition: transform 0.1s ease;
-}
-
-/* تحسين البطاقات على الهاتف */
-@media (max-width: 640px) {
-  .card-touch {
-    min-height: 44px;
-  }
-}
-
 /* تأثير الضغط على الأزرار */
 @media (hover: none) {
   button:active {
     opacity: 0.85;
+  }
+}
+
+/* ===================== تحسينات الهاتف ===================== */
+
+/* منع zoom عند التركيز على input في الهاتف */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    min-height: 36px;
+  }
+
+  /* إظهار أزرار التفاعل على البطاقات دائماً في الهاتف (بدلاً من hover) */
+  .group .mobile-actions-show {
+    opacity: 1 !important;
+    position: static !important;
+    background: none !important;
+    justify-content: flex-end;
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  /* حوار ملء الشاشة على الهاتف */
+  .mobile-dialog-fullscreen {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  .mobile-dialog-fullscreen > div:first-child {
+    max-height: calc(100vh - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow-y: auto;
+  }
+
+  /* تحسينات shadcn dialog overlay */
+  [data-state="open"] > .mobile-dialog-fullscreen {
+    max-width: 100vw;
+  }
+
+  /* تحسين شريط الأدوات */
+  .mobile-toolbar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* تحسين Tabs scrollable */
+  .mobile-tabs-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .mobile-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* تحسين padding الصفحة */
+  .mobile-page-padding {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* تأثير اللمس على البطاقات */
+  .touch-active:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+
+  /* بطاقات بأبعاد مناسبة للمس */
+  .card-touch {
+    min-height: 44px;
+  }
+
+  /* تحسين فراغ safe area للهواتف ذات النوتش */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* تحسين Dialog للهاتف - تأخير الحركة */
+@media (max-width: 640px) {
+  .mobile-dialog-overlay {
+    animation-duration: 0.15s !important;
   }
 }

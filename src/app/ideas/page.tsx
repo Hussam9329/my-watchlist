@@ -397,7 +397,7 @@ export default function IdeasPage() {
 
   const renderSidebar = () => (
     <aside
-      className={`fixed top-0 right-0 z-40 h-full w-72 transition-transform duration-300 bg-[#0f1629] border-l border-white/10 lg:translate-x-0 ${
+      className={`fixed top-0 right-0 z-40 h-full w-64 sm:w-72 transition-transform duration-300 bg-[#0f1629] border-l border-white/10 lg:translate-x-0 ${
         sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
       }`}
       style={{ direction: 'rtl' }}
@@ -611,8 +611,8 @@ export default function IdeasPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
-          <button className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors relative">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button className="hidden sm:block p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors relative">
             <Bell className="w-5 h-5" />
             {ideas.filter(i => i.progress > 0 && i.progress < 100).length > 0 && (
               <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-500" />
@@ -620,7 +620,7 @@ export default function IdeasPage() {
           </button>
           <button
             onClick={exportData}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="hidden sm:block p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
             title="تصدير البيانات"
           >
             <Download className="w-5 h-5" />
@@ -634,7 +634,7 @@ export default function IdeasPage() {
           />
           <button
             onClick={() => importInputRef.current?.click()}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="hidden sm:block p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
             title="استيراد البيانات"
           >
             <UploadIcon className="w-5 h-5" />
@@ -717,7 +717,7 @@ export default function IdeasPage() {
                 {PRIORITY_CONFIG[idea.priority].label}
               </Badge>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => toggleFavorite(idea.id)}
                 className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
@@ -896,7 +896,7 @@ export default function IdeasPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
             {filteredIdeas.map(renderIdeaCard)}
           </div>
         )}
@@ -923,18 +923,20 @@ export default function IdeasPage() {
             placeholder="أضف مهمة جديدة..."
             className="flex-1 bg-[#1e293b] border-white/10 focus:border-indigo-500/50 h-10 text-sm text-white placeholder-gray-500"
           />
-          <Select value={newTaskPriority} onValueChange={v => setNewTaskPriority(v as IdeaPriority)}>
-            <SelectTrigger className="w-28 bg-[#1e293b] border-white/10 h-10 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1e293b] border-white/10">
-              {(['high', 'medium', 'low'] as IdeaPriority[]).map(p => (
-                <SelectItem key={p} value={p}>
-                  {PRIORITY_CONFIG[p].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="hidden sm:flex">
+            <Select value={newTaskPriority} onValueChange={v => setNewTaskPriority(v as IdeaPriority)}>
+              <SelectTrigger className="w-28 bg-[#1e293b] border-white/10 h-10 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e293b] border-white/10">
+                {(['high', 'medium', 'low'] as IdeaPriority[]).map(p => (
+                  <SelectItem key={p} value={p}>
+                    {PRIORITY_CONFIG[p].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             onClick={addTask}
             className="gap-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white h-10 px-4"
@@ -1187,7 +1189,7 @@ export default function IdeasPage() {
   const renderDialog = () => (
     <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
       <DialogContent
-        className="max-w-2xl bg-[#0f1629] border-white/10 max-h-[90vh] overflow-y-auto"
+        className="w-[calc(100%-2rem)] sm:max-w-2xl bg-[#0f1629] border-white/10 max-h-[90vh] overflow-y-auto"
         style={{ direction: 'rtl' }}
       >
         <DialogHeader>

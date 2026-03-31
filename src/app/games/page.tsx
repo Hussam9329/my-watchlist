@@ -427,17 +427,17 @@ export default function GamesPage() {
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-teal-500/5 to-transparent rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-cyan-500/5 to-transparent rounded-full blur-3xl" />
       </div>
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-8" dir="rtl">
+      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8" dir="rtl">
         <header className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3 sm:gap-5">
             <Button onClick={() => { window.location.href = '/' }} variant="ghost" size="icon" className="text-neutral-500 hover:text-white hover:bg-[#1a1a1a]">
               <ArrowRight className="w-5 h-5" />
             </Button>
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
-              <Gamepad2 className="w-7 h-7 text-white" />
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
+              <Gamepad2 className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">أريد لعبها</h1>
+              <h1 className="text-lg sm:text-2xl font-bold">أريد لعبها</h1>
               <div className="flex items-center gap-2">
                 <p className="text-neutral-500 text-sm">قائمة الألعاب</p>
                 <span className={`text-xs flex items-center gap-1 ${syncStatus === 'synced' ? 'text-green-500' : syncStatus === 'syncing' ? 'text-yellow-500' : 'text-red-500'}`}>
@@ -449,7 +449,7 @@ export default function GamesPage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>
             <Popover>
               <PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Settings className="w-5 h-5" /></Button></PopoverTrigger>
@@ -463,7 +463,7 @@ export default function GamesPage() {
               </PopoverContent>
             </Popover>
             <Button onClick={() => { resetForm(); setShowAddDialog(true) }} className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white font-bold gap-2">
-              <Plus className="w-4 h-4" />إضافة لعبة
+              <Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة لعبة</span>
             </Button>
           </div>
         </header>
@@ -492,11 +492,11 @@ export default function GamesPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-4 gap-2 mb-6">
+        <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto mobile-tabs-scroll pb-1 sm:pb-0">
           {(['all', 'pc', 'console', 'mobile'] as TabType[]).map((type) => {
             const c = TAB_CONFIG[type]; const I = c.icon; const active = activeTab === type
             return (
-              <button key={type} onClick={() => setActiveTab(type)} className={`rounded-xl p-3 transition-all ${active ? 'bg-gradient-to-br ' + c.color + ' text-white shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}>
+              <button key={type} onClick={() => setActiveTab(type)} className={`flex-shrink-0 min-w-[100px] sm:min-w-0 rounded-xl p-3 transition-all ${active ? 'bg-gradient-to-br ' + c.color + ' text-white shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}>
                 <div className="flex items-center gap-2">
                   <I className="w-5 h-5" />
                   <div className="text-right">
@@ -509,43 +509,45 @@ export default function GamesPage() {
           })}
         </div>
 
-        <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 mb-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-[200px] relative">
+        <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-6">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto mobile-toolbar pb-1 sm:pb-0">
+            <div className="flex-1 min-w-0 relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
               <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث عن لعبة..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-teal-500 pr-9 h-10" />
             </div>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-              <SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10">
-                <ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                <SelectItem value="addedAt">تاريخ الإضافة</SelectItem>
-                <SelectItem value="title">العنوان</SelectItem>
-                <SelectItem value="year">السنة</SelectItem>
-                <SelectItem value="rating">التقييم</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="hidden sm:flex">
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                <SelectTrigger className="w-[120px] sm:w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10">
+                  <ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                  <SelectItem value="addedAt">تاريخ الإضافة</SelectItem>
+                  <SelectItem value="title">العنوان</SelectItem>
+                  <SelectItem value="year">السنة</SelectItem>
+                  <SelectItem value="rating">التقييم</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
             <div className="flex bg-[#1a1a1a] rounded-lg p-1">
               <Button variant="ghost" size="icon" onClick={() => setViewMode('grid')} className={`h-8 w-8 ${viewMode === 'grid' ? 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white' : 'text-neutral-400'}`}><Grid3X3 className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" onClick={() => setViewMode('list')} className={`h-8 w-8 ${viewMode === 'list' ? 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white' : 'text-neutral-400'}`}><List className="w-4 h-4" /></Button>
             </div>
             <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-teal-500 text-teal-500' : 'border-[#2a2a2a] text-neutral-400'}`}>
-              <Filter className="w-4 h-4" />فلاتر
+              <Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span>
             </Button>
           </div>
           {showFilters && (
             <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger>
+                <SelectTrigger className="w-[100px] sm:w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger>
                 <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
                   <SelectItem value="all">كل السنوات</SelectItem>
                   {YEARS_RANGE.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[130px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                <SelectTrigger className="w-[110px] sm:w-[130px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="الحالة" /></SelectTrigger>
                 <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
                   <SelectItem value="all">الكل</SelectItem>
                   <SelectItem value="watched">تم لعبها</SelectItem>
@@ -554,7 +556,7 @@ export default function GamesPage() {
                 </SelectContent>
               </Select>
               <Select value={filterGenre} onValueChange={setFilterGenre}>
-                <SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger>
+                <SelectTrigger className="w-[120px] sm:w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger>
                 <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
                   <SelectItem value="all">كل التصنيفات</SelectItem>
                   {allGenres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
@@ -607,7 +609,11 @@ export default function GamesPage() {
                       {(item as any).author && <span>• {(item as any).author}</span>}
                     </div>
                   </div>
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div className="absolute bottom-0 right-0 left-0 p-2 bg-gradient-to-t from-black/80 to-transparent sm:hidden flex items-center justify-end gap-1">
+                    <button onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id) }} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center">{item.favorite ? <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" /> : <Heart className="w-3.5 h-3.5 text-white" />}</button>
+                    <button onClick={(e) => { e.stopPropagation(); openEditDialog(item) }} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center"><Edit3 className="w-3.5 h-3.5 text-white" /></button>
+                  </div>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex items-center justify-center gap-2">
                     <Button size="icon" onClick={(e) => { e.stopPropagation(); removeFromList(item.id) }} className="w-9 h-9 rounded-full bg-red-500 text-white"><Trash2 className="w-4 h-4" /></Button>
                     <Button size="icon" onClick={(e) => { e.stopPropagation(); openEditDialog(item) }} className="w-9 h-9 rounded-full bg-teal-500/80 text-white"><Edit3 className="w-4 h-4" /></Button>
                     <Button size="icon" onClick={(e) => { e.stopPropagation(); togglePlayed(item.id) }} className={`w-9 h-9 rounded-full ${item.watched ? 'bg-green-500 text-black' : 'bg-white/20 text-white'}`}>{item.watched ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</Button>
@@ -650,7 +656,7 @@ export default function GamesPage() {
 
         {/* تفاصيل اللعبة */}
         <Dialog open={showDetails} onOpenChange={setShowDetails}>
-          <DialogContent className="max-w-2xl bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
             {selectedItem && (
               <>
                 <DialogHeader><DialogTitle className="text-xl">{getDisplayTitle(selectedItem)}</DialogTitle></DialogHeader>
@@ -701,7 +707,7 @@ export default function GamesPage() {
 
         {/* إضافة لعبة */}
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Plus className="w-5 h-5 text-teal-500" />إضافة لعبة جديدة</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">
               <div className={`relative aspect-video rounded-xl overflow-hidden cursor-pointer ${!formData.poster ? 'bg-[#1a1a1a] border-2 border-dashed border-[#2a2a2a]' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>
@@ -798,7 +804,7 @@ export default function GamesPage() {
 
         {/* تعديل لعبة */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f0f0f] border-[#2a2a2a] max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Edit3 className="w-5 h-5 text-teal-500" />تعديل اللعبة</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">
               <div className={`relative aspect-video rounded-xl overflow-hidden cursor-pointer ${!formData.poster ? 'bg-[#1a1a1a] border-2 border-dashed border-[#2a2a2a]' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>

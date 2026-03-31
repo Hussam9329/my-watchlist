@@ -61,7 +61,7 @@ export default function HussamVisionHome() {
       </div>
 
       {/* المحتوى */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-6 sm:py-12">
         
         {/* الشعار */}
         <AnimatePresence>
@@ -70,17 +70,17 @@ export default function HussamVisionHome() {
               initial={{ opacity: 0, y: -40, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="text-center mb-16"
+              className="text-center mb-6 sm:mb-16"
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
-                className="flex justify-center mb-6"
+                className="flex justify-center mb-4 sm:mb-6"
               >
                 <div className="relative">
-                  <Sparkles className="w-8 h-8 text-indigo-400" />
-                  <div className="absolute inset-0 w-8 h-8 bg-indigo-400/30 blur-xl rounded-full" />
+                  <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-400" />
+                  <div className="absolute inset-0 w-6 h-6 sm:w-8 sm:h-8 bg-indigo-400/30 blur-xl rounded-full" />
                 </div>
               </motion.div>
 
@@ -88,7 +88,7 @@ export default function HussamVisionHome() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.7 }}
-                className="text-6xl sm:text-7xl md:text-8xl font-bold mb-4 tracking-tight"
+                className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-3 sm:mb-4 tracking-tight"
               >
                 <span className="bg-gradient-to-l from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(59,130,246,0.3)]">
                   Hussam
@@ -102,14 +102,14 @@ export default function HussamVisionHome() {
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ delay: 0.7, duration: 0.6 }}
-                className="w-32 h-[1px] mx-auto mb-5 bg-gradient-to-l from-transparent via-indigo-500 to-transparent"
+                className="w-20 sm:w-32 h-[1px] mx-auto mb-3 sm:mb-5 bg-gradient-to-l from-transparent via-indigo-500 to-transparent"
               />
 
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.9, duration: 0.6 }}
-                className="text-sm sm:text-base tracking-[0.3em] text-emerald-400/70 font-light"
+                className="text-[10px] sm:text-sm tracking-[0.15em] sm:tracking-[0.3em] text-emerald-400/70 font-light"
               >
                 PRECISION ANALYTICS &bull; STRATEGIC FORESIGHT
               </motion.p>
@@ -124,7 +124,7 @@ export default function HussamVisionHome() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1, duration: 0.7 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 w-full max-w-4xl"
+              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 w-full max-w-4xl"
             >
               {/* بطاقة أريد مشاهدته */}
               <motion.a
@@ -133,33 +133,33 @@ export default function HussamVisionHome() {
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-indigo-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border border-indigo-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-all duration-300 touch-active"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b from-blue-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'archive' ? 'opacity-100' : 'opacity-0'}`} />
-                <div className={`absolute -inset-1 bg-gradient-to-b from-blue-500/20 to-purple-500/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'archive' ? 'opacity-50' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-blue-500/20 to-purple-500/20 blur-xl transition-opacity duration-300 rounded-xl sm:rounded-2xl ${hoveredCard === 'archive' ? 'opacity-50' : 'opacity-0'}`} />
                 
                 <div className="relative z-10">
                   <motion.div
                     animate={{ rotateY: hoveredCard === 'archive' ? 5 : 0 }}
                     transition={{ type: 'spring', stiffness: 300 }}
-                    className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-gradient-to-br from-amber-500/15 to-amber-700/10 border border-amber-500/25 shadow-lg shadow-amber-500/10"
+                    className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br from-amber-500/15 to-amber-700/10 border border-amber-500/25 shadow-lg shadow-amber-500/10"
                   >
-                    <BookOpen className="w-11 h-11 text-amber-400" />
+                    <BookOpen className="w-6 h-6 sm:w-11 sm:h-11 text-amber-400" />
                   </motion.div>
 
-                  <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                  <h3 className="text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
                     أريد مشاهدته
                   </h3>
-                  <p className="text-sm text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
                     تتبع أفلامك ومسلسلاتك وأنمياتك
                   </p>
 
                   <motion.div
                     animate={{ x: hoveredCard === 'archive' ? -5 : 0 }}
-                    className="mt-4 flex items-center justify-center gap-1 text-blue-400 text-sm"
+                    className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-blue-400 text-xs sm:text-sm"
                   >
                     <span>ادخل الآن</span>
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                   </motion.div>
                 </div>
               </motion.a>
@@ -171,33 +171,33 @@ export default function HussamVisionHome() {
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-emerald-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border border-emerald-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-all duration-300 touch-active"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'books' ? 'opacity-100' : 'opacity-0'}`} />
-                <div className={`absolute -inset-1 bg-gradient-to-b from-emerald-500/20 to-emerald-700/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'books' ? 'opacity-50' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-emerald-500/20 to-emerald-700/20 blur-xl transition-opacity duration-300 rounded-xl sm:rounded-2xl ${hoveredCard === 'books' ? 'opacity-50' : 'opacity-0'}`} />
                 
                 <div className="relative z-10">
                   <motion.div
                     animate={{ rotateY: hoveredCard === 'books' ? -5 : 0 }}
                     transition={{ type: 'spring', stiffness: 300 }}
-                    className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-gradient-to-br from-emerald-500/15 to-emerald-700/10 border border-emerald-500/25 shadow-lg shadow-emerald-500/10"
+                    className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br from-emerald-500/15 to-emerald-700/10 border border-emerald-500/25 shadow-lg shadow-emerald-500/10"
                   >
-                    <BookOpen className="w-11 h-11 text-emerald-400" />
+                    <BookOpen className="w-6 h-6 sm:w-11 sm:h-11 text-emerald-400" />
                   </motion.div>
 
-                  <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
+                  <h3 className="text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
                     أريد قرائته
                   </h3>
-                  <p className="text-sm text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
                     تتبع كتبك ومؤلفاتك المفضلة
                   </p>
 
                   <motion.div
                     animate={{ x: hoveredCard === 'books' ? -5 : 0 }}
-                    className="mt-4 flex items-center justify-center gap-1 text-emerald-400 text-sm"
+                    className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-emerald-400 text-xs sm:text-sm"
                   >
                     <span>ادخل الآن</span>
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                   </motion.div>
                 </div>
               </motion.a>
@@ -209,33 +209,33 @@ export default function HussamVisionHome() {
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-purple-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border border-purple-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-all duration-300 touch-active"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b from-purple-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'ideas' ? 'opacity-100' : 'opacity-0'}`} />
-                <div className={`absolute -inset-1 bg-gradient-to-b from-purple-500/20 to-pink-500/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'ideas' ? 'opacity-50' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-purple-500/20 to-pink-500/20 blur-xl transition-opacity duration-300 rounded-xl sm:rounded-2xl ${hoveredCard === 'ideas' ? 'opacity-50' : 'opacity-0'}`} />
                 
                 <div className="relative z-10">
                   <motion.div
                     animate={{ rotateY: hoveredCard === 'ideas' ? -5 : 0 }}
                     transition={{ type: 'spring', stiffness: 300 }}
-                    className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-gradient-to-br from-purple-500/15 to-purple-700/10 border border-purple-500/25 shadow-lg shadow-purple-500/10"
+                    className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br from-purple-500/15 to-purple-700/10 border border-purple-500/25 shadow-lg shadow-purple-500/10"
                   >
-                    <Lightbulb className="w-11 h-11 text-purple-400" />
+                    <Lightbulb className="w-6 h-6 sm:w-11 sm:h-11 text-purple-400" />
                   </motion.div>
 
-                  <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-purple-300 via-violet-400 to-purple-500 bg-clip-text text-transparent">
+                  <h3 className="text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l from-purple-300 via-violet-400 to-purple-500 bg-clip-text text-transparent">
                     أفكاري
                   </h3>
-                  <p className="text-sm text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
                     دوّن أفكارك وخطط لمشاريعك المستقبلية
                   </p>
 
                   <motion.div
                     animate={{ x: hoveredCard === 'ideas' ? -5 : 0 }}
-                    className="mt-4 flex items-center justify-center gap-1 text-purple-400 text-sm"
+                    className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-purple-400 text-xs sm:text-sm"
                   >
                     <span>ادخل الآن</span>
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                   </motion.div>
                 </div>
               </motion.a>
@@ -247,33 +247,33 @@ export default function HussamVisionHome() {
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
                 whileTap={{ scale: 0.98 }}
-                className="group relative rounded-2xl overflow-hidden cursor-pointer border border-teal-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-6 text-center transition-all duration-300"
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border border-teal-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-all duration-300 touch-active"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b from-teal-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'games' ? 'opacity-100' : 'opacity-0'}`} />
-                <div className={`absolute -inset-1 bg-gradient-to-b from-teal-500/20 to-cyan-500/20 blur-xl transition-opacity duration-300 rounded-2xl ${hoveredCard === 'games' ? 'opacity-50' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-teal-500/20 to-cyan-500/20 blur-xl transition-opacity duration-300 rounded-xl sm:rounded-2xl ${hoveredCard === 'games' ? 'opacity-50' : 'opacity-0'}`} />
 
                 <div className="relative z-10">
                   <motion.div
                     animate={{ rotateY: hoveredCard === 'games' ? 5 : 0 }}
                     transition={{ type: 'spring', stiffness: 300 }}
-                    className="w-24 h-24 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-gradient-to-br from-teal-500/15 to-cyan-700/10 border border-teal-500/25 shadow-lg shadow-teal-500/10"
+                    className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br from-teal-500/15 to-cyan-700/10 border border-teal-500/25 shadow-lg shadow-teal-500/10"
                   >
-                    <Gamepad2 className="w-11 h-11 text-teal-400" />
+                    <Gamepad2 className="w-6 h-6 sm:w-11 sm:h-11 text-teal-400" />
                   </motion.div>
 
-                  <h3 className="text-2xl font-bold mb-2 bg-gradient-to-l from-teal-300 via-emerald-400 to-teal-500 bg-clip-text text-transparent">
+                  <h3 className="text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l from-teal-300 via-emerald-400 to-teal-500 bg-clip-text text-transparent">
                     أريد لعبها
                   </h3>
-                  <p className="text-sm text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
                     تتبع ألعابك المفضلة على كل المنصات
                   </p>
 
                   <motion.div
                     animate={{ x: hoveredCard === 'games' ? -5 : 0 }}
-                    className="mt-4 flex items-center justify-center gap-1 text-teal-400 text-sm"
+                    className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-teal-400 text-xs sm:text-sm"
                   >
                     <span>ادخل الآن</span>
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                   </motion.div>
                 </div>
               </motion.a>
@@ -288,7 +288,7 @@ export default function HussamVisionHome() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1.5, duration: 0.6 }}
-              className="mt-16 text-center"
+              className="mt-8 sm:mt-16 text-center"
             >
               <div className="flex items-center justify-center gap-2 text-neutral-600 text-xs">
                 <div className="w-8 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />
