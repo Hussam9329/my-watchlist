@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Sparkles, BookOpen, Lightbulb, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, Sparkles, BookOpen, Lightbulb, Gamepad2, Star } from 'lucide-react'
 
 export default function HussamVisionHome() {
   const [mounted, setMounted] = useState(false)
@@ -124,7 +124,7 @@ export default function HussamVisionHome() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1, duration: 0.7 }}
-              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 w-full max-w-4xl"
+              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 lg:gap-8 w-full max-w-6xl"
             >
               {/* بطاقة أريد مشاهدته */}
               <motion.a
@@ -271,6 +271,46 @@ export default function HussamVisionHome() {
                   <motion.div
                     animate={{ x: hoveredCard === 'games' ? -5 : 0 }}
                     className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-teal-400 text-xs sm:text-sm"
+                  >
+                    <span>ادخل الآن</span>
+                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </motion.div>
+                </div>
+              </motion.a>
+
+              {/* بطاقة تقييماتي */}
+              <motion.a
+                href="https://my-watched-list.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onHoverStart={() => setHoveredCard('ratings')}
+                onHoverEnd={() => setHoveredCard(null)}
+                whileHover={{ scale: 1.03, y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border border-yellow-500/20 bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-all duration-300 touch-active"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-b from-yellow-500/10 to-transparent transition-opacity duration-300 ${hoveredCard === 'ratings' ? 'opacity-100' : 'opacity-0'}`} />
+                <div className={`absolute -inset-1 bg-gradient-to-b from-yellow-500/20 to-amber-500/20 blur-xl transition-opacity duration-300 rounded-xl sm:rounded-2xl ${hoveredCard === 'ratings' ? 'opacity-50' : 'opacity-0'}`} />
+
+                <div className="relative z-10">
+                  <motion.div
+                    animate={{ rotateY: hoveredCard === 'ratings' ? 5 : 0 }}
+                    transition={{ type: 'spring', stiffness: 300 }}
+                    className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br from-yellow-500/15 to-amber-700/10 border border-yellow-500/25 shadow-lg shadow-yellow-500/10"
+                  >
+                    <Star className="w-6 h-6 sm:w-11 sm:h-11 text-yellow-400" />
+                  </motion.div>
+
+                  <h3 className="text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l from-yellow-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                    تقييماتي
+                  </h3>
+                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
+                    افتح موقعي الخاص بالتقييمات
+                  </p>
+
+                  <motion.div
+                    animate={{ x: hoveredCard === 'ratings' ? -5 : 0 }}
+                    className="mt-2 sm:mt-4 flex items-center justify-center gap-1 text-yellow-400 text-xs sm:text-sm"
                   >
                     <span>ادخل الآن</span>
                     <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
