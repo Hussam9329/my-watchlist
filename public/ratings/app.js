@@ -41,7 +41,6 @@ const movieSearch = document.getElementById('movie-search');
 const filterGenre = document.getElementById('filter-genre');
 const filterYear = document.getElementById('filter-year');
 const filterMinRating = document.getElementById('filter-min-rating');
-const filterStatus = document.getElementById('filter-status');
 const sortMovies = document.getElementById('sort-movies');
 const clearMovieFiltersBtn = document.getElementById('clear-movie-filters');
 const printMovieFiltersBtn = document.getElementById('print-movie-filters');
@@ -50,7 +49,6 @@ const printLimitSelect = document.getElementById('print-limit');
 const seriesSearch = document.getElementById('series-search');
 const filterSeriesYear = document.getElementById('filter-series-year');
 const filterSeriesMinRating = document.getElementById('filter-series-min-rating');
-const filterSeriesRewatch = document.getElementById('filter-series-rewatch');
 const sortSeries = document.getElementById('sort-series');
 const clearSeriesFiltersBtn = document.getElementById('clear-series-filters');
 
@@ -63,8 +61,7 @@ const statAvgRating = document.getElementById('stat-avg-rating');
 const statTopYear = document.getElementById('stat-top-year');
 const statThisMonth = document.getElementById('stat-this-month');
 
-const themeToggle = document.getElementById('theme-toggle');
-const accentPicker = document.getElementById('accent-picker');
+
 
 /* ===========================
    Helpers
@@ -96,16 +93,7 @@ function validYear(y) {
 function validRating(r) {
   return Number.isFinite(r) && r >= 0 && r <= 100;
 }
-function statusLabel(status) {
-  if (status === 'watched') return 'Watched';
-  if (status === 'watching') return 'Watching';
-  return 'Plan';
-}
-function statusClass(status) {
-  if (status === 'watched') return 'status-watched';
-  if (status === 'watching') return 'status-watching';
-  return 'status-plan';
-}
+
 
 /* ===========================
    PWA / Standalone detection
@@ -121,35 +109,6 @@ function detectStandaloneMode() {
     document.body.classList.remove('ios-standalone');
   }
 }
-
-/* ===========================
-   Theme
-   =========================== */
-function initTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  const savedAccent = localStorage.getItem('accent') || '#d4a843';
-
-  if (savedTheme === 'light') {
-    document.body.classList.add('light-theme');
-    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-  } else {
-    document.body.classList.remove('light-theme');
-    themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
-  }
-
-  document.documentElement.style.setProperty('--accent', savedAccent);
-  accentPicker.value = savedAccent;
-}
-themeToggle.addEventListener('click', () => {
-  document.body.classList.toggle('light-theme');
-  const light = document.body.classList.contains('light-theme');
-  localStorage.setItem('theme', light ? 'light' : 'dark');
-  themeToggle.innerHTML = light ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-});
-accentPicker.addEventListener('input', (e) => {
-  document.documentElement.style.setProperty('--accent', e.target.value);
-  localStorage.setItem('accent', e.target.value);
-});
 
 /* ===========================
    Tabs
@@ -180,9 +139,6 @@ function mapMovie(item) {
     year: item.year,
     genre: genre,
     rating: item.userRating,
-    status: item.ratingStatus || 'watched',
-    rewatch: item.rewatch,
-    runtime: item.runtime,
     created_at: item.addedAt || item.updatedAt,
   };
 }
@@ -193,7 +149,6 @@ function mapSeries(item) {
     year: item.year,
     seasons: item.seasons,
     rating: item.userRating,
-    rewatch: item.rewatch,
     created_at: item.addedAt || item.updatedAt,
   };
 }
@@ -294,14 +249,12 @@ function applyMovieFilters(arr) {
   const g = filterGenre.value;
   const y = Number(filterYear.value);
   const minR = Number(filterMinRating.value);
-  const st = filterStatus.value;
   const sort = sortMovies.value;
 
   if (q) result = result.filter((m) => (m.title || '').toLowerCase().includes(q));
   if (g) result = result.filter((m) => m.genre === g);
   if (filterYear.value) result = result.filter((m) => Number(m.year) === y);
   if (filterMinRating.value) result = result.filter((m) => Number(m.rating) >= minR);
-  if (st) result = result.filter((m) => (m.status || 'watched') === st);
 
   switch (sort) {
     case 'rating_desc': result.sort((a, b) => Number(b.rating) - Number(a.rating)); break;
@@ -321,13 +274,11 @@ function applyMovieFiltersOnAll(arr) {
   const g = filterGenre.value;
   const y = Number(filterYear.value);
   const minR = Number(filterMinRating.value);
-  const st = filterStatus.value;
 
   if (q) result = result.filter((m) => (m.title || '').toLowerCase().includes(q));
   if (g) result = result.filter((m) => m.genre === g);
   if (filterYear.value) result = result.filter((m) => Number(m.year) === y);
   if (filterMinRating.value) result = result.filter((m) => Number(m.rating) >= minR);
-  if (st) result = result.filter((m) => (m.status || 'watched') === st);
 
   return result;
 }
@@ -347,7 +298,6 @@ function renderMovies() {
   }
 
   moviesList.innerHTML = filtered.map((m) => {
-    const rewatch = m.rewatch === true || m.rewatch === 'true';
     return `
       <div class="item-card">
         <div class="item-rating ${getRatingClass(m.rating)}">${formatRating(m.rating)}</div>
@@ -356,9 +306,6 @@ function renderMovies() {
           <div class="item-meta">
             <span><i class="fas fa-calendar"></i> ${m.year}</span>
             <span class="genre-badge">${escapeHtml(m.genre || 'Other')}</span>
-            <span class="status-pill ${statusClass(m.status || 'watched')}">${statusLabel(m.status || 'watched')}</span>
-            ${m.runtime ? `<span><i class="fas fa-clock"></i> ${m.runtime} د</span>` : ''}
-            <span class="${rewatch ? 'rewatch-yes' : 'rewatch-no'}">${rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}</span>
           </div>
         </div>
         <div class="item-actions">
@@ -404,7 +351,6 @@ function printFilteredMovies() {
     النمط: ${escapeHtml(modeLabel)} |
     السنة: ${escapeHtml(filterYear.value || 'الكل')} |
     النوع: ${escapeHtml(filterGenre.value || 'الكل')} |
-    الحالة: ${escapeHtml(filterStatus.value || 'الكل')} |
     أعلى من تقييم: ${escapeHtml(filterMinRating.value || 'بدون')} |
     بحث: ${escapeHtml(movieSearch.value || 'بدون')}
   `;
@@ -415,9 +361,7 @@ function printFilteredMovies() {
       <td>${escapeHtml(m.title || '')}</td>
       <td>${m.year ?? '-'}</td>
       <td>${escapeHtml(m.genre || '-')}</td>
-      <td>${statusLabel(m.status || 'watched')}</td>
       <td>${formatRating(m.rating)}</td>
-      <td>${(m.rewatch === true || m.rewatch === 'true') ? '✅ نعم' : '❌ لا'}</td>
     </tr>
   `).join('');
 
@@ -454,9 +398,7 @@ function printFilteredMovies() {
             <th>اسم الفيلم</th>
             <th>السنة</th>
             <th>النوع</th>
-            <th>الحالة</th>
             <th>تقييمي</th>
-            <th>إعادة مشاهدة</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -481,13 +423,11 @@ function applySeriesFilters(arr) {
   const q = seriesSearch.value.trim().toLowerCase();
   const y = Number(filterSeriesYear.value);
   const minR = Number(filterSeriesMinRating.value);
-  const rw = filterSeriesRewatch.value;
   const sort = sortSeries.value;
 
   if (q) result = result.filter((s) => (s.title || '').toLowerCase().includes(q));
   if (filterSeriesYear.value) result = result.filter((s) => Number(s.year) === y);
   if (filterSeriesMinRating.value) result = result.filter((s) => Number(s.rating) >= minR);
-  if (rw) result = result.filter((s) => String(s.rewatch === true || s.rewatch === 'true') === rw);
 
   switch (sort) {
     case 'rating_desc': result.sort((a, b) => Number(b.rating) - Number(a.rating)); break;
@@ -515,7 +455,6 @@ function renderSeries() {
   }
 
   seriesList.innerHTML = filtered.map((s) => {
-    const rewatch = s.rewatch === true || s.rewatch === 'true';
     const seasonWord = Number(s.seasons) === 1 ? 'موسم' : 'مواسم';
     return `
       <div class="item-card">
@@ -525,7 +464,6 @@ function renderSeries() {
           <div class="item-meta">
             <span><i class="fas fa-calendar"></i> ${s.year}</span>
             <span><i class="fas fa-layer-group"></i> ${s.seasons} ${seasonWord}</span>
-            <span class="${rewatch ? 'rewatch-yes' : 'rewatch-no'}">${rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}</span>
           </div>
         </div>
         <div class="item-actions">
@@ -617,18 +555,11 @@ movieForm.addEventListener('submit', async (e) => {
   const year = parseInt(document.getElementById('movie-year').value, 10);
   const genre = document.getElementById('movie-genre').value;
   const rating = parseFloat(document.getElementById('movie-rating').value);
-  const status = document.getElementById('movie-status').value;
-  const rewatch = document.getElementById('movie-rewatch').value === 'true';
-  const runtimeRaw = document.getElementById('movie-runtime').value.trim();
-  const runtime = runtimeRaw ? parseInt(runtimeRaw, 10) : null;
 
   if (!title) return showToast('اسم الفيلم مطلوب', 'error');
   if (!validYear(year)) return showToast('سنة غير صالحة', 'error');
   if (!genre) return showToast('اختر النوع', 'error');
   if (!validRating(rating)) return showToast('التقييم يجب يكون بين 0 و 100', 'error');
-  if (runtime !== null && (!Number.isInteger(runtime) || runtime < 1 || runtime > 400)) {
-    return showToast('مدة الفيلم غير صحيحة', 'error');
-  }
 
   const duplicate = await isDuplicateMovie(title, year, id);
   if (duplicate) return showToast('الفيلم موجود مسبقًا بنفس الاسم والسنة', 'error');
@@ -646,10 +577,8 @@ movieForm.addEventListener('submit', async (e) => {
           type: 'movie',
           genres: genre,
           userRating: rating,
-          ratingStatus: status,
-          rewatch,
-          runtime,
-          watched: status === 'watched',
+          ratingStatus: 'watched',
+          rewatch: false,
         })
       });
       if (!res.ok) throw new Error('Update failed');
@@ -666,10 +595,8 @@ movieForm.addEventListener('submit', async (e) => {
           type: 'movie',
           genres: genre,
           userRating: rating,
-          ratingStatus: status,
-          rewatch,
-          runtime,
-          watched: status === 'watched',
+          ratingStatus: 'watched',
+          rewatch: false,
         })
       });
       if (res.status === 409) {
@@ -699,9 +626,6 @@ async function editMovie(id) {
     document.getElementById('movie-year').value = data.year || '';
     document.getElementById('movie-genre').value = Array.isArray(data.genres) ? (data.genres[0] || '') : ((data.genres || '').split(',')[0] || '');
     document.getElementById('movie-rating').value = data.userRating ?? '';
-    document.getElementById('movie-status').value = data.ratingStatus || 'watched';
-    document.getElementById('movie-rewatch').value = String(data.rewatch === true);
-    document.getElementById('movie-runtime').value = data.runtime || '';
 
     movieFormTitle.textContent = 'تعديل فيلم';
     movieSubmitBtn.innerHTML = '<i class="fas fa-save"></i> حفظ التعديل';
@@ -721,8 +645,6 @@ function resetMovieForm() {
   movieFormTitle.textContent = 'إضافة فيلم جديد';
   movieSubmitBtn.innerHTML = '<i class="fas fa-plus"></i> إضافة الفيلم';
   movieCancelEdit.hidden = true;
-  document.getElementById('movie-status').value = 'watched';
-  document.getElementById('movie-rewatch').value = 'true';
 }
 
 async function deleteMovie(id) {
@@ -750,8 +672,6 @@ seriesForm.addEventListener('submit', async (e) => {
   const year = parseInt(document.getElementById('series-year').value, 10);
   const seasons = parseInt(document.getElementById('series-seasons').value, 10);
   const rating = parseFloat(document.getElementById('series-rating').value);
-  const rewatch = document.getElementById('series-rewatch').value === 'true';
-
   if (!title) return showToast('اسم المسلسل مطلوب', 'error');
   if (!validYear(year)) return showToast('سنة غير صالحة', 'error');
   if (!Number.isInteger(seasons) || seasons < 1 || seasons > 100) return showToast('عدد المواسم غير صحيح', 'error');
@@ -772,9 +692,8 @@ seriesForm.addEventListener('submit', async (e) => {
           type: 'series',
           seasons,
           userRating: rating,
-          rewatch,
+          rewatch: false,
           ratingStatus: 'watched',
-          watched: true,
         })
       });
       if (!res.ok) throw new Error('Update failed');
@@ -790,9 +709,8 @@ seriesForm.addEventListener('submit', async (e) => {
           type: 'series',
           seasons,
           userRating: rating,
-          rewatch,
+          rewatch: false,
           ratingStatus: 'watched',
-          watched: true,
         })
       });
       if (res.status === 409) {
@@ -822,7 +740,6 @@ async function editSeries(id) {
     document.getElementById('series-year').value = data.year || '';
     document.getElementById('series-seasons').value = data.seasons || '';
     document.getElementById('series-rating').value = data.userRating ?? '';
-    document.getElementById('series-rewatch').value = String(data.rewatch === true);
 
     seriesFormTitle.textContent = 'تعديل مسلسل';
     seriesSubmitBtn.innerHTML = '<i class="fas fa-save"></i> حفظ التعديل';
@@ -842,7 +759,6 @@ function resetSeriesForm() {
   seriesFormTitle.textContent = 'إضافة مسلسل جديد';
   seriesSubmitBtn.innerHTML = '<i class="fas fa-plus"></i> إضافة المسلسل';
   seriesCancelEdit.hidden = true;
-  document.getElementById('series-rewatch').value = 'true';
 }
 
 async function deleteSeries(id) {
@@ -868,7 +784,7 @@ function bindFilters() {
     movieSearchTimer = setTimeout(renderMovies, 250);
   });
 
-  [filterGenre, filterYear, filterMinRating, filterStatus, sortMovies].forEach((el) => {
+  [filterGenre, filterYear, filterMinRating, sortMovies].forEach((el) => {
     el.addEventListener('change', renderMovies);
     el.addEventListener('input', renderMovies);
   });
@@ -878,7 +794,6 @@ function bindFilters() {
     filterGenre.value = '';
     filterYear.value = '';
     filterMinRating.value = '';
-    filterStatus.value = '';
     sortMovies.value = 'latest_added';
     if (printLimitSelect) printLimitSelect.value = 'all';
     renderMovies();
@@ -893,7 +808,7 @@ function bindFilters() {
     seriesSearchTimer = setTimeout(renderSeries, 250);
   });
 
-  [filterSeriesYear, filterSeriesMinRating, filterSeriesRewatch, sortSeries].forEach((el) => {
+  [filterSeriesYear, filterSeriesMinRating, sortSeries].forEach((el) => {
     el.addEventListener('change', renderSeries);
     el.addEventListener('input', renderSeries);
   });
@@ -902,7 +817,6 @@ function bindFilters() {
     seriesSearch.value = '';
     filterSeriesYear.value = '';
     filterSeriesMinRating.value = '';
-    filterSeriesRewatch.value = '';
     sortSeries.value = 'latest_added';
     renderSeries();
   });
@@ -912,22 +826,18 @@ function bindFilters() {
    Movie Night Picker
    =========================== */
 movieNightBtn.addEventListener('click', () => {
-  const plan = allMoviesForStats.filter((m) => (m.status || 'watched') === 'plan');
-
-  if (!plan.length) {
+  const all = allMoviesForStats;
+  if (!all.length) {
     movieNightResult.hidden = false;
-    movieNightResult.innerHTML = 'ماكو أفلام داخل <b>Plan to Watch</b> حاليًا 😅';
+    movieNightResult.innerHTML = 'ماكو أفلام مقيّمة حاليًا 😅';
     return;
   }
-
-  const under150 = plan.filter((m) => !m.runtime || Number(m.runtime) <= 150);
-  const source = under150.length ? under150 : plan;
-  const picked = source[Math.floor(Math.random() * source.length)];
+  const picked = all[Math.floor(Math.random() * all.length)];
 
   movieNightResult.hidden = false;
   movieNightResult.innerHTML = `
     <b>🎬 اختيار الليلة:</b> ${escapeHtml(picked.title)}<br>
-    <small>${picked.year} • ${escapeHtml(picked.genre || 'Other')} • تقييمك: ${formatRating(picked.rating)}${picked.runtime ? ` • ${picked.runtime} د` : ''}</small>
+    <small>${picked.year} • ${escapeHtml(picked.genre || 'Other')} • تقييمك: ${formatRating(picked.rating)}</small>
   `;
 });
 
@@ -943,7 +853,6 @@ async function init() {
   }
 
   detectStandaloneMode();
-  initTheme();
   bindFilters();
 
   await Promise.all([

@@ -32,14 +32,7 @@
           <i class="fas fa-arrow-right"></i>
         </a>
 
-        <button id="theme-toggle" class="icon-btn" title="تبديل الوضع">
-          <i class="fas fa-moon"></i>
-        </button>
 
-        <div class="accent-wrap">
-          <label for="accent-picker">اللون</label>
-          <input type="color" id="accent-picker" value="#d4a843" />
-        </div>
       </div>
 
       <div class="logo-icon">
@@ -130,30 +123,6 @@
                 <span class="rating-max">/ 100</span>
               </div>
             </div>
-
-            <div class="form-group">
-              <label for="movie-runtime">المدة بالدقائق (اختياري)</label>
-              <input type="number" id="movie-runtime" placeholder="120" min="1" max="400" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="movie-status">الحالة</label>
-              <select id="movie-status" required>
-                <option value="watched">Watched</option>
-                <option value="watching">Watching</option>
-                <option value="plan">Plan to Watch</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="movie-rewatch">هل يستحق إعادة مشاهدة؟</label>
-              <select id="movie-rewatch" required>
-                <option value="true">✅ نعم</option>
-                <option value="false">❌ لا</option>
-              </select>
-            </div>
           </div>
 
           <div class="form-actions">
@@ -208,15 +177,7 @@
             <label for="filter-min-rating">تقييم أعلى من</label>
             <input type="number" id="filter-min-rating" min="0" max="100" step="any" placeholder="70" />
           </div>
-          <div class="form-group">
-            <label for="filter-status">الحالة</label>
-            <select id="filter-status">
-              <option value="">الكل</option>
-              <option value="watched">Watched</option>
-              <option value="watching">Watching</option>
-              <option value="plan">Plan to Watch</option>
-            </select>
-          </div>
+
           <div class="form-group">
             <label for="sort-movies">الترتيب</label>
             <select id="sort-movies">
@@ -297,13 +258,6 @@
                 <span class="rating-max">/ 100</span>
               </div>
             </div>
-            <div class="form-group">
-              <label for="series-rewatch">هل يستحق إعادة مشاهدة؟</label>
-              <select id="series-rewatch" required>
-                <option value="true">✅ نعم</option>
-                <option value="false">❌ لا</option>
-              </select>
-            </div>
           </div>
 
           <div class="form-actions">
@@ -331,14 +285,7 @@
             <label for="filter-series-min-rating">تقييم أعلى من</label>
             <input type="number" id="filter-series-min-rating" min="0" max="100" step="any" placeholder="70" />
           </div>
-          <div class="form-group">
-            <label for="filter-series-rewatch">إعادة مشاهدة</label>
-            <select id="filter-series-rewatch">
-              <option value="">الكل</option>
-              <option value="true">✅ نعم</option>
-              <option value="false">❌ لا</option>
-            </select>
-          </div>
+
           <div class="form-group">
             <label for="sort-series">الترتيب</label>
             <select id="sort-series">
