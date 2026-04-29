@@ -88,10 +88,9 @@ html {
   font-family: var(--font-tajawal), var(--font-inter), sans-serif;
 }
 
-/* تحسين التمرير السلس */
+/* تحسين التمرير */
 * {
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
 }
 
 /* تحسين Toast للهاتف */

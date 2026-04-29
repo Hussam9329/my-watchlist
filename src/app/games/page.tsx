@@ -394,8 +394,8 @@ export default function GamesPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-teal-500/5 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-cyan-500/5 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-teal-500/3 rounded-full" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-cyan-500/3 rounded-full" />
       </div>
       <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8" dir="rtl">
         <header className="flex items-center justify-between mb-6">
