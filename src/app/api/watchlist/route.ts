@@ -10,15 +10,21 @@ function formatItem(item: any) {
   }
 }
 
-// GET - جلب جميع العناصر (مع دعم الفلترة حسب النوع والبحث)
+// GET - جلب جميع العناصر (مع دعم الفلترة حسب النوع والبحث والتقييم)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const search = searchParams.get('search')
+    const hasRating = searchParams.get('hasRating') // 'true' = فقط المقيّمة, 'false' = فقط غير المقيّمة
 
     const where: any = {}
     if (type) where.type = type
+    if (hasRating === 'true') {
+      where.userRating = { not: null }
+    } else if (hasRating === 'false') {
+      where.userRating = null
+    }
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },

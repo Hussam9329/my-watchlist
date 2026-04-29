@@ -98,13 +98,13 @@ export default function WatchListPage() {
   const fetchWatchList = useCallback(async () => {
     try {
       setSyncStatus('syncing')
-      const response = await fetch('/api/watchlist')
+      const response = await fetch('/api/watchlist?hasRating=false')
       const data = await response.json()
       if (data.items && Array.isArray(data.items)) { 
-        setWatchList(data.items.filter((i: any) => i.type !== 'book' && i.type !== 'game'))
+        setWatchList(data.items.filter((i: any) => i.type !== 'book' && i.type !== 'game' && (i.userRating === null || i.userRating === undefined)))
         setSyncStatus('synced')
       } else if (Array.isArray(data)) {
-        setWatchList(data.filter((i: any) => i.type !== 'book' && i.type !== 'game'))
+        setWatchList(data.filter((i: any) => i.type !== 'book' && i.type !== 'game' && (i.userRating === null || i.userRating === undefined)))
         setSyncStatus('synced')
       } else {
         setWatchList([])

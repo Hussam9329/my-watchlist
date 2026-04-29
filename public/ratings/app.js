@@ -205,7 +205,7 @@ async function loadMoviesRecent() {
   moviesList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin fa-3x"></i><p>جاري تحميل الأفلام...</p></div>';
 
   try {
-    const res = await fetch(`${API_BASE}?type=movie`);
+    const res = await fetch(`${API_BASE}?type=movie&hasRating=true`);
     const data = await res.json();
     let items = [];
     if (data.items && Array.isArray(data.items)) {
@@ -231,7 +231,7 @@ async function loadSeriesRecent() {
   seriesList.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin fa-3x"></i><p>جاري تحميل المسلسلات...</p></div>';
 
   try {
-    const res = await fetch(`${API_BASE}?type=series`);
+    const res = await fetch(`${API_BASE}?type=series&hasRating=true`);
     const data = await res.json();
     let items = [];
     if (data.items && Array.isArray(data.items)) {
@@ -255,8 +255,8 @@ async function loadStatsData() {
   try {
     // Fetch all items for stats
     const [moviesRes, seriesRes] = await Promise.all([
-      fetch(`${API_BASE}?type=movie`),
-      fetch(`${API_BASE}?type=series`),
+      fetch(`${API_BASE}?type=movie&hasRating=true`),
+      fetch(`${API_BASE}?type=series&hasRating=true`),
     ]);
     const moviesData = await moviesRes.json();
     const seriesData = await seriesRes.json();
@@ -581,11 +581,11 @@ function updateDashboard() {
    =========================== */
 async function isDuplicateMovie(title, year, excludeId = null) {
   try {
-    const res = await fetch(`${API_BASE}?type=movie&search=${encodeURIComponent(title)}`);
+    const res = await fetch(`${API_BASE}?type=movie&hasRating=true&search=${encodeURIComponent(title)}`);
     const data = await res.json();
     let items = data.items || data;
     if (!Array.isArray(items)) return false;
-    const matches = items.filter(i => i.title === title && i.year === String(year) && i.userRating != null);
+    const matches = items.filter(i => i.title === title && i.year === String(year));
     if (excludeId) return matches.some(i => i.id !== excludeId);
     return matches.length > 0;
   } catch {
@@ -594,11 +594,11 @@ async function isDuplicateMovie(title, year, excludeId = null) {
 }
 async function isDuplicateSeries(title, year, excludeId = null) {
   try {
-    const res = await fetch(`${API_BASE}?type=series&search=${encodeURIComponent(title)}`);
+    const res = await fetch(`${API_BASE}?type=series&hasRating=true&search=${encodeURIComponent(title)}`);
     const data = await res.json();
     let items = data.items || data;
     if (!Array.isArray(items)) return false;
-    const matches = items.filter(i => i.title === title && i.year === String(year) && i.userRating != null);
+    const matches = items.filter(i => i.title === title && i.year === String(year));
     if (excludeId) return matches.some(i => i.id !== excludeId);
     return matches.length > 0;
   } catch {
