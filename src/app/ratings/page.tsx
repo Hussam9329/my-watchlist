@@ -1,54 +1,44 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase'
 import {
-  Star, Film, Tv, Sparkles, Gamepad2, BookOpen, Search, Loader2,
-  ArrowRight, Dice5, Download, Edit3, Trash2, Check, X,
-  BarChart3, CalendarDays, Filter, ArrowUpDown, Eye
+  Star, Film, Tv, ArrowRight, Dice5, Edit3, Trash2,
+  BarChart3, CalendarDays, Filter, ArrowUpDown, Search, Loader2, X, Plus, Check
 } from 'lucide-react'
 
-interface RatedItem {
-  id: string
+/* ===========================
+   Types
+   =========================== */
+interface Movie {
+  id: number
   title: string
-  originalTitle?: string
-  year: string
-  type: string
-  poster?: string | null
-  rating?: string | null
-  overview?: string | null
-  genres: string | string[]
-  episodes?: number | null
-  seasons?: number | null
-  duration?: string | null
-  status?: string | null
-  author?: string | null
-  tags: string | string[]
-  notes: string
-  favorite: boolean
-  watched: boolean
-  watchedAt?: string | null
-  userRating?: number | null
-  addedAt: string
-  updatedAt: string
+  year: number
+  genre: string
+  rating: number
+  status: string
+  rewatch: boolean
+  runtime: number | null
+  created_at: string
 }
 
-type TabType = 'all' | 'movie' | 'series' | 'anime' | 'game' | 'book'
-type SortBy = 'userRating' | 'year' | 'title' | 'addedAt'
-
-const TYPE_CONFIG: Record<TabType, { icon: typeof Star; label: string; plural: string; color: string; bgColor: string }> = {
-  all: { icon: Star, label: 'الكل', plural: 'جميع التقييمات', color: 'from-yellow-500 to-amber-600', bgColor: 'bg-yellow-500/10' },
-  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-red-500 to-orange-500', bgColor: 'bg-red-500/10' },
-  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-blue-500 to-indigo-500', bgColor: 'bg-blue-500/10' },
-  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-purple-500 to-pink-500', bgColor: 'bg-purple-500/10' },
-  game: { icon: Gamepad2, label: 'لعبة', plural: 'ألعاب', color: 'from-teal-500 to-cyan-500', bgColor: 'bg-teal-500/10' },
-  book: { icon: BookOpen, label: 'كتاب', plural: 'كتب', color: 'from-emerald-500 to-green-500', bgColor: 'bg-emerald-500/10' },
+interface Series {
+  id: number
+  title: string
+  year: number
+  seasons: number
+  rating: number
+  rewatch: boolean
+  created_at: string
 }
+
+type TabType = 'movies' | 'series'
+type SortBy = 'latest_added' | 'rating_desc' | 'year_desc' | 'year_asc' | 'title_asc'
 
 const GENRE_OPTIONS = [
   'Action', 'Adventure', 'Anime', 'Animation', 'Biography', 'Comedy', 'Comics',
@@ -56,9 +46,19 @@ const GENRE_OPTIONS = [
   'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western', 'Other'
 ]
 
-const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
+const STATUS_OPTIONS = [
+  { value: 'watched', label: 'Watched' },
+  { value: 'watching', label: 'Watching' },
+  { value: 'plan', label: 'Plan to Watch' },
+]
 
-const APP_PASSWORD = '20262028'
+/* ===========================
+   Helpers
+   =========================== */
+function formatRating(num: number) {
+  const n = Math.round(Number(num) * 100) / 100
+  return Number.isInteger(n) ? String(n) : n.toFixed(2)
+}
 
 function getRatingColor(rating: number): string {
   if (rating >= 70) return 'text-green-400 bg-green-500/15 border-green-500/25'
@@ -72,255 +72,371 @@ function getRatingBarColor(rating: number): string {
   return 'bg-red-500'
 }
 
-function getDisplayTitle(item: RatedItem): string {
-  return item.originalTitle || item.title || ''
+function statusLabel(status: string) {
+  if (status === 'watched') return 'Watched'
+  if (status === 'watching') return 'Watching'
+  return 'Plan'
 }
 
+function statusColor(status: string) {
+  if (status === 'watched') return 'text-green-400 border-green-500/30 bg-green-500/10'
+  if (status === 'watching') return 'text-blue-400 border-blue-500/30 bg-blue-500/10'
+  return 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+}
+
+/* ===========================
+   Component
+   =========================== */
 export default function RatingsPage() {
   const { toast } = useToast()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [showLogin, setShowLogin] = useState(true)
 
-  const [activeTab, setActiveTab] = useState<TabType>('all')
-  const [allItems, setAllItems] = useState<RatedItem[]>([])
+  const [activeTab, setActiveTab] = useState<TabType>('movies')
   const [isLoading, setIsLoading] = useState(true)
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('userRating')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [filterYear, setFilterYear] = useState<string>('all')
-  const [filterGenre, setFilterGenre] = useState<string>('all')
-  const [filterMinRating, setFilterMinRating] = useState<string>('')
-  const [showFilters, setShowFilters] = useState(false)
+  // Movies data
+  const [recentMovies, setRecentMovies] = useState<Movie[]>([])
+  const [allMovies, setAllMovies] = useState<Movie[]>([])
+  const [movieSearch, setMovieSearch] = useState('')
+  const [filterGenre, setFilterGenre] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [filterMinRating, setFilterMinRating] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [sortMovies, setSortMovies] = useState<SortBy>('latest_added')
+
+  // Series data
+  const [recentSeries, setRecentSeries] = useState<Series[]>([])
+  const [allSeries, setAllSeries] = useState<Series[]>([])
+  const [seriesSearch, setSeriesSearch] = useState('')
+  const [filterSeriesYear, setFilterSeriesYear] = useState('')
+  const [filterSeriesMinRating, setFilterSeriesMinRating] = useState('')
+  const [filterSeriesRewatch, setFilterSeriesRewatch] = useState('')
+  const [sortSeries, setSortSeries] = useState<SortBy>('latest_added')
+
+  // Movie form
+  const [showMovieForm, setShowMovieForm] = useState(false)
+  const [editingMovie, setEditingMovie] = useState<Movie | null>(null)
+  const [movieForm, setMovieForm] = useState({
+    title: '', year: new Date().getFullYear().toString(), genre: 'Action',
+    rating: '', status: 'watched', rewatch: 'true', runtime: ''
+  })
+
+  // Series form
+  const [showSeriesForm, setShowSeriesForm] = useState(false)
+  const [editingSeries, setEditingSeries] = useState<Series | null>(null)
+  const [seriesForm, setSeriesForm] = useState({
+    title: '', year: new Date().getFullYear().toString(), seasons: '1',
+    rating: '', rewatch: 'true'
+  })
+
+  // Stats & UI
   const [showStats, setShowStats] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [pickerResult, setPickerResult] = useState('')
 
-  const [editingItem, setEditingItem] = useState<RatedItem | null>(null)
-  const [editRating, setEditRating] = useState<string>('')
-  const [showEditDialog, setShowEditDialog] = useState(false)
-
-  const [pickerResult, setPickerResult] = useState<string>('')
-
-  // Fetch all items
-  const fetchAllItems = useCallback(async () => {
-    try {
-      setSyncStatus('syncing')
-      const response = await fetch('/api/watchlist')
-      const data = await response.json()
-      if (data.items && Array.isArray(data.items)) {
-        setAllItems(data.items.filter((i: RatedItem) => i.userRating !== null && i.userRating !== undefined))
-        setSyncStatus('synced')
-      } else {
-        setAllItems([])
-        setSyncStatus('error')
-      }
-    } catch {
-      setSyncStatus('error')
-      setAllItems([])
-    } finally {
-      setIsLoading(false)
+  // Auth check
+  useEffect(() => {
+    const auth = localStorage.getItem('hussamvision_auth')
+    if (auth !== 'true') {
+      window.location.href = '/'
+      return
     }
+    setIsAuthenticated(true)
   }, [])
+
+  // Fetch data
+  const fetchMovies = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('movies')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setAllMovies(data || [])
+      setRecentMovies((data || []).slice(0, 5))
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'خطأ', description: 'خطأ في تحميل الأفلام', variant: 'destructive' })
+    }
+  }, [toast])
+
+  const fetchSeries = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('series')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setAllSeries(data || [])
+      setRecentSeries((data || []).slice(0, 5))
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'خطأ', description: 'خطأ في تحميل المسلسلات', variant: 'destructive' })
+    }
+  }, [toast])
 
   useEffect(() => {
-    const auth = localStorage.getItem('ratings_auth')
-    if (auth === 'true') { setIsAuthenticated(true); setShowLogin(false) }
-  }, [])
-
-  useEffect(() => { fetchAllItems() }, [fetchAllItems])
-
-  // Computed
-  const filteredItems = useMemo(() => {
-    let items = activeTab === 'all' ? [...allItems] : allItems.filter(i => i.type === activeTab)
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      items = items.filter(i =>
-        i.title.toLowerCase().includes(q) ||
-        i.originalTitle?.toLowerCase().includes(q)
-      )
+    if (isAuthenticated) {
+      Promise.all([fetchMovies(), fetchSeries()]).finally(() => setIsLoading(false))
     }
+  }, [isAuthenticated, fetchMovies, fetchSeries])
 
-    if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
-
-    if (filterGenre !== 'all') {
-      items = items.filter(i => {
-        const genres = typeof i.genres === 'string' ? i.genres : (i.genres || []).join(', ')
-        return genres.toLowerCase().includes(filterGenre.toLowerCase())
-      })
+  // Filtered movies
+  const filteredMovies = (() => {
+    let result = [...recentMovies]
+    if (movieSearch.trim()) {
+      const q = movieSearch.toLowerCase()
+      result = result.filter(m => m.title.toLowerCase().includes(q))
     }
-
-    if (filterMinRating) {
-      const minR = parseFloat(filterMinRating)
-      if (!isNaN(minR)) items = items.filter(i => (i.userRating || 0) >= minR)
+    if (filterGenre) result = result.filter(m => m.genre === filterGenre)
+    if (filterYear) result = result.filter(m => Number(m.year) === Number(filterYear))
+    if (filterMinRating) result = result.filter(m => Number(m.rating) >= Number(filterMinRating))
+    if (filterStatus) result = result.filter(m => (m.status || 'watched') === filterStatus)
+    switch (sortMovies) {
+      case 'rating_desc': result.sort((a, b) => Number(b.rating) - Number(a.rating)); break
+      case 'year_desc': result.sort((a, b) => Number(b.year) - Number(a.year)); break
+      case 'year_asc': result.sort((a, b) => Number(a.year) - Number(b.year)); break
+      case 'title_asc': result.sort((a, b) => a.title.localeCompare(b.title)); break
+      default: result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
+    return result
+  })()
 
-    items.sort((a, b) => {
-      let c = 0
-      if (sortBy === 'userRating') c = (a.userRating || 0) - (b.userRating || 0)
-      else if (sortBy === 'year') c = parseInt(a.year) - parseInt(b.year)
-      else if (sortBy === 'title') c = getDisplayTitle(a).localeCompare(getDisplayTitle(b))
-      else c = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
-      return sortOrder === 'asc' ? c : -c
-    })
+  // Filtered series
+  const filteredSeries = (() => {
+    let result = [...recentSeries]
+    if (seriesSearch.trim()) {
+      const q = seriesSearch.toLowerCase()
+      result = result.filter(s => s.title.toLowerCase().includes(q))
+    }
+    if (filterSeriesYear) result = result.filter(s => Number(s.year) === Number(filterSeriesYear))
+    if (filterSeriesMinRating) result = result.filter(s => Number(s.rating) >= Number(filterSeriesMinRating))
+    if (filterSeriesRewatch) result = result.filter(s => String(s.rewatch === true || s.rewatch === 'true') === filterSeriesRewatch)
+    switch (sortSeries) {
+      case 'rating_desc': result.sort((a, b) => Number(b.rating) - Number(a.rating)); break
+      case 'year_desc': result.sort((a, b) => Number(b.year) - Number(a.year)); break
+      case 'year_asc': result.sort((a, b) => Number(a.year) - Number(b.year)); break
+      case 'title_asc': result.sort((a, b) => a.title.localeCompare(b.title)); break
+      default: result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+    return result
+  })()
 
-    return items
-  }, [allItems, activeTab, searchQuery, filterYear, filterGenre, filterMinRating, sortBy, sortOrder])
-
-  const stats = useMemo(() => {
-    const items = activeTab === 'all' ? allItems : allItems.filter(i => i.type === activeTab)
-    const ratings = items.map(i => i.userRating || 0).filter(r => r > 0)
-    const avg = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
-
+  // Stats
+  const stats = (() => {
+    const total = allMovies.length + allSeries.length
     const genreMap: Record<string, number> = {}
-    items.forEach(i => {
-      const genres = typeof i.genres === 'string' ? i.genres.split(',').map(g => g.trim()).filter(Boolean) : (i.genres || [])
-      genres.forEach(g => { genreMap[g] = (genreMap[g] || 0) + 1 })
-    })
+    allMovies.forEach(m => { genreMap[m.genre || 'Other'] = (genreMap[m.genre || 'Other'] || 0) + 1 })
     const topGenre = Object.keys(genreMap).sort((a, b) => genreMap[b] - genreMap[a])[0] || '-'
-
+    const ratings = [...allMovies, ...allSeries].map(x => Number(x.rating)).filter(x => Number.isFinite(x))
+    const avg = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
     const yearMap: Record<string, number> = {}
-    items.forEach(i => { if (i.year) yearMap[i.year] = (yearMap[i.year] || 0) + 1 })
+    allMovies.forEach(m => { const y = Number(m.year); if (Number.isInteger(y)) yearMap[y] = (yearMap[y] || 0) + 1 })
     const topYear = Object.keys(yearMap).sort((a, b) => yearMap[b] - yearMap[a])[0] || '-'
-
     const now = new Date()
-    const thisMonth = items.filter(i => {
-      const d = new Date(i.addedAt)
+    const thisMonth = [...allMovies, ...allSeries].filter(x => {
+      const d = new Date(x.created_at)
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
     }).length
+    return { total, topGenre, avg, topYear, thisMonth }
+  })()
 
-    return { total: items.length, avg: avg.toFixed(1), topGenre, topYear, thisMonth }
-  }, [allItems, activeTab])
+  // Movie CRUD
+  const handleMovieSubmit = async () => {
+    if (!movieForm.title.trim()) return toast({ title: 'خطأ', description: 'اسم الفيلم مطلوب', variant: 'destructive' })
+    const year = parseInt(movieForm.year)
+    const rating = parseFloat(movieForm.rating)
+    if (isNaN(year) || year < 1900 || year > 2100) return toast({ title: 'خطأ', description: 'سنة غير صالحة', variant: 'destructive' })
+    if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب أن يكون بين 0 و 100', variant: 'destructive' })
 
-  const tabStats = useMemo(() => {
-    const base = (type: string) => allItems.filter(i => i.type === type).length
-    return {
-      all: allItems.length,
-      movie: base('movie'),
-      series: base('series'),
-      anime: base('anime'),
-      game: base('game'),
-      book: base('book'),
+    const data = {
+      title: movieForm.title.trim(),
+      year,
+      genre: movieForm.genre,
+      rating,
+      status: movieForm.status,
+      rewatch: movieForm.rewatch === 'true',
+      runtime: movieForm.runtime ? parseInt(movieForm.runtime) : null,
     }
-  }, [allItems])
 
-  // Actions
-  const handleLogin = () => {
-    if (passwordInput === APP_PASSWORD) {
-      setIsAuthenticated(true); setShowLogin(false)
-      localStorage.setItem('ratings_auth', 'true')
-      toast({ title: 'مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
-    } else {
-      toast({ title: 'خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
+    try {
+      if (editingMovie) {
+        const { error } = await supabase.from('movies').update(data).eq('id', editingMovie.id)
+        if (error) throw error
+        toast({ title: 'تم التحديث', description: 'تم تحديث الفيلم بنجاح' })
+      } else {
+        const { error } = await supabase.from('movies').insert([data])
+        if (error) throw error
+        toast({ title: 'تمت الإضافة', description: 'تمت إضافة الفيلم بنجاح' })
+      }
+      resetMovieForm()
+      fetchMovies()
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message || 'فشلت العملية', variant: 'destructive' })
     }
+  }
+
+  const editMovie = (m: Movie) => {
+    setEditingMovie(m)
+    setMovieForm({
+      title: m.title, year: m.year.toString(), genre: m.genre || 'Action',
+      rating: m.rating.toString(), status: m.status || 'watched',
+      rewatch: String(m.rewatch === true || m.rewatch === 'true'),
+      runtime: m.runtime?.toString() || ''
+    })
+    setShowMovieForm(true)
+  }
+
+  const deleteMovie = async (id: number) => {
+    try {
+      const { error } = await supabase.from('movies').delete().eq('id', id)
+      if (error) throw error
+      toast({ title: 'تم الحذف', description: 'تم حذف الفيلم' })
+      fetchMovies()
+    } catch {
+      toast({ title: 'خطأ', description: 'فشل حذف الفيلم', variant: 'destructive' })
+    }
+  }
+
+  const resetMovieForm = () => {
+    setEditingMovie(null)
+    setMovieForm({ title: '', year: new Date().getFullYear().toString(), genre: 'Action', rating: '', status: 'watched', rewatch: 'true', runtime: '' })
+    setShowMovieForm(false)
+  }
+
+  // Series CRUD
+  const handleSeriesSubmit = async () => {
+    if (!seriesForm.title.trim()) return toast({ title: 'خطأ', description: 'اسم المسلسل مطلوب', variant: 'destructive' })
+    const year = parseInt(seriesForm.year)
+    const seasons = parseInt(seriesForm.seasons)
+    const rating = parseFloat(seriesForm.rating)
+    if (isNaN(year) || year < 1900 || year > 2100) return toast({ title: 'خطأ', description: 'سنة غير صالحة', variant: 'destructive' })
+    if (isNaN(seasons) || seasons < 1 || seasons > 100) return toast({ title: 'خطأ', description: 'عدد المواسم غير صحيح', variant: 'destructive' })
+    if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب أن يكون بين 0 و 100', variant: 'destructive' })
+
+    const data = {
+      title: seriesForm.title.trim(),
+      year,
+      seasons,
+      rating,
+      rewatch: seriesForm.rewatch === 'true',
+    }
+
+    try {
+      if (editingSeries) {
+        const { error } = await supabase.from('series').update(data).eq('id', editingSeries.id)
+        if (error) throw error
+        toast({ title: 'تم التحديث', description: 'تم تحديث المسلسل بنجاح' })
+      } else {
+        const { error } = await supabase.from('series').insert([data])
+        if (error) throw error
+        toast({ title: 'تمت الإضافة', description: 'تمت إضافة المسلسل بنجاح' })
+      }
+      resetSeriesForm()
+      fetchSeries()
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message || 'فشلت العملية', variant: 'destructive' })
+    }
+  }
+
+  const editSeriesFn = (s: Series) => {
+    setEditingSeries(s)
+    setSeriesForm({
+      title: s.title, year: s.year.toString(), seasons: s.seasons.toString(),
+      rating: s.rating.toString(), rewatch: String(s.rewatch === true || s.rewatch === 'true')
+    })
+    setShowSeriesForm(true)
+  }
+
+  const deleteSeries = async (id: number) => {
+    try {
+      const { error } = await supabase.from('series').delete().eq('id', id)
+      if (error) throw error
+      toast({ title: 'تم الحذف', description: 'تم حذف المسلسل' })
+      fetchSeries()
+    } catch {
+      toast({ title: 'خطأ', description: 'فشل حذف المسلسل', variant: 'destructive' })
+    }
+  }
+
+  const resetSeriesForm = () => {
+    setEditingSeries(null)
+    setSeriesForm({ title: '', year: new Date().getFullYear().toString(), seasons: '1', rating: '', rewatch: 'true' })
+    setShowSeriesForm(false)
+  }
+
+  // Movie Night Picker
+  const movieNightPicker = () => {
+    const plan = allMovies.filter(m => (m.status || 'watched') === 'plan')
+    if (!plan.length && !allMovies.length) {
+      setPickerResult('لا توجد أفلام حالياً')
+      return
+    }
+    const source = plan.length > 0 ? plan : allMovies
+    const under150 = source.filter(m => !m.runtime || Number(m.runtime) <= 150)
+    const pool = under150.length ? under150 : source
+    const picked = pool[Math.floor(Math.random() * pool.length)]
+    setPickerResult(`اختيار الليلة: ${picked.title} (${picked.year}) - ${picked.genre || 'Other'} - تقييمك: ${formatRating(picked.rating)}${picked.runtime ? ` - ${picked.runtime} د` : ''}`)
+  }
+
+  // Print movies
+  const printMovies = () => {
+    const filtered = allMovies
+    if (!filtered.length) return toast({ title: 'خطأ', description: 'لا توجد أفلام للطباعة', variant: 'destructive' })
+
+    const sorted = [...filtered].sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }))
+    const rows = sorted.map((m, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${m.title}</td>
+        <td>${m.year}</td>
+        <td>${m.genre || '-'}</td>
+        <td>${statusLabel(m.status || 'watched')}</td>
+        <td>${formatRating(m.rating)}</td>
+        <td>${(m.rewatch === true || m.rewatch === 'true') ? 'نعم' : 'لا'}</td>
+      </tr>
+    `).join('')
+
+    const w = window.open('', '_blank', 'width=1100,height=800')
+    if (!w) return toast({ title: 'خطأ', description: 'المتصفح منع فتح نافذة الطباعة', variant: 'destructive' })
+    w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة الأفلام</title>
+      <style>body{font-family:Tahoma,Arial,sans-serif;padding:22px;color:#111}h1{font-size:22px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:8px;font-size:12px;text-align:center}th{background:#f1f1f1}</style>
+      </head><body><h1>قائمة الأفلام</h1><p>عدد الأفلام: ${sorted.length}</p><table><thead><tr><th>#</th><th>اسم الفيلم</th><th>السنة</th><th>النوع</th><th>الحالة</th><th>تقييمي</th><th>إعادة مشاهدة</th></tr></thead><tbody>${rows}</tbody></table></body></html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 250)
+  }
+
+  // Clear filters
+  const clearMovieFilters = () => {
+    setMovieSearch(''); setFilterGenre(''); setFilterYear(''); setFilterMinRating(''); setFilterStatus(''); setSortMovies('latest_added')
+  }
+  const clearSeriesFilters = () => {
+    setSeriesSearch(''); setFilterSeriesYear(''); setFilterSeriesMinRating(''); setFilterSeriesRewatch(''); setSortSeries('latest_added')
   }
 
   const handleLogout = () => {
-    setIsAuthenticated(false); setShowLogin(true)
-    localStorage.removeItem('ratings_auth'); setPasswordInput('')
+    localStorage.removeItem('hussamvision_auth')
+    window.location.href = '/'
   }
 
-  const openEditRating = (item: RatedItem) => {
-    setEditingItem(item)
-    setEditRating(item.userRating?.toString() || '')
-    setShowEditDialog(true)
-  }
+  if (!isAuthenticated) return null
 
-  const saveRating = async () => {
-    if (!editingItem) return
-    const rating = parseFloat(editRating)
-    if (isNaN(rating) || rating < 0 || rating > 100) {
-      toast({ title: 'خطأ', description: 'التقييم يجب أن يكون بين 0 و 100', variant: 'destructive' })
-      return
-    }
-    try {
-      await fetch(`/api/watchlist/${editingItem.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRating: rating, watched: true })
-      })
-      setAllItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, userRating: rating } : i))
-      toast({ title: 'تم الحفظ', description: `تم تحديث تقييم "${getDisplayTitle(editingItem)}" إلى ${rating}/100` })
-      setShowEditDialog(false); setEditingItem(null)
-    } catch {
-      toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحفظ', variant: 'destructive' })
-    }
-  }
-
-  const removeRating = async (item: RatedItem) => {
-    try {
-      await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRating: null })
-      })
-      setAllItems(prev => prev.filter(i => i.id !== item.id))
-      toast({ title: 'تم الحذف', description: `تم إزالة تقييم "${getDisplayTitle(item)}"` })
-    } catch {
-      toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحذف', variant: 'destructive' })
-    }
-  }
-
-  const movieNightPicker = () => {
-    const unwatched = allItems.filter(i => i.type === 'movie' && !i.watched)
-    const candidates = unwatched.length > 0 ? unwatched : allItems.filter(i => i.type === 'movie')
-    if (!candidates.length) {
-      setPickerResult('لا توجد أفلام للتقييم حالياً')
-      return
-    }
-    const picked = candidates[Math.floor(Math.random() * candidates.length)]
-    setPickerResult(`اختيار الليلة: ${getDisplayTitle(picked)} (${picked.year}) - تقييمك: ${picked.userRating || 'لم يُقيّم'}/100`)
-  }
-
-  const exportData = () => {
-    const d = JSON.stringify(allItems, null, 2)
-    const b = new Blob([d], { type: 'application/json' })
-    const u = URL.createObjectURL(b)
-    const a = document.createElement('a')
-    a.href = u; a.download = `ratings_${new Date().toISOString().split('T')[0]}.json`; a.click()
-    URL.revokeObjectURL(u)
-    toast({ title: 'تم التصدير', description: 'تم تصدير التقييمات بنجاح' })
-  }
-
-  const clearFilters = () => {
-    setSearchQuery(''); setFilterYear('all'); setFilterGenre('all'); setFilterMinRating('')
-  }
-
-  // Login Screen
-  if (showLogin && !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
-        <div className="w-full max-w-sm px-6">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-yellow-500/20">
-              <Star className="w-10 h-10 text-black fill-black" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">تقييماتي</h1>
-            <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
-          </div>
-          <div className="space-y-4">
-            <Input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="كلمة المرور"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-12 text-center text-lg" />
-            <Button onClick={handleLogin} className="w-full bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold h-12">دخول</Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-yellow-500" /></div>
+  if (isLoading) return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+      <Loader2 className="w-12 h-12 animate-spin text-yellow-500" />
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Background effects */}
+      {/* Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-yellow-500/5 to-transparent rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-amber-500/5 to-transparent rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8" dir="rtl">
+      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8" dir="rtl">
         {/* Header */}
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3 sm:gap-5">
@@ -328,238 +444,351 @@ export default function RatingsPage() {
               <ArrowRight className="w-5 h-5" />
             </Button>
             <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-lg">
-              <Star className="w-5 h-5 sm:w-7 sm:h-7 text-black fill-black" />
+              <Film className="w-5 h-5 sm:w-7 sm:h-7 text-black" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-2xl font-bold">تقييماتي</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-neutral-500 text-sm">قائمة التقييمات</p>
-                <span className={`text-xs flex items-center gap-1 ${syncStatus === 'synced' ? 'text-green-500' : syncStatus === 'syncing' ? 'text-yellow-500' : 'text-red-500'}`}>
-                  {syncStatus === 'synced' ? 'متزامن' : syncStatus === 'syncing' ? 'مزامنة...' : 'خطأ'}
-                </span>
-              </div>
+              <h1 className="text-lg sm:text-2xl font-bold">قائمة المشاهدة</h1>
+              <p className="text-neutral-500 text-sm">آخر 5 عناصر فقط للعرض + إحصائيات من كل البيانات</p>
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>
             <Button onClick={handleLogout} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><X className="w-5 h-5" /></Button>
-            <Button onClick={exportData} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Download className="w-5 h-5" /></Button>
-            <Button onClick={movieNightPicker} className="bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold gap-2">
-              <Dice5 className="w-4 h-4" /><span className="hidden sm:inline">فيلم الليلة</span>
-            </Button>
           </div>
         </header>
 
-        {/* Picker Result */}
-        {pickerResult && (
-          <div className="bg-yellow-500/10 border border-dashed border-yellow-500/40 rounded-xl p-4 mb-6 text-center">
-            <p className="text-yellow-300 font-medium">{pickerResult}</p>
-          </div>
-        )}
-
         {/* Stats */}
         {showStats && (
-          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-6 mb-6">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-yellow-500" />إحصائيات التقييمات</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
-                <p className="text-2xl font-bold text-yellow-500">{stats.total}</p>
-                <p className="text-sm text-neutral-400">إجمالي المُقيّمة</p>
-              </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
-                <p className="text-2xl font-bold text-amber-400">{stats.avg}</p>
-                <p className="text-sm text-neutral-400">متوسط التقييم</p>
-              </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
-                <p className="text-2xl font-bold text-yellow-300">{stats.topGenre}</p>
-                <p className="text-sm text-neutral-400">أكثر تصنيف</p>
-              </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
-                <p className="text-2xl font-bold text-amber-300">{stats.topYear}</p>
-                <p className="text-sm text-neutral-400">أكثر سنة</p>
-              </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]">
-                <p className="text-2xl font-bold text-yellow-400">{stats.thisMonth}</p>
-                <p className="text-sm text-neutral-400">هذا الشهر</p>
-              </div>
+          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-6">
+            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-yellow-500" />إحصائيات سريعة</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-yellow-500">{stats.total}</p><p className="text-xs text-neutral-400">عدد الأعمال الكلي</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-amber-400">{stats.topGenre}</p><p className="text-xs text-neutral-400">أكثر Genre</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-yellow-300">{formatRating(stats.avg)}</p><p className="text-xs text-neutral-400">متوسط التقييم</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-amber-300">{stats.topYear}</p><p className="text-xs text-neutral-400">أكثر سنة إنتاج</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-yellow-400">{stats.thisMonth}</p><p className="text-xs text-neutral-400">عدد هذا الشهر</p></div>
             </div>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-1 sm:pb-0">
-          {(['all', 'movie', 'series', 'anime', 'game', 'book'] as TabType[]).map((type) => {
-            const c = TYPE_CONFIG[type]; const I = c.icon; const active = activeTab === type
-            return (
-              <button key={type} onClick={() => setActiveTab(type)}
-                className={`flex-shrink-0 min-w-[90px] sm:min-w-0 rounded-xl p-3 transition-all ${active ? 'bg-gradient-to-br ' + c.color + ' text-black shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}>
-                <div className="flex items-center gap-2">
-                  <I className="w-5 h-5" />
-                  <div className="text-right">
-                    <p className="font-bold text-sm">{c.plural}</p>
-                    <p className={`text-xs ${active ? 'opacity-80' : 'text-neutral-500'}`}>{tabStats[type]}</p>
+        <div className="flex gap-2 mb-6">
+          <button onClick={() => setActiveTab('movies')}
+            className={`flex-1 rounded-xl p-3 transition-all flex items-center justify-center gap-2 ${activeTab === 'movies' ? 'bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}>
+            <Film className="w-5 h-5" /><span>الأفلام</span><span className={`text-xs ${activeTab === 'movies' ? 'opacity-80' : 'text-neutral-500'}`}>({allMovies.length})</span>
+          </button>
+          <button onClick={() => setActiveTab('series')}
+            className={`flex-1 rounded-xl p-3 transition-all flex items-center justify-center gap-2 ${activeTab === 'series' ? 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white font-bold shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}>
+            <Tv className="w-5 h-5" /><span>المسلسلات</span><span className={`text-xs ${activeTab === 'series' ? 'opacity-80' : 'text-neutral-500'}`}>({allSeries.length})</span>
+          </button>
+        </div>
+
+        {/* ===================== Movies Tab ===================== */}
+        {activeTab === 'movies' && (
+          <>
+            {/* Add Movie Button */}
+            <div className="flex gap-2 mb-4">
+              <Button onClick={() => { resetMovieForm(); setShowMovieForm(true) }} className="bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold gap-2">
+                <Plus className="w-4 h-4" />إضافة فيلم
+              </Button>
+              <Button onClick={movieNightPicker} variant="outline" className="border-[#2a2a2a] text-neutral-400 gap-2">
+                <Dice5 className="w-4 h-4" />فيلم الليلة
+              </Button>
+              <Button onClick={printMovies} variant="outline" className="border-[#2a2a2a] text-neutral-400 gap-2 hidden sm:flex">
+                طباعة الكل
+              </Button>
+            </div>
+
+            {/* Picker Result */}
+            {pickerResult && (
+              <div className="bg-yellow-500/10 border border-dashed border-yellow-500/40 rounded-xl p-4 mb-4 text-center">
+                <p className="text-yellow-300 font-medium">{pickerResult}</p>
+              </div>
+            )}
+
+            {/* Movie Form Dialog */}
+            {showMovieForm && (
+              <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-4">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-yellow-500" />
+                  {editingMovie ? 'تعديل فيلم' : 'إضافة فيلم جديد'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-neutral-400 mb-1 block">اسم الفيلم *</label>
+                    <Input value={movieForm.title} onChange={e => setMovieForm(p => ({ ...p, title: e.target.value }))} placeholder="مثال: Interstellar" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">سنة الإنتاج *</label>
+                    <Input type="number" value={movieForm.year} onChange={e => setMovieForm(p => ({ ...p, year: e.target.value }))} placeholder="2024" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">التصنيف *</label>
+                    <Select value={movieForm.genre} onValueChange={v => setMovieForm(p => ({ ...p, genre: v }))}>
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
+                        {GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">التقييم (0-100) *</label>
+                    <Input type="number" value={movieForm.rating} onChange={e => setMovieForm(p => ({ ...p, rating: e.target.value }))} placeholder="85" min={0} max={100} className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">المدة بالدقائق</label>
+                    <Input type="number" value={movieForm.runtime} onChange={e => setMovieForm(p => ({ ...p, runtime: e.target.value }))} placeholder="120" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">الحالة</label>
+                    <Select value={movieForm.status} onValueChange={v => setMovieForm(p => ({ ...p, status: v }))}>
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                        {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">هل يستحق إعادة مشاهدة؟</label>
+                    <Select value={movieForm.rewatch} onValueChange={v => setMovieForm(p => ({ ...p, rewatch: v }))}>
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                        <SelectItem value="true">نعم</SelectItem>
+                        <SelectItem value="false">لا</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </button>
-            )
-          })}
-        </div>
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={handleMovieSubmit} className="flex-1 bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold">{editingMovie ? 'حفظ التعديل' : 'إضافة الفيلم'}</Button>
+                  <Button onClick={resetMovieForm} variant="outline" className="border-[#2a2a2a]">إلغاء</Button>
+                </div>
+              </div>
+            )}
 
-        {/* Search & Filters */}
-        <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-6">
-          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0">
-            <div className="flex-1 min-w-0 relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث عن عمل مُقيّم..."
-                className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 pr-9 h-10" />
+            {/* Movie Filters */}
+            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm font-bold">بحث + فلترة + ترتيب (على آخر 5)</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-2 relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <Input value={movieSearch} onChange={e => setMovieSearch(e.target.value)} placeholder="ابحث باسم الفيلم..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 pr-9 h-9" />
+                </div>
+                <Select value={filterGenre || '_all'} onValueChange={v => setFilterGenre(v === '_all' ? '' : v)}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="النوع" /></SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
+                    <SelectItem value="_all">الكل</SelectItem>
+                    {GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input type="number" value={filterYear} onChange={e => setFilterYear(e.target.value)} placeholder="السنة" className="bg-[#1a1a1a] border-[#2a2a2a] h-9" />
+                <Input type="number" value={filterMinRating} onChange={e => setFilterMinRating(e.target.value)} placeholder="تقييم أعلى من" className="bg-[#1a1a1a] border-[#2a2a2a] h-9" />
+                <Select value={filterStatus || '_all'} onValueChange={v => setFilterStatus(v === '_all' ? '' : v)}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="_all">الكل</SelectItem>
+                    {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={sortMovies} onValueChange={v => setSortMovies(v as SortBy)}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-9"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="latest_added">Latest added</SelectItem>
+                    <SelectItem value="rating_desc">الأعلى تقييمًا</SelectItem>
+                    <SelectItem value="year_desc">الأحدث</SelectItem>
+                    <SelectItem value="year_asc">الأقدم</SelectItem>
+                    <SelectItem value="title_asc">A-Z</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mt-2">
+                <Button variant="ghost" size="sm" onClick={clearMovieFilters} className="text-neutral-400">مسح الفلاتر</Button>
+              </div>
             </div>
-            <div className="hidden sm:flex">
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-                <SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10">
-                  <ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                  <SelectItem value="userRating">التقييم</SelectItem>
-                  <SelectItem value="year">السنة</SelectItem>
-                  <SelectItem value="title">العنوان</SelectItem>
-                  <SelectItem value="addedAt">تاريخ الإضافة</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-yellow-500 text-yellow-500' : 'border-[#2a2a2a] text-neutral-400'}`}>
-              <Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span>
-            </Button>
-          </div>
-          {showFilters && (
-            <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-[#2a2a2a]">
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-[100px] sm:w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger>
-                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
-                  <SelectItem value="all">كل السنوات</SelectItem>
-                  {YEARS_RANGE.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterGenre} onValueChange={setFilterGenre}>
-                <SelectTrigger className="w-[120px] sm:w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger>
-                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
-                  <SelectItem value="all">كل التصنيفات</SelectItem>
-                  {GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input type="number" value={filterMinRating} onChange={(e) => setFilterMinRating(e.target.value)} placeholder="تقييم أعلى من..." min={0} max={100}
-                className="w-[150px] bg-[#1a1a1a] border-[#2a2a2a] h-9" />
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-neutral-400"><X className="w-4 h-4 ml-1" />مسح</Button>
-            </div>
-          )}
-        </div>
 
-        {/* Results count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-neutral-400">{filteredItems.length} نتيجة</p>
-        </div>
-
-        {/* Items List */}
-        {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-24 h-24 rounded-full bg-yellow-500/10 flex items-center justify-center mb-6">
-              <Star className="w-12 h-12 text-neutral-500" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">{allItems.length === 0 ? 'لا توجد تقييمات' : 'لا توجد نتائج'}</h3>
-            <p className="text-neutral-500 mb-4">{allItems.length === 0 ? 'قم بتقييم أعمالك من صفحات الأقسام' : 'جرب تغيير الفلاتر'}</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredItems.map((item) => {
-              const rating = item.userRating || 0
-              const typeConfig = TYPE_CONFIG[item.type as TabType] || TYPE_CONFIG.all
-              const TypeIcon = typeConfig.icon
-              const genres = typeof item.genres === 'string' ? item.genres.split(',').map(g => g.trim()).filter(Boolean) : (item.genres || [])
-
-              return (
-                <div key={item.id} className="flex gap-3 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 border border-[#2a2a2a]/50 transition-all group">
-                  {/* Rating Badge */}
-                  <div className={`flex-shrink-0 w-14 h-14 rounded-xl border flex flex-col items-center justify-center ${getRatingColor(rating)}`}>
-                    <span className="text-lg font-black leading-none">{rating}</span>
-                    <span className="text-[9px] opacity-60">/100</span>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-bold line-clamp-1">{getDisplayTitle(item)}</h3>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs text-neutral-400">{item.year}</span>
-                          {item.seasons && <span className="text-xs text-neutral-400">• {item.seasons} موسم</span>}
-                          {(item as any).author && item.type === 'game' && <span className="text-xs text-neutral-400">• {(item as any).author}</span>}
-                          <Badge className={`text-[9px] bg-gradient-to-r ${typeConfig.color} text-white`}>{typeConfig.label}</Badge>
-                          {genres.slice(0, 2).map(g => (
-                            <Badge key={g} className="text-[9px] bg-yellow-500/15 text-yellow-400 border-yellow-500/25">{g}</Badge>
-                          ))}
-                          {item.favorite && <span className="text-red-400 text-xs">مفضلة</span>}
+            {/* Movies List */}
+            <div className="mb-4">
+              <h2 className="text-sm font-bold mb-3 flex items-center gap-2">
+                <Film className="w-4 h-4 text-yellow-500" />آخر الأفلام
+                <Badge className="text-[9px] bg-yellow-500/15 text-yellow-400 border-yellow-500/25">{filteredMovies.length}</Badge>
+              </h2>
+              {filteredMovies.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Film className="w-12 h-12 text-neutral-600 mb-4" />
+                  <p className="text-neutral-500">{allMovies.length === 0 ? 'لا توجد أفلام بعد' : 'لا يوجد نتائج ضمن آخر 5 أفلام'}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredMovies.map(m => {
+                    const rewatch = m.rewatch === true || m.rewatch === 'true'
+                    return (
+                      <div key={m.id} className="flex gap-3 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 border border-[#2a2a2a]/50 transition-all group">
+                        <div className={`flex-shrink-0 w-14 h-14 rounded-xl border flex flex-col items-center justify-center ${getRatingColor(m.rating)}`}>
+                          <span className="text-lg font-black leading-none">{formatRating(m.rating)}</span>
+                          <span className="text-[8px] opacity-60">/100</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold line-clamp-1">{m.title}</h3>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-xs text-neutral-400">{m.year}</span>
+                            <Badge className="text-[9px] bg-yellow-500/15 text-yellow-400 border-yellow-500/25">{m.genre || 'Other'}</Badge>
+                            <span className={`text-[10px] rounded-full px-2 py-0.5 border ${statusColor(m.status || 'watched')}`}>{statusLabel(m.status || 'watched')}</span>
+                            {m.runtime && <span className="text-xs text-neutral-400">{m.runtime} د</span>}
+                            <span className={`text-xs ${rewatch ? 'text-green-400' : 'text-red-400'}`}>{rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}</span>
+                          </div>
+                          <div className="mt-2 w-full h-1.5 rounded-full bg-[#2a2a2a] overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${getRatingBarColor(m.rating)}`} style={{ width: `${m.rating}%` }} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="icon" variant="ghost" onClick={() => editMovie(m)} className="w-8 h-8 text-neutral-400 hover:text-yellow-400"><Edit3 className="w-3.5 h-3.5" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => deleteMovie(m.id)} className="w-8 h-8 text-neutral-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="icon" variant="ghost" onClick={() => openEditRating(item)} className="w-8 h-8 text-neutral-400 hover:text-yellow-400">
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => removeRating(item)} className="w-8 h-8 text-neutral-400 hover:text-red-400">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                    {/* Rating Bar */}
-                    <div className="mt-2 w-full h-1.5 rounded-full bg-[#2a2a2a] overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-500 ${getRatingBarColor(rating)}`} style={{ width: `${rating}%` }} />
-                    </div>
-                  </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
+              )}
+            </div>
+          </>
         )}
 
-        {/* Top Rated Section */}
-        {allItems.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              أعلى 10 تقييمات
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {[...allItems].sort((a, b) => (b.userRating || 0) - (a.userRating || 0)).slice(0, 10).map((item, idx) => {
-                const rating = item.userRating || 0
-                const typeConfig = TYPE_CONFIG[item.type as TabType] || TYPE_CONFIG.all
-                return (
-                  <div key={item.id} className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-[#2a2a2a] hover:border-yellow-500/30 transition-all hover:scale-[1.02]">
-                    <div className="aspect-[2/3] bg-[#1a1a1a]">
-                      {item.poster ? (
-                        <img src={item.poster} alt={item.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className={`w-full h-full flex items-center justify-center ${typeConfig.bgColor}`}>
-                          <Star className="w-12 h-12 text-neutral-600" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                      {/* Rank */}
-                      <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/70 flex items-center justify-center text-xs font-black text-yellow-400">
-                        {idx + 1}
-                      </div>
-                      {/* Rating */}
-                      <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg border text-xs font-black ${getRatingColor(rating)}`}>
-                        {rating}
-                      </div>
-                      <div className="absolute bottom-0 right-0 left-0 p-2">
-                        <h4 className="font-bold text-xs line-clamp-1">{getDisplayTitle(item)}</h4>
-                        <p className="text-[10px] text-neutral-400">{item.year} • {typeConfig.label}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+        {/* ===================== Series Tab ===================== */}
+        {activeTab === 'series' && (
+          <>
+            {/* Add Series Button */}
+            <div className="flex gap-2 mb-4">
+              <Button onClick={() => { resetSeriesForm(); setShowSeriesForm(true) }} className="bg-gradient-to-br from-blue-500 to-indigo-500 text-white font-bold gap-2">
+                <Plus className="w-4 h-4" />إضافة مسلسل
+              </Button>
             </div>
-          </div>
+
+            {/* Series Form Dialog */}
+            {showSeriesForm && (
+              <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-4">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-blue-500" />
+                  {editingSeries ? 'تعديل مسلسل' : 'إضافة مسلسل جديد'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs text-neutral-400 mb-1 block">اسم المسلسل *</label>
+                    <Input value={seriesForm.title} onChange={e => setSeriesForm(p => ({ ...p, title: e.target.value }))} placeholder="مثال: Breaking Bad" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-blue-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">سنة الإنتاج *</label>
+                    <Input type="number" value={seriesForm.year} onChange={e => setSeriesForm(p => ({ ...p, year: e.target.value }))} placeholder="2024" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-blue-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">عدد المواسم *</label>
+                    <Input type="number" value={seriesForm.seasons} onChange={e => setSeriesForm(p => ({ ...p, seasons: e.target.value }))} placeholder="3" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-blue-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">التقييم (0-100) *</label>
+                    <Input type="number" value={seriesForm.rating} onChange={e => setSeriesForm(p => ({ ...p, rating: e.target.value }))} placeholder="90" min={0} max={100} className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-blue-500 h-10" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 mb-1 block">هل يستحق إعادة مشاهدة؟</label>
+                    <Select value={seriesForm.rewatch} onValueChange={v => setSeriesForm(p => ({ ...p, rewatch: v }))}>
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                        <SelectItem value="true">نعم</SelectItem>
+                        <SelectItem value="false">لا</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={handleSeriesSubmit} className="flex-1 bg-gradient-to-br from-blue-500 to-indigo-500 text-white font-bold">{editingSeries ? 'حفظ التعديل' : 'إضافة المسلسل'}</Button>
+                  <Button onClick={resetSeriesForm} variant="outline" className="border-[#2a2a2a]">إلغاء</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Series Filters */}
+            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-bold">بحث + فلترة + ترتيب (على آخر 5)</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-2 relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <Input value={seriesSearch} onChange={e => setSeriesSearch(e.target.value)} placeholder="ابحث باسم المسلسل..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-blue-500 pr-9 h-9" />
+                </div>
+                <Input type="number" value={filterSeriesYear} onChange={e => setFilterSeriesYear(e.target.value)} placeholder="السنة" className="bg-[#1a1a1a] border-[#2a2a2a] h-9" />
+                <Input type="number" value={filterSeriesMinRating} onChange={e => setFilterSeriesMinRating(e.target.value)} placeholder="تقييم أعلى من" className="bg-[#1a1a1a] border-[#2a2a2a] h-9" />
+                <Select value={filterSeriesRewatch || '_all'} onValueChange={v => setFilterSeriesRewatch(v === '_all' ? '' : v)}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="إعادة مشاهدة" /></SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="_all">الكل</SelectItem>
+                    <SelectItem value="true">نعم</SelectItem>
+                    <SelectItem value="false">لا</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortSeries} onValueChange={v => setSortSeries(v as SortBy)}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-9"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="latest_added">Latest added</SelectItem>
+                    <SelectItem value="rating_desc">الأعلى تقييمًا</SelectItem>
+                    <SelectItem value="year_desc">الأحدث</SelectItem>
+                    <SelectItem value="year_asc">الأقدم</SelectItem>
+                    <SelectItem value="title_asc">A-Z</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mt-2">
+                <Button variant="ghost" size="sm" onClick={clearSeriesFilters} className="text-neutral-400">مسح الفلاتر</Button>
+              </div>
+            </div>
+
+            {/* Series List */}
+            <div className="mb-4">
+              <h2 className="text-sm font-bold mb-3 flex items-center gap-2">
+                <Tv className="w-4 h-4 text-blue-500" />آخر المسلسلات
+                <Badge className="text-[9px] bg-blue-500/15 text-blue-400 border-blue-500/25">{filteredSeries.length}</Badge>
+              </h2>
+              {filteredSeries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Tv className="w-12 h-12 text-neutral-600 mb-4" />
+                  <p className="text-neutral-500">{allSeries.length === 0 ? 'لا توجد مسلسلات بعد' : 'لا يوجد نتائج ضمن آخر 5 مسلسلات'}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredSeries.map(s => {
+                    const rewatch = s.rewatch === true || s.rewatch === 'true'
+                    const seasonWord = Number(s.seasons) === 1 ? 'موسم' : 'مواسم'
+                    return (
+                      <div key={s.id} className="flex gap-3 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 border border-[#2a2a2a]/50 transition-all group">
+                        <div className={`flex-shrink-0 w-14 h-14 rounded-xl border flex flex-col items-center justify-center ${getRatingColor(s.rating)}`}>
+                          <span className="text-lg font-black leading-none">{formatRating(s.rating)}</span>
+                          <span className="text-[8px] opacity-60">/100</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold line-clamp-1">{s.title}</h3>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-xs text-neutral-400">{s.year}</span>
+                            <span className="text-xs text-neutral-400">{s.seasons} {seasonWord}</span>
+                            <span className={`text-xs ${rewatch ? 'text-green-400' : 'text-red-400'}`}>{rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}</span>
+                          </div>
+                          <div className="mt-2 w-full h-1.5 rounded-full bg-[#2a2a2a] overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${getRatingBarColor(s.rating)}`} style={{ width: `${s.rating}%` }} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="icon" variant="ghost" onClick={() => editSeriesFn(s)} className="w-8 h-8 text-neutral-400 hover:text-blue-400"><Edit3 className="w-3.5 h-3.5" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => deleteSeries(s.id)} className="w-8 h-8 text-neutral-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Footer */}
@@ -567,39 +796,6 @@ export default function RatingsPage() {
           <p className="text-neutral-600 text-xs">صُنع بـ ❤️ بواسطة Hussam</p>
         </div>
       </div>
-
-      {/* Edit Rating Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-sm bg-[#0f0f0f] border-[#2a2a2a]">
-          <DialogHeader><DialogTitle className="text-lg">تعديل التقييم</DialogTitle></DialogHeader>
-          {editingItem && (
-            <div className="mt-4 space-y-4">
-              <p className="text-sm text-neutral-300">{getDisplayTitle(editingItem)} ({editingItem.year})</p>
-              <div>
-                <label className="text-sm text-neutral-400 mb-2 block">التقييم (0-100)</label>
-                <div className="flex items-center gap-3">
-                  <Input type="number" value={editRating} onChange={(e) => setEditRating(e.target.value)}
-                    min={0} max={100} step="0.1" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-yellow-500 h-12 text-center text-xl font-bold" />
-                  <span className="text-neutral-500">/ 100</span>
-                </div>
-                {/* Quick rating buttons */}
-                <div className="flex gap-1 mt-3 flex-wrap">
-                  {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(r => (
-                    <button key={r} onClick={() => setEditRating(r.toString())}
-                      className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${parseFloat(editRating) === r ? 'bg-yellow-500 text-black' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a]'}`}>
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={saveRating} className="flex-1 bg-gradient-to-br from-yellow-500 to-amber-600 text-black font-bold">حفظ</Button>
-                <Button onClick={() => setShowEditDialog(false)} variant="outline" className="flex-1 border-[#2a2a2a]">إلغاء</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

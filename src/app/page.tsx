@@ -2,13 +2,78 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Sparkles, BookOpen, Lightbulb, Gamepad2, Star } from 'lucide-react'
+import { ArrowLeft, Sparkles, BookOpen, Lightbulb, Gamepad2, Star, Lock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+
+const APP_PASSWORD = '204871'
 
 export default function HussamVisionHome() {
   const [mounted, setMounted] = useState(false)
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [showLogin, setShowLogin] = useState(true)
+  const [passwordInput, setPasswordInput] = useState('')
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+    const auth = localStorage.getItem('hussamvision_auth')
+    if (auth === 'true') {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+    }
+  }, [])
+
+  const handleLogin = () => {
+    if (passwordInput === APP_PASSWORD) {
+      setIsAuthenticated(true)
+      setShowLogin(false)
+      localStorage.setItem('hussamvision_auth', 'true')
+    }
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setShowLogin(true)
+    localStorage.removeItem('hussamvision_auth')
+    setPasswordInput('')
+  }
+
+  // شاشة تسجيل الدخول
+  if (showLogin && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#030712] text-white flex items-center justify-center">
+        <div className="w-full max-w-sm px-6">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/20">
+              <Lock className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">
+              <span className="bg-gradient-to-l from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">Hussam</span>
+              <span className="bg-gradient-to-l from-purple-400 via-purple-500 to-purple-600 bg-clip-text text-transparent">Vision</span>
+            </h1>
+            <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
+          </div>
+          <div className="space-y-4">
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="كلمة المرور"
+              className="bg-[#1a1a2a] border-[#2a2a3a] focus:border-indigo-500 h-12 text-center text-lg"
+            />
+            <Button
+              onClick={handleLogin}
+              className="w-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold h-12"
+            >
+              دخول
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#030712] text-white overflow-hidden relative" dir="rtl">
@@ -328,7 +393,10 @@ export default function HussamVisionHome() {
               transition={{ delay: 1.5, duration: 0.6 }}
               className="mt-8 sm:mt-16 text-center"
             >
-              <div className="flex items-center justify-center gap-2 text-neutral-600 text-xs">
+              <div className="flex items-center justify-center gap-4 text-neutral-600 text-xs">
+                <div className="flex items-center gap-2 text-neutral-500 cursor-pointer hover:text-neutral-300" onClick={handleLogout}>
+                  خروج
+                </div>
                 <div className="w-8 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />
                 <span>صُنع بـ ❤️ بواسطة Hussam</span>
                 <div className="w-8 h-[1px] bg-gradient-to-r from-transparent to-neutral-700" />

@@ -55,13 +55,10 @@ const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.
   })
 }
 
-const APP_PASSWORD = '7777'
 
 export default function GamesPage() {
   const { toast } = useToast()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [showLogin, setShowLogin] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('all')
   const [gameList, setGameList] = useState<GameItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -113,8 +110,12 @@ export default function GamesPage() {
   }, [])
 
   useEffect(() => {
-    const auth = localStorage.getItem('games_auth')
-    if (auth === 'true') { setIsAuthenticated(true); setShowLogin(false) }
+    const auth = localStorage.getItem('hussamvision_auth')
+    if (auth !== 'true') {
+      window.location.href = '/'
+      return
+    }
+    setIsAuthenticated(true)
   }, [])
 
   useEffect(() => { fetchGameList() }, [fetchGameList])
@@ -379,45 +380,14 @@ export default function GamesPage() {
     }
   }
 
-  const handleLogin = () => {
-    if (passwordInput === APP_PASSWORD) {
-      setIsAuthenticated(true); setShowLogin(false)
-      localStorage.setItem('games_auth', 'true')
-      toast({ title: '✅ مرحباً بك!', description: 'تم تسجيل الدخول بنجاح' })
-    } else {
-      toast({ title: '❌ خطأ', description: 'كلمة المرور غير صحيحة', variant: 'destructive' })
-    }
-  }
-
   const handleLogout = () => {
-    setIsAuthenticated(false); setShowLogin(true)
-    localStorage.removeItem('games_auth'); setPasswordInput('')
+    localStorage.removeItem('hussamvision_auth')
+    window.location.href = '/'
   }
 
   const clearFilters = () => { setSearchQuery(''); setFilterYear('all'); setFilterRating([0, 10]); setFilterStatus('all'); setFilterGenre('all') }
 
   const TabIcon = TAB_CONFIG[activeTab].icon
-
-  // شاشة تسجيل الدخول
-  if (showLogin && !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
-        <div className="w-full max-w-sm px-6">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
-              <Gamepad2 className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">أريد لعبها</h1>
-            <p className="text-neutral-500">أدخل كلمة المرور للدخول</p>
-          </div>
-          <div className="space-y-4">
-            <Input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="كلمة المرور" className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-teal-500 h-12 text-center text-lg" />
-            <Button onClick={handleLogin} className="w-full bg-gradient-to-br from-teal-500 to-cyan-500 text-white font-bold h-12">دخول</Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-teal-500" /></div>
 
