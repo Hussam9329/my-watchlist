@@ -29,6 +29,9 @@ model MediaItem {
   watched        Boolean  @default(false)
   watchedAt      String?
   userRating     Float?
+  rewatch        Boolean  @default(false)
+  runtime        Int?
+  ratingStatus   String   @default("watched")
   addedAt        DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

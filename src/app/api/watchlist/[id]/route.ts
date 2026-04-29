@@ -53,6 +53,9 @@ export async function PUT(
         watched: body.watched,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
         userRating: body.userRating ? parseFloat(body.userRating) : null,
+        rewatch: body.rewatch || false,
+        runtime: body.runtime ? parseInt(body.runtime) : null,
+        ratingStatus: body.ratingStatus || 'watched',
       }
     })
     
