@@ -52,7 +52,7 @@ export async function PUT(
         favorite: body.favorite,
         watched: body.watched,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
-        userRating: body.userRating ? parseFloat(body.userRating) : null,
+        userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
         rewatch: body.rewatch || false,
         runtime: body.runtime ? parseInt(body.runtime) : null,
         ratingStatus: body.ratingStatus || 'watched',

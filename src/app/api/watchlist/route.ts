@@ -10,10 +10,24 @@ function formatItem(item: any) {
   }
 }
 
-// GET - جلب جميع العناصر
-export async function GET() {
+// GET - جلب جميع العناصر (مع دعم الفلترة حسب النوع والبحث)
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type')
+    const search = searchParams.get('search')
+
+    const where: any = {}
+    if (type) where.type = type
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { originalTitle: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
     const items = await prisma.mediaItem.findMany({
+      where,
       orderBy: { addedAt: 'desc' }
     })
     const formattedItems = items.map(formatItem)
@@ -67,7 +81,7 @@ if (existing) {
         favorite: body.favorite || false,
         watched: body.watched || false,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
-        userRating: body.userRating ? parseFloat(body.userRating) : null,
+        userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
         rewatch: body.rewatch || false,
         runtime: body.runtime ? parseInt(body.runtime) : null,
         ratingStatus: body.ratingStatus || 'watched',
