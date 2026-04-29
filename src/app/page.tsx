@@ -280,9 +280,7 @@ export default function HussamVisionHome() {
 
               {/* بطاقة تقييماتي */}
               <motion.a
-                href="https://my-watched-list.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/ratings"
                 onHoverStart={() => setHoveredCard('ratings')}
                 onHoverEnd={() => setHoveredCard(null)}
                 whileHover={{ scale: 1.03, y: -5 }}
@@ -305,7 +303,7 @@ export default function HussamVisionHome() {
                     تقييماتي
                   </h3>
                   <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
-                    افتح موقعي الخاص بالتقييمات
+                    قيّم أعمالك المفضلة بتفصيل
                   </p>
 
                   <motion.div
