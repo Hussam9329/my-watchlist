@@ -1,17 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
-import {
-  Film, Tv, Plus, Search, Filter, ArrowRight, Star, Trash2, Edit,
-  Dice5, Printer, RefreshCw, X, Clock, Calendar, BarChart3,
-  Loader2, Clapperboard, CheckCircle2, Eye, BookmarkPlus, RotateCcw
-} from 'lucide-react'
+
+/* ============================================================
+   CSS Import
+   ============================================================ */
+// We load the CSS via a link tag in useEffect to avoid Next.js CSS module issues
 
 /* ============================================================
    Types
@@ -46,8 +40,7 @@ interface DashboardStats {
 }
 
 type TabType = 'movies' | 'series'
-type MovieSortOption = 'latest_added' | 'rating_desc' | 'year_desc' | 'year_asc' | 'title_asc'
-type SeriesSortOption = 'latest_added' | 'rating_desc' | 'year_desc' | 'year_asc' | 'title_asc'
+type SortOption = 'latest_added' | 'rating_desc' | 'year_desc' | 'year_asc' | 'title_asc'
 
 /* ============================================================
    Constants
@@ -59,31 +52,35 @@ const GENRE_OPTIONS = [
   'War', 'Western', 'Other'
 ]
 
-const STATUS_OPTIONS = [
-  { value: 'watched', label: 'Watched', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  { value: 'watching', label: 'Watching', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  { value: 'plan', label: 'Plan to Watch', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-]
+const STATUS_OPTIONS = ['watched', 'watching', 'plan']
 
-const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
+const STATUS_LABELS: Record<string, string> = {
+  watched: 'Watched',
+  watching: 'Watching',
+  plan: 'Plan to Watch',
+}
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'latest_added', label: 'Latest added' },
+  { value: 'rating_desc', label: 'الأعلى تقييمًا' },
+  { value: 'year_desc', label: 'الأحدث سنة' },
+  { value: 'year_asc', label: 'الأقدم سنة' },
+  { value: 'title_asc', label: 'A-Z' },
+]
 
 /* ============================================================
    Helpers
    ============================================================ */
-function getRatingColor(rating: number) {
-  if (rating >= 70) return 'bg-green-500 text-white'
-  if (rating >= 40) return 'bg-yellow-500 text-black'
-  return 'bg-red-500 text-white'
+function getRatingClass(rating: number) {
+  if (rating >= 70) return 'rating-high'
+  if (rating >= 40) return 'rating-mid'
+  return 'rating-low'
 }
 
-function getRatingTextColor(rating: number) {
-  if (rating >= 70) return 'text-green-400'
-  if (rating >= 40) return 'text-yellow-400'
-  return 'text-red-400'
-}
-
-function getStatusConfig(status: string) {
-  return STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0]
+function getStatusClass(status: string) {
+  if (status === 'watched') return 'status-watched'
+  if (status === 'watching') return 'status-watching'
+  return 'status-plan'
 }
 
 function formatRating(num: number) {
@@ -95,8 +92,6 @@ function formatRating(num: number) {
    Main Component
    ============================================================ */
 export default function RatingsPage() {
-  const { toast } = useToast()
-
   // Auth
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -104,14 +99,16 @@ export default function RatingsPage() {
   // Data
   const [allItems, setAllItems] = useState<RatedItem[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
 
   // UI State
   const [activeTab, setActiveTab] = useState<TabType>('movies')
-  const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [editingItem, setEditingItem] = useState<RatedItem | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
+  const [isDarkTheme, setIsDarkTheme] = useState(true)
+  const [accentColor, setAccentColor] = useState('#d4a843')
+
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Movie filters
   const [movieSearch, setMovieSearch] = useState('')
@@ -119,14 +116,13 @@ export default function RatingsPage() {
   const [movieYearFilter, setMovieYearFilter] = useState('')
   const [movieMinRating, setMovieMinRating] = useState('')
   const [movieStatusFilter, setMovieStatusFilter] = useState('all')
-  const [movieSort, setMovieSort] = useState<MovieSortOption>('latest_added')
+  const [movieSort, setMovieSort] = useState<SortOption>('latest_added')
 
   // Series filters
   const [seriesSearch, setSeriesSearch] = useState('')
   const [seriesYearFilter, setSeriesYearFilter] = useState('')
   const [seriesMinRating, setSeriesMinRating] = useState('')
-  const [seriesRewatchFilter, setSeriesRewatchFilter] = useState('all')
-  const [seriesSort, setSeriesSort] = useState<SeriesSortOption>('latest_added')
+  const [seriesSort, setSeriesSort] = useState<SortOption>('latest_added')
 
   // Movie form
   const [movieForm, setMovieForm] = useState({
@@ -151,6 +147,52 @@ export default function RatingsPage() {
   // Movie night picker
   const [movieNightResult, setMovieNightResult] = useState<string | null>(null)
 
+  // Print select
+  const [printSort, setPrintSort] = useState('alpha')
+
+  /* ============================================================
+     Load CSS
+     ============================================================ */
+  useEffect(() => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = '/ratings-style.css'
+    link.id = 'ratings-style'
+    document.head.appendChild(link)
+    return () => {
+      const el = document.getElementById('ratings-style')
+      if (el) el.remove()
+    }
+  }, [])
+
+  /* ============================================================
+     Theme & Accent
+     ============================================================ */
+  useEffect(() => {
+    if (isDarkTheme) {
+      document.body.classList.remove('light-theme')
+    } else {
+      document.body.classList.add('light-theme')
+    }
+  }, [isDarkTheme])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', accentColor)
+    // Derive glow
+    const r = parseInt(accentColor.slice(1, 3), 16)
+    const g = parseInt(accentColor.slice(3, 5), 16)
+    const b = parseInt(accentColor.slice(5, 7), 16)
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r},${g},${b},0.15)`)
+  }, [accentColor])
+
+  /* ============================================================
+     Toast
+     ============================================================ */
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }, [])
+
   /* ============================================================
      Auth Check
      ============================================================ */
@@ -168,9 +210,6 @@ export default function RatingsPage() {
      ============================================================ */
   const fetchData = useCallback(async () => {
     try {
-      setSyncStatus('syncing')
-
-      // Fetch rated items
       const itemsRes = await fetch('/api/watchlist')
       const itemsData = await itemsRes.json()
 
@@ -181,26 +220,22 @@ export default function RatingsPage() {
         items = itemsData
       }
 
-      // Filter: only movie/series with userRating
       const ratedItems = items.filter(
         (i: any) => (i.type === 'movie' || i.type === 'series') && i.userRating != null
       )
       setAllItems(ratedItems)
 
-      // Fetch stats
       const statsRes = await fetch('/api/ratings-stats')
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
       }
-
-      setSyncStatus('synced')
     } catch {
-      setSyncStatus('error')
+      showToast('حدث خطأ أثناء تحميل البيانات', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     if (isAuthenticated) fetchData()
@@ -264,10 +299,6 @@ export default function RatingsPage() {
       const minR = parseFloat(seriesMinRating)
       if (!isNaN(minR)) result = result.filter(i => i.userRating >= minR)
     }
-    if (seriesRewatchFilter !== 'all') {
-      const rewatchVal = seriesRewatchFilter === 'true'
-      result = result.filter(i => i.rewatch === rewatchVal)
-    }
 
     switch (seriesSort) {
       case 'rating_desc': result.sort((a, b) => b.userRating - a.userRating); break
@@ -278,7 +309,7 @@ export default function RatingsPage() {
     }
 
     return result
-  }, [series, seriesSearch, seriesYearFilter, seriesMinRating, seriesRewatchFilter, seriesSort])
+  }, [series, seriesSearch, seriesYearFilter, seriesMinRating, seriesSort])
 
   /* Recent 5 */
   const recentMovies = useMemo(() => filteredMovies.slice(0, 5), [filteredMovies])
@@ -296,10 +327,10 @@ export default function RatingsPage() {
     const rewatch = movieForm.rewatch === 'true'
     const runtime = movieForm.runtime ? parseInt(movieForm.runtime, 10) : null
 
-    if (!title) return toast({ title: 'خطأ', description: 'اسم الفيلم مطلوب', variant: 'destructive' })
-    if (!genre) return toast({ title: 'خطأ', description: 'اختر التصنيف', variant: 'destructive' })
-    if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب أن يكون بين 0 و 100', variant: 'destructive' })
-    if (isNaN(year) || year < 1900 || year > 2100) return toast({ title: 'خطأ', description: 'سنة غير صالحة', variant: 'destructive' })
+    if (!title) return showToast('اسم الفيلم مطلوب', 'error')
+    if (!genre) return showToast('اختر التصنيف', 'error')
+    if (isNaN(rating) || rating < 0 || rating > 100) return showToast('التقييم يجب أن يكون بين 0 و 100', 'error')
+    if (isNaN(year) || year < 1900 || year > 2100) return showToast('سنة غير صالحة', 'error')
 
     try {
       const res = await fetch('/api/watchlist', {
@@ -321,18 +352,17 @@ export default function RatingsPage() {
 
       const data = await res.json()
       if (res.status === 409) {
-        toast({ title: '⚠️ موجود مسبقاً!', description: data.error, variant: 'destructive' })
+        showToast('⚠️ موجود مسبقاً!', 'error')
         return
       }
 
       if (data && data.id) {
         await fetchData()
-        setShowAddDialog(false)
         resetMovieForm()
-        toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${title}" بنجاح` })
+        showToast(`تم إضافة "${title}" بنجاح`)
       }
     } catch {
-      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' })
+      showToast('حدث خطأ أثناء الإضافة', 'error')
     }
   }
 
@@ -346,10 +376,10 @@ export default function RatingsPage() {
     const rating = parseFloat(seriesForm.rating)
     const rewatch = seriesForm.rewatch === 'true'
 
-    if (!title) return toast({ title: 'خطأ', description: 'اسم المسلسل مطلوب', variant: 'destructive' })
-    if (isNaN(seasons) || seasons < 1 || seasons > 100) return toast({ title: 'خطأ', description: 'عدد المواسم غير صحيح', variant: 'destructive' })
-    if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب أن يكون بين 0 و 100', variant: 'destructive' })
-    if (isNaN(year) || year < 1900 || year > 2100) return toast({ title: 'خطأ', description: 'سنة غير صالحة', variant: 'destructive' })
+    if (!title) return showToast('اسم المسلسل مطلوب', 'error')
+    if (isNaN(seasons) || seasons < 1 || seasons > 100) return showToast('عدد المواسم غير صحيح', 'error')
+    if (isNaN(rating) || rating < 0 || rating > 100) return showToast('التقييم يجب أن يكون بين 0 و 100', 'error')
+    if (isNaN(year) || year < 1900 || year > 2100) return showToast('سنة غير صالحة', 'error')
 
     try {
       const res = await fetch('/api/watchlist', {
@@ -370,26 +400,26 @@ export default function RatingsPage() {
 
       const data = await res.json()
       if (res.status === 409) {
-        toast({ title: '⚠️ موجود مسبقاً!', description: data.error, variant: 'destructive' })
+        showToast('⚠️ موجود مسبقاً!', 'error')
         return
       }
 
       if (data && data.id) {
         await fetchData()
-        setShowAddDialog(false)
         resetSeriesForm()
-        toast({ title: '✅ تمت الإضافة', description: `تم إضافة "${title}" بنجاح` })
+        showToast(`تم إضافة "${title}" بنجاح`)
       }
     } catch {
-      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' })
+      showToast('حدث خطأ أثناء الإضافة', 'error')
     }
   }
 
   /* ============================================================
      CRUD: Edit
      ============================================================ */
-  const openEditDialog = (item: RatedItem) => {
+  const openEdit = (item: RatedItem) => {
     setEditingItem(item)
+    setIsEditing(true)
     if (item.type === 'movie') {
       setMovieForm({
         title: item.title,
@@ -409,15 +439,12 @@ export default function RatingsPage() {
         rewatch: String(item.rewatch),
       })
     }
-    setShowEditDialog(true)
   }
 
   const handleSaveEdit = async () => {
     if (!editingItem) return
 
     try {
-      setSyncStatus('syncing')
-
       const body: any = {
         title: editingItem.type === 'movie' ? movieForm.title : seriesForm.title,
         originalTitle: editingItem.type === 'movie' ? movieForm.title : seriesForm.title,
@@ -449,16 +476,21 @@ export default function RatingsPage() {
       const data = await res.json()
       if (data) {
         await fetchData()
-        setSyncStatus('synced')
-        toast({ title: '✅ تم التعديل', description: 'تم حفظ التعديلات بنجاح' })
+        showToast('تم حفظ التعديلات بنجاح')
       }
 
-      setShowEditDialog(false)
+      setIsEditing(false)
       setEditingItem(null)
     } catch {
-      setSyncStatus('error')
-      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الحفظ', variant: 'destructive' })
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     }
+  }
+
+  const cancelEdit = () => {
+    setIsEditing(false)
+    setEditingItem(null)
+    resetMovieForm()
+    resetSeriesForm()
   }
 
   /* ============================================================
@@ -468,16 +500,12 @@ export default function RatingsPage() {
     if (!confirm(`هل أنت متأكد من حذف "${title}"؟`)) return
 
     try {
-      setSyncStatus('syncing')
       await fetch(`/api/watchlist/${id}`, { method: 'DELETE' })
       setAllItems(prev => prev.filter(i => i.id !== id))
-      setSyncStatus('synced')
-      toast({ title: '🗑️ تم الحذف', description: `تم حذف "${title}"` })
-      // Refresh stats
+      showToast(`تم حذف "${title}"`)
       fetchData()
     } catch {
-      setSyncStatus('error')
-      toast({ title: '❌ خطأ', description: 'حدث خطأ أثناء الحذف', variant: 'destructive' })
+      showToast('حدث خطأ أثناء الحذف', 'error')
     }
   }
 
@@ -522,7 +550,6 @@ export default function RatingsPage() {
     setSeriesSearch('')
     setSeriesYearFilter('')
     setSeriesMinRating('')
-    setSeriesRewatchFilter('all')
     setSeriesSort('latest_added')
   }
 
@@ -549,12 +576,17 @@ export default function RatingsPage() {
   const printFilteredMovies = () => {
     const itemsToPrint = [...filteredMovies]
     if (!itemsToPrint.length) {
-      toast({ title: 'خطأ', description: 'لا توجد نتائج للطباعة', variant: 'destructive' })
+      showToast('لا توجد نتائج للطباعة', 'error')
       return
     }
 
-    // Sort alphabetically for print
-    itemsToPrint.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }))
+    if (printSort === 'alpha') {
+      itemsToPrint.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }))
+    } else if (printSort === 'rating') {
+      itemsToPrint.sort((a, b) => b.userRating - a.userRating)
+    } else if (printSort === 'year') {
+      itemsToPrint.sort((a, b) => parseInt(b.year) - parseInt(a.year))
+    }
 
     const rows = itemsToPrint.map((m, idx) => `
       <tr>
@@ -562,7 +594,7 @@ export default function RatingsPage() {
         <td>${m.title}</td>
         <td>${m.year}</td>
         <td>${m.genres?.[0] || '-'}</td>
-        <td>${getStatusConfig(m.ratingStatus).label}</td>
+        <td>${STATUS_LABELS[m.ratingStatus] || 'Watched'}</td>
         <td>${formatRating(m.userRating)}</td>
         <td>${m.rewatch ? '✅ نعم' : '❌ لا'}</td>
       </tr>
@@ -570,7 +602,7 @@ export default function RatingsPage() {
 
     const printWindow = window.open('', '_blank', 'width=1100,height=800')
     if (!printWindow) {
-      toast({ title: 'خطأ', description: 'المتصفح منع فتح نافذة الطباعة', variant: 'destructive' })
+      showToast('المتصفح منع فتح نافذة الطباعة', 'error')
       return
     }
 
@@ -620,8 +652,17 @@ export default function RatingsPage() {
      ============================================================ */
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#030712] text-white flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-amber-500" />
+      <div style={{
+        minHeight: '100vh',
+        background: '#0a0a0f',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#d4a843',
+        fontSize: '2rem',
+        fontFamily: 'Tajawal, sans-serif',
+      }}>
+        <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
       </div>
     )
   }
@@ -629,1001 +670,540 @@ export default function RatingsPage() {
   if (!isAuthenticated) return null
 
   /* ============================================================
+     Determine if editing a movie or series
+     ============================================================ */
+  const isEditingMovie = editingItem?.type === 'movie'
+  const isEditingSeries = editingItem?.type === 'series'
+
+  /* ============================================================
      Render
      ============================================================ */
   return (
-    <div className="min-h-screen bg-[#030712] text-white" dir="rtl">
+    <div className="ratings-page" dir="rtl">
       {/* Background effects */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-amber-500/3 rounded-full" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-yellow-500/3 rounded-full" />
+      <div className="bg-effects">
+        <div className="glow glow-1" />
+        <div className="glow glow-2" />
+        <div className="glow glow-3" />
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="ratings-container">
         {/* Header */}
-        <header className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3 sm:gap-5">
-            <Button
-              onClick={() => window.location.href = '/'}
-              variant="ghost"
-              size="icon"
-              className="text-neutral-500 hover:text-white hover:bg-[#1a1a1a]"
-            >
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-lg">
-              <Star className="w-5 h-5 sm:w-7 sm:h-7 text-black" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-2xl font-bold">تقييماتي</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-neutral-500 text-sm">أفلام ومسلسلات</p>
-                <span className={`text-xs flex items-center gap-1 ${syncStatus === 'synced' ? 'text-green-500' : syncStatus === 'syncing' ? 'text-yellow-500' : 'text-red-500'}`}>
-                  {syncStatus === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}
-                  {syncStatus === 'synced' ? 'متزامن' : syncStatus === 'syncing' ? 'مزامنة...' : 'خطأ'}
-                </span>
+        <div className="ratings-header">
+          <div className="top-controls">
+            <a href="/" className="icon-btn" title="رجوع">→</a>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                className="icon-btn"
+                onClick={() => setIsDarkTheme(!isDarkTheme)}
+                title="تبديل السمة"
+              >
+                {isDarkTheme ? '☀️' : '🌙'}
+              </button>
+              <div className="accent-wrap">
+                <input
+                  type="color"
+                  className="accent-picker-input"
+                  value={accentColor}
+                  onChange={e => setAccentColor(e.target.value)}
+                  title="لون التمييز"
+                />
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button
-              onClick={() => fetchData()}
-              variant="ghost"
-              size="icon"
-              className="text-neutral-400 hover:text-white"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() => {
-                resetMovieForm()
-                resetSeriesForm()
-                setShowAddDialog(true)
-              }}
-              className="bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">إضافة</span>
-            </Button>
-          </div>
-        </header>
+          <div className="logo-icon">🎬</div>
+          <h1>قائمة المشاهدة</h1>
+          <p className="subtitle">آخر 5 عناصر فقط للعرض + إحصائيات دقيقة من كل البيانات</p>
+        </div>
 
         {/* Dashboard Stats */}
         {stats && (
-          <section className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6 mb-6">
-            <h2 className="font-bold mb-4 flex items-center gap-2 text-amber-400">
-              <BarChart3 className="w-5 h-5" />
-              إحصائيات سريعة
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
-              <div className="bg-[#111827] rounded-lg p-3 sm:p-4 border border-[#1e293b]">
-                <p className="text-xl sm:text-2xl font-bold text-amber-400">{stats.totalRated}</p>
-                <p className="text-xs sm:text-sm text-neutral-400">إجمالي المقيّم</p>
+          <div className="dashboard-card">
+            <div className="list-title">
+              <span style={{ color: 'var(--accent)' }}>📊</span>
+              إحصائيات
+            </div>
+            <div className="stats-grid">
+              <div className="stat-item">
+                <span>إجمالي المقيّم</span>
+                <strong>{stats.totalRated}</strong>
               </div>
-              <div className="bg-[#111827] rounded-lg p-3 sm:p-4 border border-[#1e293b]">
-                <p className="text-xl sm:text-2xl font-bold text-yellow-400">{stats.topGenre}</p>
-                <p className="text-xs sm:text-sm text-neutral-400">أكثر تصنيف</p>
+              <div className="stat-item">
+                <span>أكثر تصنيف</span>
+                <strong>{stats.topGenre}</strong>
               </div>
-              <div className="bg-[#111827] rounded-lg p-3 sm:p-4 border border-[#1e293b]">
-                <p className="text-xl sm:text-2xl font-bold text-amber-300">{formatRating(stats.avgRating)}</p>
-                <p className="text-xs sm:text-sm text-neutral-400">متوسط التقييم</p>
+              <div className="stat-item">
+                <span>متوسط التقييم</span>
+                <strong>{formatRating(stats.avgRating)}</strong>
               </div>
-              <div className="bg-[#111827] rounded-lg p-3 sm:p-4 border border-[#1e293b]">
-                <p className="text-xl sm:text-2xl font-bold text-yellow-300">{stats.topYear}</p>
-                <p className="text-xs sm:text-sm text-neutral-400">أكثر سنة إنتاج</p>
+              <div className="stat-item">
+                <span>أكثر سنة إنتاج</span>
+                <strong>{stats.topYear}</strong>
               </div>
-              <div className="bg-[#111827] rounded-lg p-3 sm:p-4 border border-[#1e293b] col-span-2 sm:col-span-1">
-                <p className="text-xl sm:text-2xl font-bold text-amber-500">{stats.thisMonth}</p>
-                <p className="text-xs sm:text-sm text-neutral-400">أُضيف هذا الشهر</p>
+              <div className="stat-item">
+                <span>أُضيف هذا الشهر</span>
+                <strong>{stats.thisMonth}</strong>
               </div>
             </div>
-          </section>
+          </div>
         )}
 
         {/* Tabs */}
-        <nav className="flex gap-2 mb-6">
+        <div className="tabs">
           <button
+            className={`tab-btn ${activeTab === 'movies' ? 'active' : ''}`}
             onClick={() => setActiveTab('movies')}
-            className={`flex-shrink-0 rounded-xl p-3 transition-all flex items-center gap-2 ${
-              activeTab === 'movies'
-                ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-black shadow-lg'
-                : 'bg-[#111827] text-neutral-400 hover:bg-[#1e293b] border border-[#1e293b]/50'
-            }`}
           >
-            <Film className="w-5 h-5" />
-            <div className="text-right">
-              <p className="font-bold text-sm">الأفلام</p>
-              <p className={`text-xs ${activeTab === 'movies' ? 'opacity-80' : 'text-neutral-500'}`}>
-                {movies.length} فيلم
-              </p>
-            </div>
+            🎬 أفلام
           </button>
           <button
+            className={`tab-btn ${activeTab === 'series' ? 'active' : ''}`}
             onClick={() => setActiveTab('series')}
-            className={`flex-shrink-0 rounded-xl p-3 transition-all flex items-center gap-2 ${
-              activeTab === 'series'
-                ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-black shadow-lg'
-                : 'bg-[#111827] text-neutral-400 hover:bg-[#1e293b] border border-[#1e293b]/50'
-            }`}
           >
-            <Tv className="w-5 h-5" />
-            <div className="text-right">
-              <p className="font-bold text-sm">المسلسلات</p>
-              <p className={`text-xs ${activeTab === 'series' ? 'opacity-80' : 'text-neutral-500'}`}>
-                {series.length} مسلسل
-              </p>
-            </div>
+            📺 مسلسلات
           </button>
-        </nav>
+        </div>
 
         {/* ============================== MOVIES TAB ============================== */}
         {activeTab === 'movies' && (
-          <div className="space-y-6">
-            {/* Add Movie Form Card */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <h2 className="font-bold mb-4 flex items-center gap-2 text-amber-400">
-                <Plus className="w-5 h-5" />
-                إضافة فيلم جديد
-              </h2>
-              <div className="space-y-3">
-                <Input
-                  value={movieForm.title}
-                  onChange={e => setMovieForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم الفيلم"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
+          <>
+            {/* Add/Edit Movie Form Card */}
+            <div className="form-card">
+              <div className="form-title">
+                <span style={{ color: 'var(--accent)' }}>{isEditing && isEditingMovie ? '✏️' : '➕'}</span>
+                {isEditing && isEditingMovie ? 'تعديل الفيلم' : 'إضافة فيلم جديد'}
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>اسم الفيلم</label>
+                  <input
+                    type="text"
+                    value={movieForm.title}
+                    onChange={e => setMovieForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="اسم الفيلم"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>سنة الإنتاج</label>
+                  <input
+                    type="number"
                     value={movieForm.year}
                     onChange={e => setMovieForm(p => ({ ...p, year: e.target.value }))}
                     placeholder="سنة الإنتاج"
-                    type="number"
                     min={1900}
                     max={2100}
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                   />
-                  <Select value={movieForm.genre} onValueChange={v => setMovieForm(p => ({ ...p, genre: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="التصنيف" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b] max-h-[200px]">
-                      {GENRE_OPTIONS.map(g => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>التصنيف</label>
+                  <select
+                    value={movieForm.genre}
+                    onChange={e => setMovieForm(p => ({ ...p, genre: e.target.value }))}
+                  >
+                    <option value="">اختر التصنيف</option>
+                    {GENRE_OPTIONS.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>التقييم</label>
+                  <div className="rating-input-wrapper">
+                    <span className="rating-max">/100</span>
+                    <input
+                      type="number"
                       value={movieForm.rating}
                       onChange={e => setMovieForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
+                      placeholder="0-100"
                       min={0}
                       max={100}
                       step="any"
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">/ 100</span>
                   </div>
-                  <Input
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>المدة (دقائق)</label>
+                  <input
+                    type="number"
                     value={movieForm.runtime}
                     onChange={e => setMovieForm(p => ({ ...p, runtime: e.target.value }))}
-                    placeholder="المدة بالدقائق (اختياري)"
-                    type="number"
+                    placeholder="اختياري"
                     min={1}
                     max={400}
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Select value={movieForm.status} onValueChange={v => setMovieForm(p => ({ ...p, status: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="الحالة" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="watched">Watched</SelectItem>
-                      <SelectItem value="watching">Watching</SelectItem>
-                      <SelectItem value="plan">Plan to Watch</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={movieForm.rewatch} onValueChange={v => setMovieForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="form-group">
+                  <label>الحالة</label>
+                  <select
+                    value={movieForm.status}
+                    onChange={e => setMovieForm(p => ({ ...p, status: e.target.value }))}
+                  >
+                    {STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
                 </div>
-                <Button
-                  onClick={handleAddMovie}
-                  className="w-full bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2 h-10"
-                >
-                  <Plus className="w-4 h-4" />
-                  إضافة الفيلم
-                </Button>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>إعادة مشاهدة؟</label>
+                  <select
+                    value={movieForm.rewatch}
+                    onChange={e => setMovieForm(p => ({ ...p, rewatch: e.target.value }))}
+                  >
+                    <option value="true">✅ نعم</option>
+                    <option value="false">❌ لا</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-actions">
+                {isEditing && isEditingMovie ? (
+                  <>
+                    <button className="btn-submit" onClick={handleSaveEdit}>💾 حفظ التعديلات</button>
+                    <button className="btn-secondary" onClick={cancelEdit}>إلغاء</button>
+                  </>
+                ) : (
+                  <button className="btn-submit" onClick={handleAddMovie}>➕ إضافة الفيلم</button>
+                )}
               </div>
             </div>
 
             {/* Filters Card */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold flex items-center gap-2 text-amber-400">
-                  <Filter className="w-5 h-5" />
-                  بحث + فلترة + ترتيب
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="text-neutral-400"
-                >
-                  {showFilters ? 'إخفاء' : 'عرض'}
-                </Button>
+            <div className="form-card">
+              <div className="form-title">
+                <span style={{ color: 'var(--accent)' }}>🔍</span>
+                بحث + فلترة + ترتيب
               </div>
-
-              {/* Search always visible */}
-              <div className="relative mb-3">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <Input
+              <div className="form-group">
+                <input
+                  type="text"
                   value={movieSearch}
                   onChange={e => setMovieSearch(e.target.value)}
                   placeholder="ابحث باسم الفيلم..."
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 pr-9 h-10"
                 />
               </div>
-
-              {showFilters && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <Select value={movieGenreFilter} onValueChange={setMovieGenreFilter}>
-                      <SelectTrigger className="bg-[#111827] border-[#1e293b] h-9">
-                        <SelectValue placeholder="النوع" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#111827] border-[#1e293b] max-h-[200px]">
-                        <SelectItem value="all">الكل</SelectItem>
-                        {GENRE_OPTIONS.map(g => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={movieYearFilter}
-                      onChange={e => setMovieYearFilter(e.target.value)}
-                      placeholder="السنة"
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-9"
-                    />
-                    <Input
-                      value={movieMinRating}
-                      onChange={e => setMovieMinRating(e.target.value)}
-                      placeholder="تقييم أعلى من"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-9"
-                    />
-                    <Select value={movieStatusFilter} onValueChange={setMovieStatusFilter}>
-                      <SelectTrigger className="bg-[#111827] border-[#1e293b] h-9">
-                        <SelectValue placeholder="الحالة" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#111827] border-[#1e293b]">
-                        <SelectItem value="all">الكل</SelectItem>
-                        <SelectItem value="watched">Watched</SelectItem>
-                        <SelectItem value="watching">Watching</SelectItem>
-                        <SelectItem value="plan">Plan to Watch</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={movieSort} onValueChange={v => setMovieSort(v as MovieSortOption)}>
-                      <SelectTrigger className="bg-[#111827] border-[#1e293b] h-9">
-                        <SelectValue placeholder="الترتيب" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#111827] border-[#1e293b]">
-                        <SelectItem value="latest_added">Latest added</SelectItem>
-                        <SelectItem value="rating_desc">الأعلى تقييمًا</SelectItem>
-                        <SelectItem value="year_desc">الأحدث</SelectItem>
-                        <SelectItem value="year_asc">الأقدم</SelectItem>
-                        <SelectItem value="title_asc">A-Z</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" size="sm" onClick={clearMovieFilters} className="text-neutral-400">
-                      <X className="w-4 h-4 ml-1" />
-                      مسح الفلاتر
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={printFilteredMovies} className="text-neutral-400">
-                      <Printer className="w-4 h-4 ml-1" />
-                      طباعة النتائج
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={pickMovieNight}
-                      className="text-amber-400 hover:text-amber-300"
-                    >
-                      <Dice5 className="w-4 h-4 ml-1" />
-                      اختار لي فيلم الليلة
-                    </Button>
-                  </div>
+              <div className="filters-grid">
+                <div className="form-group">
+                  <label>التصنيف</label>
+                  <select value={movieGenreFilter} onChange={e => setMovieGenreFilter(e.target.value)}>
+                    <option value="all">الكل</option>
+                    {GENRE_OPTIONS.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
                 </div>
-              )}
-
-              {/* Movie Night Result */}
+                <div className="form-group">
+                  <label>السنة</label>
+                  <input
+                    type="number"
+                    value={movieYearFilter}
+                    onChange={e => setMovieYearFilter(e.target.value)}
+                    placeholder="السنة"
+                    min={1900}
+                    max={2100}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>تقييم أعلى من</label>
+                  <input
+                    type="number"
+                    value={movieMinRating}
+                    onChange={e => setMovieMinRating(e.target.value)}
+                    placeholder="تقييم أدنى"
+                    min={0}
+                    max={100}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>الحالة</label>
+                  <select value={movieStatusFilter} onChange={e => setMovieStatusFilter(e.target.value)}>
+                    <option value="all">الكل</option>
+                    {STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>الترتيب</label>
+                  <select value={movieSort} onChange={e => setMovieSort(e.target.value as SortOption)}>
+                    {SORT_OPTIONS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="filter-actions">
+                <button className="btn-secondary" onClick={clearMovieFilters}>✖ مسح الفلاتر</button>
+                <button className="btn-secondary" onClick={printFilteredMovies}>🖨️ طباعة النتائج</button>
+                <button className="btn-accent" onClick={pickMovieNight}>🎲 اختار لي فيلم الليلة</button>
+              </div>
               {movieNightResult && (
-                <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm">
+                <div className="picker-result">
                   {movieNightResult}
                 </div>
               )}
             </div>
 
             {/* Movies List */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold flex items-center gap-2 text-amber-400">
-                  <Clapperboard className="w-5 h-5" />
-                  آخر الأفلام
-                </h2>
-                <Badge variant="secondary" className="bg-[#111827] text-neutral-400 border border-[#1e293b]">
-                  {filteredMovies.length} نتيجة
-                </Badge>
+            <div className="list-card">
+              <div className="list-title">
+                <span style={{ color: 'var(--accent)' }}>🎬</span>
+                آخر الأفلام
+                <span className="count-badge">{filteredMovies.length}</span>
               </div>
-
               {recentMovies.length === 0 ? (
-                <div className="flex flex-col items-center py-12 text-neutral-500">
-                  <Film className="w-16 h-16 mb-4 opacity-30" />
+                <div className="empty-state">
                   <p>لا يوجد أفلام مقيّمة</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="items-list">
                   {recentMovies.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-[#111827]/50 hover:bg-[#1e293b]/50 border border-[#1e293b]/50 transition-colors"
-                    >
-                      {/* Rating Badge */}
-                      <div className={`flex-shrink-0 w-14 h-14 rounded-lg flex items-center justify-center font-bold text-sm ${getRatingColor(item.userRating)}`}>
+                    <div className="item-card" key={item.id}>
+                      <div className={`item-rating ${getRatingClass(item.userRating)}`}>
                         {formatRating(item.userRating)}
                       </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm truncate">{item.title}</div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-neutral-400">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {item.year}
-                          </span>
+                      <div className="item-info">
+                        <div className="item-title">{item.title}</div>
+                        <div className="item-meta">
+                          <span>{item.year}</span>
                           {item.genres?.[0] && (
-                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-[#1e293b] text-neutral-300">
-                              {item.genres[0]}
-                            </Badge>
+                            <span className="genre-badge">{item.genres[0]}</span>
                           )}
-                          <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${getStatusConfig(item.ratingStatus).color}`}>
-                            {getStatusConfig(item.ratingStatus).label}
-                          </Badge>
-                          {item.runtime && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {item.runtime} د
-                            </span>
-                          )}
-                          <span className={item.rewatch ? 'text-green-400' : 'text-red-400'}>
-                            {item.rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}
+                          <span className={`status-pill ${getStatusClass(item.ratingStatus)}`}>
+                            {STATUS_LABELS[item.ratingStatus] || 'Watched'}
+                          </span>
+                          {item.runtime && <span>{item.runtime} د</span>}
+                          <span className={item.rewatch ? 'rewatch-yes' : 'rewatch-no'}>
+                            {item.rewatch ? '🔄 إعادة' : '🚫'}
                           </span>
                         </div>
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-neutral-400 hover:text-amber-400"
-                          onClick={() => openEditDialog(item)}
+                      <div className="item-actions">
+                        <button
+                          className="btn-icon"
+                          onClick={() => openEdit(item)}
+                          title="تعديل"
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-neutral-400 hover:text-red-400"
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-icon btn-delete"
                           onClick={() => handleDelete(item.id, item.title)}
+                          title="حذف"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-
-              {/* Show all count */}
-              {filteredMovies.length > 5 && (
-                <p className="text-center text-xs text-neutral-500 mt-3">
-                  عرض آخر 5 من أصل {filteredMovies.length} فيلم مفلتر
-                </p>
-              )}
             </div>
-          </div>
+          </>
         )}
 
         {/* ============================== SERIES TAB ============================== */}
         {activeTab === 'series' && (
-          <div className="space-y-6">
-            {/* Add Series Form Card */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <h2 className="font-bold mb-4 flex items-center gap-2 text-amber-400">
-                <Plus className="w-5 h-5" />
-                إضافة مسلسل جديد
-              </h2>
-              <div className="space-y-3">
-                <Input
-                  value={seriesForm.title}
-                  onChange={e => setSeriesForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم المسلسل"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
+          <>
+            {/* Add/Edit Series Form Card */}
+            <div className="form-card">
+              <div className="form-title">
+                <span style={{ color: 'var(--accent)' }}>{isEditing && isEditingSeries ? '✏️' : '➕'}</span>
+                {isEditing && isEditingSeries ? 'تعديل المسلسل' : 'إضافة مسلسل جديد'}
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>اسم المسلسل</label>
+                  <input
+                    type="text"
+                    value={seriesForm.title}
+                    onChange={e => setSeriesForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="اسم المسلسل"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>سنة الإنتاج</label>
+                  <input
+                    type="number"
                     value={seriesForm.year}
                     onChange={e => setSeriesForm(p => ({ ...p, year: e.target.value }))}
                     placeholder="سنة الإنتاج"
-                    type="number"
                     min={1900}
                     max={2100}
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                   />
-                  <Input
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>عدد المواسم</label>
+                  <input
+                    type="number"
                     value={seriesForm.seasons}
                     onChange={e => setSeriesForm(p => ({ ...p, seasons: e.target.value }))}
                     placeholder="عدد المواسم"
-                    type="number"
                     min={1}
                     max={100}
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
+                <div className="form-group">
+                  <label>التقييم</label>
+                  <div className="rating-input-wrapper">
+                    <span className="rating-max">/100</span>
+                    <input
+                      type="number"
                       value={seriesForm.rating}
                       onChange={e => setSeriesForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
+                      placeholder="0-100"
                       min={0}
                       max={100}
                       step="any"
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">/ 100</span>
                   </div>
-                  <Select value={seriesForm.rewatch} onValueChange={v => setSeriesForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
-                <Button
-                  onClick={handleAddSeries}
-                  className="w-full bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2 h-10"
-                >
-                  <Plus className="w-4 h-4" />
-                  إضافة المسلسل
-                </Button>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>إعادة مشاهدة؟</label>
+                  <select
+                    value={seriesForm.rewatch}
+                    onChange={e => setSeriesForm(p => ({ ...p, rewatch: e.target.value }))}
+                  >
+                    <option value="true">✅ نعم</option>
+                    <option value="false">❌ لا</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-actions">
+                {isEditing && isEditingSeries ? (
+                  <>
+                    <button className="btn-submit" onClick={handleSaveEdit}>💾 حفظ التعديلات</button>
+                    <button className="btn-secondary" onClick={cancelEdit}>إلغاء</button>
+                  </>
+                ) : (
+                  <button className="btn-submit" onClick={handleAddSeries}>➕ إضافة المسلسل</button>
+                )}
               </div>
             </div>
 
             {/* Series Filters Card */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold flex items-center gap-2 text-amber-400">
-                  <Filter className="w-5 h-5" />
-                  بحث + فلترة + ترتيب
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="text-neutral-400"
-                >
-                  {showFilters ? 'إخفاء' : 'عرض'}
-                </Button>
+            <div className="form-card">
+              <div className="form-title">
+                <span style={{ color: 'var(--accent)' }}>🔍</span>
+                بحث + فلترة + ترتيب
               </div>
-
-              <div className="relative mb-3">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <Input
+              <div className="form-group">
+                <input
+                  type="text"
                   value={seriesSearch}
                   onChange={e => setSeriesSearch(e.target.value)}
                   placeholder="ابحث باسم المسلسل..."
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 pr-9 h-10"
                 />
               </div>
-
-              {showFilters && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <Input
-                      value={seriesYearFilter}
-                      onChange={e => setSeriesYearFilter(e.target.value)}
-                      placeholder="السنة"
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-9"
-                    />
-                    <Input
-                      value={seriesMinRating}
-                      onChange={e => setSeriesMinRating(e.target.value)}
-                      placeholder="تقييم أعلى من"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-9"
-                    />
-                    <Select value={seriesRewatchFilter} onValueChange={setSeriesRewatchFilter}>
-                      <SelectTrigger className="bg-[#111827] border-[#1e293b] h-9">
-                        <SelectValue placeholder="إعادة مشاهدة" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#111827] border-[#1e293b]">
-                        <SelectItem value="all">الكل</SelectItem>
-                        <SelectItem value="true">✅ نعم</SelectItem>
-                        <SelectItem value="false">❌ لا</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={seriesSort} onValueChange={v => setSeriesSort(v as SeriesSortOption)}>
-                      <SelectTrigger className="bg-[#111827] border-[#1e293b] h-9">
-                        <SelectValue placeholder="الترتيب" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#111827] border-[#1e293b]">
-                        <SelectItem value="latest_added">Latest added</SelectItem>
-                        <SelectItem value="rating_desc">الأعلى تقييمًا</SelectItem>
-                        <SelectItem value="year_desc">الأحدث</SelectItem>
-                        <SelectItem value="year_asc">الأقدم</SelectItem>
-                        <SelectItem value="title_asc">A-Z</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={clearSeriesFilters} className="text-neutral-400">
-                    <X className="w-4 h-4 ml-1" />
-                    مسح الفلاتر
-                  </Button>
+              <div className="filters-grid">
+                <div className="form-group">
+                  <label>السنة</label>
+                  <input
+                    type="number"
+                    value={seriesYearFilter}
+                    onChange={e => setSeriesYearFilter(e.target.value)}
+                    placeholder="السنة"
+                    min={1900}
+                    max={2100}
+                  />
                 </div>
-              )}
+                <div className="form-group">
+                  <label>تقييم أعلى من</label>
+                  <input
+                    type="number"
+                    value={seriesMinRating}
+                    onChange={e => setSeriesMinRating(e.target.value)}
+                    placeholder="تقييم أدنى"
+                    min={0}
+                    max={100}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>الترتيب</label>
+                  <select value={seriesSort} onChange={e => setSeriesSort(e.target.value as SortOption)}>
+                    {SORT_OPTIONS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="filter-actions">
+                <button className="btn-secondary" onClick={clearSeriesFilters}>✖ مسح الفلاتر</button>
+              </div>
             </div>
 
             {/* Series List */}
-            <div className="bg-[#0a0f1e] border border-[#1e293b] rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold flex items-center gap-2 text-amber-400">
-                  <Tv className="w-5 h-5" />
-                  آخر المسلسلات
-                </h2>
-                <Badge variant="secondary" className="bg-[#111827] text-neutral-400 border border-[#1e293b]">
-                  {filteredSeries.length} نتيجة
-                </Badge>
+            <div className="list-card">
+              <div className="list-title">
+                <span style={{ color: 'var(--accent)' }}>📺</span>
+                آخر المسلسلات
+                <span className="count-badge">{filteredSeries.length}</span>
               </div>
-
               {recentSeries.length === 0 ? (
-                <div className="flex flex-col items-center py-12 text-neutral-500">
-                  <Tv className="w-16 h-16 mb-4 opacity-30" />
+                <div className="empty-state">
                   <p>لا يوجد مسلسلات مقيّمة</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="items-list">
                   {recentSeries.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-[#111827]/50 hover:bg-[#1e293b]/50 border border-[#1e293b]/50 transition-colors"
-                    >
-                      {/* Rating Badge */}
-                      <div className={`flex-shrink-0 w-14 h-14 rounded-lg flex items-center justify-center font-bold text-sm ${getRatingColor(item.userRating)}`}>
+                    <div className="item-card" key={item.id}>
+                      <div className={`item-rating ${getRatingClass(item.userRating)}`}>
                         {formatRating(item.userRating)}
                       </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm truncate">{item.title}</div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-neutral-400">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {item.year}
-                          </span>
-                          {item.seasons && (
-                            <span className="flex items-center gap-1">
-                              <BookmarkPlus className="w-3 h-3" />
-                              {item.seasons} {item.seasons === 1 ? 'موسم' : 'مواسم'}
-                            </span>
-                          )}
-                          <span className={item.rewatch ? 'text-green-400' : 'text-red-400'}>
-                            {item.rewatch ? '✅ إعادة مشاهدة' : '❌ لا يُعاد'}
+                      <div className="item-info">
+                        <div className="item-title">{item.title}</div>
+                        <div className="item-meta">
+                          <span>{item.year}</span>
+                          {item.seasons && <span>{item.seasons} مواسم</span>}
+                          <span className={item.rewatch ? 'rewatch-yes' : 'rewatch-no'}>
+                            {item.rewatch ? '🔄 إعادة' : '🚫'}
                           </span>
                         </div>
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-neutral-400 hover:text-amber-400"
-                          onClick={() => openEditDialog(item)}
+                      <div className="item-actions">
+                        <button
+                          className="btn-icon"
+                          onClick={() => openEdit(item)}
+                          title="تعديل"
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-neutral-400 hover:text-red-400"
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-icon btn-delete"
                           onClick={() => handleDelete(item.id, item.title)}
+                          title="حذف"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-
-              {filteredSeries.length > 5 && (
-                <p className="text-center text-xs text-neutral-500 mt-3">
-                  عرض آخر 5 من أصل {filteredSeries.length} مسلسل مفلتر
-                </p>
-              )}
             </div>
-          </div>
+          </>
         )}
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-neutral-600 text-xs py-6">
+        <div className="page-footer">
           صُنع بـ ❤️ بواسطة Hussam
-        </footer>
+        </div>
       </div>
 
-      {/* ============================== ADD DIALOG ============================== */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md bg-[#0a0f1e] border-[#1e293b]">
-          <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Plus className="w-5 h-5 text-amber-400" />
-              إضافة جديد
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {/* Type selector */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  resetMovieForm()
-                  resetSeriesForm()
-                  setEditingItem({ type: 'movie' } as RatedItem)
-                }}
-                className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  editingItem?.type === 'movie'
-                    ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-black'
-                    : 'bg-[#111827] text-neutral-400 hover:bg-[#1e293b] border border-[#1e293b]/50'
-                }`}
-              >
-                <Film className="w-5 h-5" />
-                <span className="text-xs font-bold">فيلم</span>
-              </button>
-              <button
-                onClick={() => {
-                  resetMovieForm()
-                  resetSeriesForm()
-                  setEditingItem({ type: 'series' } as RatedItem)
-                }}
-                className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  editingItem?.type === 'series'
-                    ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-black'
-                    : 'bg-[#111827] text-neutral-400 hover:bg-[#1e293b] border border-[#1e293b]/50'
-                }`}
-              >
-                <Tv className="w-5 h-5" />
-                <span className="text-xs font-bold">مسلسل</span>
-              </button>
-            </div>
-
-            {/* Movie form in dialog */}
-            {(editingItem?.type === 'movie' || !editingItem) && (
-              <div className="space-y-3">
-                <Input
-                  value={movieForm.title}
-                  onChange={e => setMovieForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم الفيلم"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    value={movieForm.year}
-                    onChange={e => setMovieForm(p => ({ ...p, year: e.target.value }))}
-                    placeholder="السنة"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                  <Select value={movieForm.genre} onValueChange={v => setMovieForm(p => ({ ...p, genre: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="التصنيف" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b] max-h-[200px]">
-                      {GENRE_OPTIONS.map(g => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
-                      value={movieForm.rating}
-                      onChange={e => setMovieForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs">/100</span>
-                  </div>
-                  <Input
-                    value={movieForm.runtime}
-                    onChange={e => setMovieForm(p => ({ ...p, runtime: e.target.value }))}
-                    placeholder="المدة (د)"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Select value={movieForm.status} onValueChange={v => setMovieForm(p => ({ ...p, status: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="الحالة" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="watched">Watched</SelectItem>
-                      <SelectItem value="watching">Watching</SelectItem>
-                      <SelectItem value="plan">Plan to Watch</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={movieForm.rewatch} onValueChange={v => setMovieForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleAddMovie}
-                  className="w-full bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  إضافة الفيلم
-                </Button>
-              </div>
-            )}
-
-            {/* Series form in dialog */}
-            {editingItem?.type === 'series' && (
-              <div className="space-y-3">
-                <Input
-                  value={seriesForm.title}
-                  onChange={e => setSeriesForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم المسلسل"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    value={seriesForm.year}
-                    onChange={e => setSeriesForm(p => ({ ...p, year: e.target.value }))}
-                    placeholder="السنة"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                  <Input
-                    value={seriesForm.seasons}
-                    onChange={e => setSeriesForm(p => ({ ...p, seasons: e.target.value }))}
-                    placeholder="عدد المواسم"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
-                      value={seriesForm.rating}
-                      onChange={e => setSeriesForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs">/100</span>
-                  </div>
-                  <Select value={seriesForm.rewatch} onValueChange={v => setSeriesForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleAddSeries}
-                  className="w-full bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  إضافة المسلسل
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ============================== EDIT DIALOG ============================== */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md bg-[#0a0f1e] border-[#1e293b]">
-          <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Edit className="w-5 h-5 text-amber-400" />
-              تعديل {editingItem?.type === 'movie' ? 'الفيلم' : 'المسلسل'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {editingItem?.type === 'movie' ? (
-              <div className="space-y-3">
-                <Input
-                  value={movieForm.title}
-                  onChange={e => setMovieForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم الفيلم"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    value={movieForm.year}
-                    onChange={e => setMovieForm(p => ({ ...p, year: e.target.value }))}
-                    placeholder="السنة"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                  <Select value={movieForm.genre} onValueChange={v => setMovieForm(p => ({ ...p, genre: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="التصنيف" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b] max-h-[200px]">
-                      {GENRE_OPTIONS.map(g => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
-                      value={movieForm.rating}
-                      onChange={e => setMovieForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs">/100</span>
-                  </div>
-                  <Input
-                    value={movieForm.runtime}
-                    onChange={e => setMovieForm(p => ({ ...p, runtime: e.target.value }))}
-                    placeholder="المدة (د)"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Select value={movieForm.status} onValueChange={v => setMovieForm(p => ({ ...p, status: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="الحالة" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="watched">Watched</SelectItem>
-                      <SelectItem value="watching">Watching</SelectItem>
-                      <SelectItem value="plan">Plan to Watch</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={movieForm.rewatch} onValueChange={v => setMovieForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Input
-                  value={seriesForm.title}
-                  onChange={e => setSeriesForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="اسم المسلسل"
-                  className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    value={seriesForm.year}
-                    onChange={e => setSeriesForm(p => ({ ...p, year: e.target.value }))}
-                    placeholder="السنة"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                  <Input
-                    value={seriesForm.seasons}
-                    onChange={e => setSeriesForm(p => ({ ...p, seasons: e.target.value }))}
-                    placeholder="عدد المواسم"
-                    type="number"
-                    className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Input
-                      value={seriesForm.rating}
-                      onChange={e => setSeriesForm(p => ({ ...p, rating: e.target.value }))}
-                      placeholder="التقييم"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="bg-[#111827] border-[#1e293b] focus:border-amber-500 h-10"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs">/100</span>
-                  </div>
-                  <Select value={seriesForm.rewatch} onValueChange={v => setSeriesForm(p => ({ ...p, rewatch: v }))}>
-                    <SelectTrigger className="bg-[#111827] border-[#1e293b] h-10">
-                      <SelectValue placeholder="إعادة مشاهدة؟" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#111827] border-[#1e293b]">
-                      <SelectItem value="true">✅ نعم</SelectItem>
-                      <SelectItem value="false">❌ لا</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                onClick={handleSaveEdit}
-                className="flex-1 bg-gradient-to-br from-amber-500 to-yellow-600 text-black font-bold gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                حفظ التعديل
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => { setShowEditDialog(false); setEditingItem(null) }}
-                className="text-neutral-400"
-              >
-                إلغاء
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Toast */}
+      {toast && (
+        <div className={`toast-container show ${toast.type === 'success' ? 'toast-success' : 'toast-error'}`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   )
 }
