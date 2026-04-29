@@ -11,8 +11,8 @@ const tajawal = Tajawal({
 
 export const metadata: Metadata = {
   title: "HussamVision",
-  description: "PRECISION ANALYTICS • STRATEGIC FORESIGHT - أرشيفي وأفكاري",
-  keywords: ["HussamVision", "أرشيفي", "أفكاري", "أفلام", "مسلسلات", "أنمي", "كتب"],
+  description: "PRECISION ANALYTICS • STRATEGIC FORESIGHT - أرشيفي",
+  keywords: ["HussamVision", "أرشيفي", "أفلام", "مسلسلات", "أنمي", "كتب"],
   authors: [{ name: "Hussam" }],
   icons: {
     icon: "/favicon.ico",
