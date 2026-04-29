@@ -105,10 +105,10 @@ export default function WatchListPage() {
       const response = await fetch('/api/watchlist')
       const data = await response.json()
       if (data.items && Array.isArray(data.items)) { 
-        setWatchList(data.items.filter((i: any) => i.type !== 'book'))
+        setWatchList(data.items.filter((i: any) => i.type !== 'book' && i.type !== 'game'))
         setSyncStatus('synced')
       } else if (Array.isArray(data)) {
-        setWatchList(data.filter((i: any) => i.type !== 'book'))
+        setWatchList(data.filter((i: any) => i.type !== 'book' && i.type !== 'game'))
         setSyncStatus('synced')
       } else {
         setWatchList([])
@@ -132,10 +132,10 @@ export default function WatchListPage() {
   useEffect(() => { fetchWatchList() }, [fetchWatchList])
   useEffect(() => { if (activeTab !== 'all') setAddType(activeTab as typeof addType) }, [activeTab])
 
-  const allGenres = useMemo(() => { const g = new Set<string>(); watchList.filter(i => i.type !== 'book').forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [watchList])
+  const allGenres = useMemo(() => { const g = new Set<string>(); watchList.filter(i => i.type !== 'book' && i.type !== 'game').forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [watchList])
 
   const filteredItems = useMemo(() => {
-    let items = activeTab === 'all' ? watchList.filter(i => i.type !== 'book') : watchList.filter(i => i.type === activeTab)
+    let items = activeTab === 'all' ? watchList.filter(i => i.type !== 'book' && i.type !== 'game') : watchList.filter(i => i.type === activeTab)
     if (activeTab === 'all' && filterType !== 'all') items = items.filter(i => i.type === filterType)
     if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); items = items.filter(i => i.title.toLowerCase().includes(q) || i.originalTitle?.toLowerCase().includes(q)) }
     if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
@@ -148,8 +148,8 @@ export default function WatchListPage() {
     return items
   }, [watchList, activeTab, searchQuery, filterYear, filterRating, filterStatus, filterGenre, filterType, sortBy, sortOrder])
 
-  const stats = useMemo(() => { const items = activeTab === 'all' ? watchList.filter(i => i.type !== 'book') : watchList.filter(i => i.type === activeTab); return { total: items.length, watched: items.filter(i => i.watched).length, favorite: items.filter(i => i.favorite).length, avgRating: items.reduce((a, i) => a + (parseFloat(i.rating) || 0), 0) / (items.length || 1) } }, [watchList, activeTab])
-  const tabStats = useMemo(() => ({ all: { total: watchList.filter(i => i.type !== 'book').length, watched: watchList.filter(i => i.type !== 'book' && i.watched).length }, anime: { total: watchList.filter(i => i.type === 'anime').length, watched: watchList.filter(i => i.type === 'anime' && i.watched).length }, series: { total: watchList.filter(i => i.type === 'series').length, watched: watchList.filter(i => i.type === 'series' && i.watched).length }, movie: { total: watchList.filter(i => i.type === 'movie').length, watched: watchList.filter(i => i.type === 'movie' && i.watched).length } }), [watchList])
+  const stats = useMemo(() => { const items = activeTab === 'all' ? watchList.filter(i => i.type !== 'book' && i.type !== 'game') : watchList.filter(i => i.type === activeTab); return { total: items.length, watched: items.filter(i => i.watched).length, favorite: items.filter(i => i.favorite).length, avgRating: items.reduce((a, i) => a + (parseFloat(i.rating) || 0), 0) / (items.length || 1) } }, [watchList, activeTab])
+  const tabStats = useMemo(() => ({ all: { total: watchList.filter(i => i.type !== 'book' && i.type !== 'game').length, watched: watchList.filter(i => i.type !== 'book' && i.type !== 'game' && i.watched).length }, anime: { total: watchList.filter(i => i.type === 'anime').length, watched: watchList.filter(i => i.type === 'anime' && i.watched).length }, series: { total: watchList.filter(i => i.type === 'series').length, watched: watchList.filter(i => i.type === 'series' && i.watched).length }, movie: { total: watchList.filter(i => i.type === 'movie').length, watched: watchList.filter(i => i.type === 'movie' && i.watched).length } }), [watchList])
 
   const handlePosterUpload = useCallback(async (file: File) => { if (file?.type.startsWith('image/')) { try { const c = await compressImage(file); setFormData(p => ({ ...p, poster: c })) } catch {} } }, [])
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true) }, [])
