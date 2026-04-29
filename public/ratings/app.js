@@ -167,11 +167,18 @@ tabs.forEach((tab) => {
    Map Prisma item → Supabase-like shape for compatibility
    =========================== */
 function mapMovie(item) {
+  // genres can be an array (from API) or a string (legacy)
+  let genre = '';
+  if (Array.isArray(item.genres)) {
+    genre = item.genres[0] || '';
+  } else if (typeof item.genres === 'string') {
+    genre = item.genres.split(',')[0] || '';
+  }
   return {
     id: item.id,
     title: item.title,
     year: item.year,
-    genre: (item.genres || '').split(',')[0] || '',
+    genre: genre,
     rating: item.userRating,
     status: item.ratingStatus || 'watched',
     rewatch: item.rewatch,
@@ -690,7 +697,7 @@ async function editMovie(id) {
     movieIdInput.value = data.id;
     document.getElementById('movie-title').value = data.title || '';
     document.getElementById('movie-year').value = data.year || '';
-    document.getElementById('movie-genre').value = (data.genres || '').split(',')[0] || '';
+    document.getElementById('movie-genre').value = Array.isArray(data.genres) ? (data.genres[0] || '') : ((data.genres || '').split(',')[0] || '');
     document.getElementById('movie-rating').value = data.userRating ?? '';
     document.getElementById('movie-status').value = data.ratingStatus || 'watched';
     document.getElementById('movie-rewatch').value = String(data.rewatch === true);
