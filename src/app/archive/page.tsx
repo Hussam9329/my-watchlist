@@ -30,6 +30,7 @@ const TYPE_CONFIG: Record<TabType | 'book', { icon: typeof Film; label: string; 
 const GENRE_OPTIONS = ['Action','Adventure','Anime','Animation','Biography','Comedy','Comics','Crime','Disaster','Documentary','Drama','Fantasy','History','Horror','Mystery','Romance','Sci-Fi','Thriller','War','Western','Other']
 const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
 const PAGE_SIZE = 20
+const RATINGS_PREVIEW_SIZE = 5
 
 const getDisplayTitle = (item: MediaItem): string => item.originalTitle || item.title || ''
 
@@ -65,6 +66,7 @@ export default function HussamArchivePage() {
   const [showQuickRate, setShowQuickRate] = useState(false)
   const [quickRateItem, setQuickRateItem] = useState<MediaItem | null>(null)
   const [quickRateValue, setQuickRateValue] = useState<string>('')
+  const [quickRateGenre, setQuickRateGenre] = useState<string>('')
   const [addType, setAddType] = useState<'movie' | 'series' | 'anime'>('movie')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [searchQuery, setSearchQuery] = useState('')
@@ -119,12 +121,48 @@ export default function HussamArchivePage() {
     } catch { setSyncStatus('error') } finally { setIsLoading(false); setIsLoadingMore(false) }
   }, [])
 
+  // Fetch rated items preview (last 5 only) — fast initial load
+  const fetchRatedPreview = useCallback(async () => {
+    try { setSyncStatus('syncing')
+      const response = await fetch(`/api/watchlist?hasRating=true&page=1&limit=${RATINGS_PREVIEW_SIZE}`)
+      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
+      setRatedList(items); setRtTotal(data.total || 0); setRtHasMore(true); setRtPage(1); setSyncStatus('synced')
+    } catch { setSyncStatus('error') } finally { setIsLoading(false); setIsLoadingMore(false) }
+  }, [])
+
+  // Search rated items from the FULL database (server-side)
+  const [isSearchingRatings, setIsSearchingRatings] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchRatedItems = useCallback(async (query: string, type?: string) => {
+    if (!query.trim()) { fetchRatedPreview(); return }
+    try { setIsSearchingRatings(true)
+      const params = new URLSearchParams({ hasRating: 'true', search: query.trim(), page: '1', limit: '200' })
+      if (type && type !== 'all') params.set('type', type)
+      const response = await fetch(`/api/watchlist?${params}`)
+      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
+      setRatedList(items); setRtTotal(data.total || 0); setRtHasMore(false); setRtPage(1)
+    } catch {} finally { setIsSearchingRatings(false) }
+  }, [fetchRatedPreview])
+
+  // Fetch ALL rated items from database (for print)
+  const fetchAllRatedItems = useCallback(async () => {
+    try {
+      const allItems: MediaItem[] = []; let page = 1; let hasMore = true
+      while (hasMore) {
+        const response = await fetch(`/api/watchlist?hasRating=true&page=${page}&limit=100`)
+        const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
+        allItems.push(...items); hasMore = data.hasMore || false; page++
+      }
+      return allItems
+    } catch { return [] }
+  }, [])
+
   const fetchRatingsStats = useCallback(async () => { try { const res = await fetch('/api/ratings-stats'); const data = await res.json(); setRatingsStats(data) } catch {} }, [])
 
-  useEffect(() => { if (!isAuthenticated) return; if (mainTab === 'watchlist') fetchWatchList(1); else { fetchRatedList(1); fetchRatingsStats() } }, [isAuthenticated, mainTab])
+  useEffect(() => { if (!isAuthenticated) return; if (mainTab === 'watchlist') fetchWatchList(1); else { fetchRatedPreview(); fetchRatingsStats() } }, [isAuthenticated, mainTab])
   useEffect(() => { if (activeTab !== 'all') setAddType(activeTab as typeof addType) }, [activeTab])
 
-  useEffect(() => { if (!loaderRef.current) return; const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting && !isLoadingMore) { if (mainTab === 'watchlist' && wlHasMore) fetchWatchList(wlPage + 1, true); else if (mainTab === 'ratings' && rtHasMore) fetchRatedList(rtPage + 1, true) } }, { threshold: 0.1 }); observer.observe(loaderRef.current); return () => observer.disconnect() }, [mainTab, wlHasMore, rtHasMore, wlPage, rtPage, isLoadingMore, fetchWatchList, fetchRatedList])
+  useEffect(() => { if (!loaderRef.current) return; const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting && !isLoadingMore) { if (mainTab === 'watchlist' && wlHasMore) fetchWatchList(wlPage + 1, true); else if (mainTab === 'ratings' && rtHasMore && !searchQuery.trim()) fetchRatedList(rtPage + 1, true) } }, { threshold: 0.1 }); observer.observe(loaderRef.current); return () => observer.disconnect() }, [mainTab, wlHasMore, rtHasMore, wlPage, rtPage, isLoadingMore, fetchWatchList, fetchRatedList, searchQuery])
 
   const currentList = mainTab === 'watchlist' ? watchList : ratedList
 
@@ -151,9 +189,12 @@ export default function HussamArchivePage() {
     movie: { total: currentList.filter(i => i.type === 'movie').length, watched: currentList.filter(i => i.type === 'movie' && i.watched).length }
   }), [currentList])
 
+  // Debounced search for ratings — search from full database
+  useEffect(() => { if (mainTab !== 'ratings') return; if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); if (!searchQuery.trim()) return; searchTimeoutRef.current = setTimeout(() => { searchRatedItems(searchQuery, ratingSubTab) }, 300); return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) } }, [searchQuery, mainTab, ratingSubTab, searchRatedItems])
+
   const filteredRatedItems = useMemo(() => {
     let items = ratedList.filter(i => i.type === ratingSubTab)
-    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); items = items.filter(i => i.title.toLowerCase().includes(q) || i.originalTitle?.toLowerCase().includes(q)) }
+    if (!searchQuery.trim()) { /* when not searching, only apply client-side filters */ }
     if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
     if (filterMinUserRating) items = items.filter(i => (i.userRating || 0) >= Number(filterMinUserRating))
     if (filterGenre !== 'all') items = items.filter(i => i.genres?.includes(filterGenre))
@@ -191,8 +232,8 @@ export default function HussamArchivePage() {
 
   // Watchlist edit: only notes + poster
   // Quick rate from watchlist — opens rating dialog
-  const openQuickRate = (item: MediaItem) => { setQuickRateItem(item); setQuickRateValue(''); setShowQuickRate(true) }
-  const handleQuickRate = () => { if (!quickRateItem) return; const r = parseFloat(quickRateValue); if (isNaN(r) || r < 0 || r > 100) { toast({ title: 'خطأ', description: 'التقييم يجب يكون بين 0 و 100', variant: 'destructive' }); return }; rateItem(quickRateItem.id, r); setShowQuickRate(false); setQuickRateItem(null); setQuickRateValue('') }
+  const openQuickRate = (item: MediaItem) => { setQuickRateItem(item); setQuickRateValue(''); setQuickRateGenre(item.genres?.[0] || ''); setShowQuickRate(true) }
+  const handleQuickRate = () => { if (!quickRateItem) return; const r = parseFloat(quickRateValue); if (isNaN(r) || r < 0 || r > 100) { toast({ title: 'خطأ', description: 'التقييم يجب يكون بين 0 و 100', variant: 'destructive' }); return }; rateItem(quickRateItem.id, r, quickRateGenre); setShowQuickRate(false); setQuickRateItem(null); setQuickRateValue(''); setQuickRateGenre('') }
 
   const openEditDialog = (item: MediaItem) => { setEditingItem(item); setFormData({ title: item.title, originalTitle: item.originalTitle || '', year: item.year, rating: item.rating, overview: item.overview, genres: item.genres?.join(', ') || '', episodes: item.episodes?.toString() || '', seasons: item.seasons?.toString() || '', duration: item.duration || '', status: item.status || '', author: item.author || '', pages: item.pages?.toString() || '', tags: item.tags?.join(', ') || '', notes: item.notes, poster: item.poster, userRating: '' }); setShowDetails(false); setShowEditDialog(true) }
 
@@ -211,7 +252,7 @@ export default function HussamArchivePage() {
   const toggleFavorite = async (id: string) => { const list = mainTab === 'watchlist' ? watchList : ratedList; const item = list.find(i => i.id === id); if (!item) return; try { await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ favorite: !item.favorite }) }); if (mainTab === 'watchlist') setWatchList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); else setRatedList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); toast({ title: item.favorite ? 'أُزيل من المفضلة' : 'أُضيف للمفضلة' }) } catch {} }
 
   // Rate item 0-100 — moves from watchlist to ratings
-  const rateItem = async (id: string, rating: number) => { try { await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userRating: rating, watched: true }) }); const item = watchList.find(i => i.id === id); if (item) { setWatchList(p => p.filter(i => i.id !== id)); setRatedList(p => [{ ...item, userRating: rating, watched: true }, ...p]) }; if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }; toast({ title: 'تم التقييم!', description: `تم تقييم "${item?.originalTitle || item?.title}" بـ ${formatRating(rating)}/100 ونقله للتقييمات` }); fetchRatingsStats() } catch {} }
+  const rateItem = async (id: string, rating: number, genre?: string) => { try { const patchData: any = { userRating: rating, watched: true }; if (genre) patchData.genres = genre; await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchData) }); const item = watchList.find(i => i.id === id); if (item) { setWatchList(p => p.filter(i => i.id !== id)); const updatedItem = { ...item, userRating: rating, watched: true, ...(genre ? { genres: [genre] } : {}) }; setRatedList(p => [updatedItem, ...p]) }; if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }; toast({ title: 'تم التقييم!', description: `تم تقييم "${item?.originalTitle || item?.title}" بـ ${formatRating(rating)}/100 ونقله للتقييمات` }); fetchRatingsStats() } catch {} }
 
   const exportData = () => { const d = JSON.stringify(mainTab === 'watchlist' ? watchList : ratedList, null, 2); const b = new Blob([d], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${mainTab === 'watchlist' ? 'watchlist' : 'ratings'}_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(u); toast({ title: 'تم التصدير' }) }
   const importData = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = async (ev) => { try { const imp = JSON.parse(ev.target?.result as string); if (Array.isArray(imp)) { for (const item of imp) await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }); if (mainTab === 'watchlist') fetchWatchList(1); else fetchRatedList(1); toast({ title: 'تم الاستيراد', description: `تم استيراد ${imp.length} عنصر` }) } } catch {} }; r.readAsText(f) } }
@@ -224,8 +265,12 @@ export default function HussamArchivePage() {
 
   // Print rated items
   // Print: compute filtered items based on print dialog selections
+  // Print data: separate full list loaded from DB for printing
+  const [printAllItems, setPrintAllItems] = useState<MediaItem[]>([])
+  const [isPrintLoading, setIsPrintLoading] = useState(false)
+
   const printPreviewItems = useMemo(() => {
-    let items = [...ratedList]
+    let items = [...printAllItems]
     if (printType !== 'all') items = items.filter(i => i.type === printType)
     if (printYear !== 'all') items = items.filter(i => i.year === printYear)
     if (printMinRating) items = items.filter(i => (i.userRating || 0) >= Number(printMinRating))
@@ -239,10 +284,10 @@ export default function HussamArchivePage() {
     // Final alphabetical sort for printing
     items.sort((a, b) => (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title))
     return items
-  }, [ratedList, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter])
+  }, [printAllItems, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter])
 
-  const printYears = useMemo(() => Array.from(new Set(ratedList.map(i => i.year))).sort((a, b) => Number(b) - Number(a)), [ratedList])
-  const printGenres = useMemo(() => { const g = new Set<string>(); ratedList.forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [ratedList])
+  const printYears = useMemo(() => Array.from(new Set(printAllItems.map(i => i.year))).sort((a, b) => Number(b) - Number(a)), [printAllItems])
+  const printGenres = useMemo(() => { const g = new Set<string>(); printAllItems.forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [printAllItems])
 
   const executePrint = () => {
     const items = printPreviewItems
@@ -259,7 +304,7 @@ export default function HussamArchivePage() {
 
   const resetPrintFilters = () => { setPrintFilter('all'); setPrintType('all'); setPrintYear('all'); setPrintMinRating(''); setPrintMaxRating(''); setPrintGenre('all') }
 
-  const openPrintDialog = () => { resetPrintFilters(); setShowPrintDialog(true) }
+  const openPrintDialog = async () => { resetPrintFilters(); setShowPrintDialog(true); setIsPrintLoading(true); const allItems = await fetchAllRatedItems(); setPrintAllItems(allItems); setIsPrintLoading(false) }
 
   if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
 
@@ -322,7 +367,7 @@ export default function HussamArchivePage() {
           {/* Search & Filters */}
           <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
             <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0">
-              <div className="flex-1 min-w-0 relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-9 h-10" /></div>
+              <div className="flex-1 min-w-0 relative">{isSearchingRatings ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#d4af37] animate-spin" /> : <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />}<Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث في كل التقييمات..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-9 h-10" /></div>
               <div className="hidden sm:flex"><Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="addedAt">تاريخ الإضافة</SelectItem><SelectItem value="title">العنوان</SelectItem><SelectItem value="year">السنة</SelectItem><SelectItem value="userRating">تقييمي</SelectItem><SelectItem value="rating">التقييم العام</SelectItem></SelectContent></Select></div>
               <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
               <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#2a2a2a] text-neutral-400'}`}><Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span></Button>
@@ -496,9 +541,11 @@ export default function HussamArchivePage() {
               <div className="w-12 h-18 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{quickRateItem.poster ? <img src={quickRateItem.poster} alt="" className="w-full h-full object-cover" /> : <Film className="w-6 h-6 text-neutral-500" />}</div>
               <div><p className="font-bold line-clamp-1">{getDisplayTitle(quickRateItem)}</p><p className="text-xs text-neutral-400">{quickRateItem.year} • {TYPE_CONFIG[quickRateItem.type as TabType]?.label}</p></div>
             </div>
-            <div><p className="text-sm text-neutral-400 mb-2">اختر تقييمك (0-100):</p><div className="flex items-center gap-2 flex-wrap">{[10,20,30,40,50,60,70,80,90,100].map(r => <button key={r} onClick={() => { rateItem(quickRateItem.id, r); setShowQuickRate(false); setQuickRateItem(null) }} className="w-12 h-10 rounded-lg text-sm font-bold bg-[#1a1a1a] text-neutral-400 hover:bg-[#d4af37] hover:text-[#0a0a0a] transition-all">{r}</button>)}</div>
+            {/* Genre Selection */}
+            <div><label className="text-sm text-neutral-400 mb-2 block">التصنيف</label><Select value={quickRateGenre || 'Other'} onValueChange={setQuickRateGenre}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
+            <div><p className="text-sm text-neutral-400 mb-2">اختر تقييمك (0-100):</p><div className="flex items-center gap-2 flex-wrap">{[10,20,30,40,50,60,70,80,90,100].map(r => <button key={r} onClick={() => { rateItem(quickRateItem.id, r, quickRateGenre); setShowQuickRate(false); setQuickRateItem(null); setQuickRateGenre('') }} className="w-12 h-10 rounded-lg text-sm font-bold bg-[#1a1a1a] text-neutral-400 hover:bg-[#d4af37] hover:text-[#0a0a0a] transition-all">{r}</button>)}</div>
             <div className="flex items-center gap-1 mt-2"><Input type="number" min="0" max="100" step="0.01" value={quickRateValue} onChange={(e) => setQuickRateValue(e.target.value)} placeholder="مثال: 88.33" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-32" onKeyDown={(e) => { if (e.key === 'Enter') handleQuickRate() }} /><span className="text-neutral-500 text-sm">/ 100</span></div></div>
-            <div className="flex gap-2"><Button onClick={handleQuickRate} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">قيّم وانقل للتقييمات</Button><Button onClick={() => { setShowQuickRate(false); setQuickRateItem(null) }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
+            <div className="flex gap-2"><Button onClick={handleQuickRate} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">قيّم وانقل للتقييمات</Button><Button onClick={() => { setShowQuickRate(false); setQuickRateItem(null); setQuickRateGenre('') }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
           </div>}
         </DialogContent></Dialog>
 
@@ -506,6 +553,8 @@ export default function HussamArchivePage() {
         {/* Print Customization Dialog */}
         <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Printer className="w-5 h-5 text-[#d4af37]" />تخصيص الطباعة</DialogTitle></DialogHeader>
           <div className="space-y-5 mt-4">
+            {isPrintLoading && <div className="flex items-center justify-center py-8 gap-3"><Loader2 className="w-6 h-6 animate-spin text-[#d4af37]" /><span className="text-neutral-400">جاري تحميل كل البيانات للطباعة...</span></div>}
+            {!isPrintLoading && <>
             {/* Quick Selections */}
             <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
               <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Trophy className="w-4 h-4" />اختيار سريع</label>
@@ -578,6 +627,7 @@ export default function HussamArchivePage() {
               <Button onClick={resetPrintFilters} variant="ghost" className="text-neutral-400 gap-1"><X className="w-4 h-4" />إعادة تعيين</Button>
               <Button onClick={() => setShowPrintDialog(false)} variant="ghost" className="text-neutral-400">إلغاء</Button>
             </div>
+            </>}
           </div>
         </DialogContent></Dialog>
 

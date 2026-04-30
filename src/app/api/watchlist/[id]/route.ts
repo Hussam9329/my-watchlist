@@ -96,6 +96,12 @@ export async function PATCH(
     if (body.watchedAt) {
       updateData.watchedAt = String(body.watchedAt)
     }
+    if (body.genres !== undefined) {
+      updateData.genres = Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || '')
+    }
+    if (body.userRating !== undefined) {
+      updateData.userRating = body.userRating != null ? parseFloat(String(body.userRating)) : null
+    }
     
     const item = await prisma.mediaItem.update({
       where: { id },
