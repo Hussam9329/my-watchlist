@@ -43,6 +43,7 @@ const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.
 
 function formatRating(num: number | null | undefined) { if (num == null) return '-'; const n = Math.round(Number(num) * 100) / 100; return Number.isInteger(n) ? String(n) : n.toFixed(2) }
 function getRatingClass(rating: number) { if (rating >= 70) return 'text-green-400'; if (rating >= 40) return 'text-yellow-400'; return 'text-red-400' }
+function getRatingBg(rating: number) { if (rating >= 70) return 'bg-green-500/20 border-green-500/30 text-green-400'; if (rating >= 40) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'; return 'bg-red-500/20 border-red-500/30 text-red-400' }
 
 export default function HussamArchivePage() {
   const { toast } = useToast()
@@ -85,6 +86,7 @@ export default function HussamArchivePage() {
   const [wlPage, setWlPage] = useState(1); const [wlTotal, setWlTotal] = useState(0); const [wlHasMore, setWlHasMore] = useState(false)
   const [rtPage, setRtPage] = useState(1); const [rtTotal, setRtTotal] = useState(0); const [rtHasMore, setRtHasMore] = useState(false)
   const [ratingsStats, setRatingsStats] = useState<any>(null)
+  const [ratingSubTab, setRatingSubTab] = useState<'movie' | 'series' | 'anime'>('movie')
   const loaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const auth = localStorage.getItem('hussamvision_auth'); if (auth !== 'true') { window.location.href = '/'; return }; setIsAuthenticated(true) }, [])
@@ -138,6 +140,16 @@ export default function HussamArchivePage() {
     series: { total: currentList.filter(i => i.type === 'series').length, watched: currentList.filter(i => i.type === 'series' && i.watched).length },
     movie: { total: currentList.filter(i => i.type === 'movie').length, watched: currentList.filter(i => i.type === 'movie' && i.watched).length }
   }), [currentList])
+
+  const filteredRatedItems = useMemo(() => {
+    let items = ratedList.filter(i => i.type === ratingSubTab)
+    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); items = items.filter(i => i.title.toLowerCase().includes(q) || i.originalTitle?.toLowerCase().includes(q)) }
+    if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
+    if (filterMinUserRating) items = items.filter(i => (i.userRating || 0) >= Number(filterMinUserRating))
+    if (filterGenre !== 'all') items = items.filter(i => i.genres?.includes(filterGenre))
+    items.sort((a, b) => { let c = 0; if (sortBy === 'title') c = (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title); else if (sortBy === 'year') c = parseInt(a.year) - parseInt(b.year); else if (sortBy === 'rating') c = (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0); else if (sortBy === 'userRating') c = (a.userRating || 0) - (b.userRating || 0); else c = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime(); return sortOrder === 'asc' ? c : -c })
+    return items
+  }, [ratedList, ratingSubTab, searchQuery, filterYear, filterMinUserRating, filterGenre, sortBy, sortOrder])
 
   const handlePosterUpload = useCallback(async (file: File) => { if (file?.type.startsWith('image/')) { try { const c = await compressImage(file); setFormData(p => ({ ...p, poster: c })) } catch {} } }, [])
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true) }, [])
@@ -198,7 +210,7 @@ export default function HussamArchivePage() {
 
   // Print rated items
   const printRatedItems = () => {
-    const items = filteredItems
+    const items = mainTab === 'ratings' ? filteredRatedItems : filteredItems
     if (!items.length) { toast({ title: 'لا توجد نتائج للطباعة' }); return }
     const rows = items.map((m, idx) => `<tr><td>${idx + 1}</td><td>${m.originalTitle || m.title}</td><td>${m.year}</td><td>${m.genres?.[0] || '-'}</td><td>${formatRating(m.userRating)}</td></tr>`).join('')
     const printWindow = window.open('', '_blank', 'width=1100,height=800')
@@ -223,7 +235,7 @@ export default function HussamArchivePage() {
           <div className="flex items-center gap-1 sm:gap-2">
             {mainTab === 'ratings' && <Button onClick={movieNightPick} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="اختيار الليلة"><Dice5 className="w-5 h-5" /></Button>}
             {mainTab === 'ratings' && <Button onClick={printRatedItems} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="طباعة"><Printer className="w-5 h-5" /></Button>}
-            <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>
+            {mainTab === 'watchlist' && <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>}
             <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Settings className="w-5 h-5" /></Button></PopoverTrigger><PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]"><div className="space-y-2"><Button onClick={exportData} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><Download className="w-4 h-4" />تصدير</Button><Button onClick={() => importInputRef.current?.click()} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><UploadIcon className="w-4 h-4" />استيراد</Button><input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} /></div></PopoverContent></Popover>
             {mainTab === 'watchlist' && <Button onClick={() => { resetForm(); setShowAddDialog(true) }} className="bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة</span></Button>}
             {mainTab === 'ratings' && <Button onClick={() => { resetForm(); setAddType('movie'); setShowAddRatedDialog(true) }} className="bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة تقييم</span></Button>}
@@ -233,18 +245,87 @@ export default function HussamArchivePage() {
         {/* Main Tab Switch */}
         <div className="flex gap-2 mb-4">
           <button onClick={() => { setMainTab('watchlist'); setSearchQuery(''); clearFilters() }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'watchlist' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Eye className="w-5 h-5" /><span>أريد مشاهدته</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'watchlist' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{wlTotal}</span></div></button>
-          <button onClick={() => { setMainTab('ratings'); setSearchQuery(''); clearFilters() }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'ratings' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /><span>تقييماتي</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'ratings' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{rtTotal}</span></div></button>
+          <button onClick={() => { setMainTab('ratings'); setSearchQuery(''); clearFilters(); setRatingSubTab('movie') }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'ratings' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /><span>تقييماتي</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'ratings' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{rtTotal}</span></div></button>
         </div>
 
-        {/* Ratings Tab: Old Design via iframe */}
+        {/* Ratings Tab: Native React Implementation */}
         {mainTab === 'ratings' && (
-          <div className="-mx-3 sm:-mx-4 -mb-4 sm:-mb-8">
-            <iframe
-              src="/ratings/index.html"
-              style={{ width: '100%', height: 'calc(100vh - 140px)', border: 'none', display: 'block' }}
-              title="تقييماتي"
-            />
+        <>
+          {/* Stats Dashboard Card */}
+          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-6">
+            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#d4af37]" />إحصائيات شاملة</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.totalRated ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأعمال الكلي</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.movieCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأفلام</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#e6c65a]">{ratingsStats?.seriesCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد المسلسلات</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#c9a227]">{ratingsStats?.animeCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأنمي</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.topGenre ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر Genre</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#f0d77a]">{ratingsStats?.avgRating ? Number(ratingsStats.avgRating).toFixed(1) : '0'}</p><p className="text-[10px] sm:text-sm text-neutral-400">متوسط التقييم</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-green-400">{ratingsStats?.maxRating ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أعلى تقييم</p>{ratingsStats?.maxRatingTitle && <p className="text-[10px] text-neutral-500 truncate mt-0.5">{ratingsStats.maxRatingTitle}</p>}</div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#e6c65a]">{ratingsStats?.topYear ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر سنة إنتاج</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#c9a227]">{ratingsStats?.topDecade ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر عقد</p></div>
+              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.thisMonth ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد هذا الشهر</p></div>
+            </div>
           </div>
+
+          {/* Ratings Sub-tabs: أفلام / مسلسلات / أنمي */}
+          <div className="flex gap-2 mb-4">
+            {([
+              { key: 'movie' as const, label: 'أفلام', Icon: Film, color: 'from-[#d4af37] to-[#b8960f]', count: ratingsStats?.movieCount ?? 0 },
+              { key: 'series' as const, label: 'مسلسلات', Icon: Tv, color: 'from-[#e6c65a] to-[#c9a227]', count: ratingsStats?.seriesCount ?? 0 },
+              { key: 'anime' as const, label: 'أنمي', Icon: Sparkles, color: 'from-[#c9a227] to-[#a07d00]', count: ratingsStats?.animeCount ?? 0 },
+            ]).map((tab) => { const active = ratingSubTab === tab.key; return <button key={tab.key} onClick={() => setRatingSubTab(tab.key)} className={`flex-1 rounded-xl p-3 transition-all text-center ${active ? 'bg-gradient-to-br ' + tab.color + ' text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><tab.Icon className="w-5 h-5" /><span>{tab.label}</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{tab.count}</span></div></button> })}
+          </div>
+
+          {/* Search & Filters */}
+          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
+            <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex-1 min-w-0 relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-9 h-10" /></div>
+              <div className="hidden sm:flex"><Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="addedAt">تاريخ الإضافة</SelectItem><SelectItem value="title">العنوان</SelectItem><SelectItem value="year">السنة</SelectItem><SelectItem value="userRating">تقييمي</SelectItem><SelectItem value="rating">التقييم العام</SelectItem></SelectContent></Select></div>
+              <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
+              <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#2a2a2a] text-neutral-400'}`}><Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span></Button>
+            </div>
+            {showFilters && <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-[#2a2a2a]">
+              <Select value={filterYear} onValueChange={setFilterYear}><SelectTrigger className="w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل السنوات</SelectItem>{YEARS_RANGE.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select>
+              <Input type="number" min="0" max="100" value={filterMinUserRating} onChange={(e) => setFilterMinUserRating(e.target.value)} placeholder="تقييم أعلى من" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-[130px]" />
+              <Select value={filterGenre} onValueChange={setFilterGenre}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل التصنيفات</SelectItem>{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-neutral-400"><X className="w-4 h-4 ml-1" />مسح</Button>
+            </div>}
+          </div>
+
+          <div className="flex items-center justify-between mb-4"><p className="text-sm text-neutral-400">{filteredRatedItems.length} نتيجة</p></div>
+
+          {/* Ratings Items List */}
+          {filteredRatedItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20"><div className="w-24 h-24 rounded-full bg-[#d4af37]/10 flex items-center justify-center mb-6"><Star className="w-12 h-12 text-neutral-500" /></div><h3 className="text-xl font-bold mb-2">{ratedList.length === 0 ? 'لا توجد تقييمات' : 'لا توجد نتائج'}</h3><p className="text-neutral-500 mb-8">{ratedList.length === 0 ? 'أضف تقييمك الأول' : 'جرب تغيير الفلاتر'}</p></div>
+          ) : (
+            <div className="space-y-2">
+              {filteredRatedItems.map((item) => {
+                const rating = item.userRating ?? 0
+                return (
+                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 border border-[#2a2a2a]/50 transition-all cursor-pointer" onClick={() => { setSelectedItem(item); setShowDetails(true) }}>
+                    <div className={`w-[46px] h-[46px] rounded-lg flex items-center justify-center font-bold text-sm border flex-shrink-0 ${getRatingBg(rating)}`}>{formatRating(item.userRating)}</div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold line-clamp-1 english-title">{getDisplayTitle(item)}</h3>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-neutral-400">
+                        <span>{item.year}</span>
+                        {item.genres?.[0] && <Badge className="bg-[#2a2a2a] text-neutral-300 text-[10px] px-1.5 py-0">{item.genres[0]}</Badge>}
+                        {item.seasons && <span>• {item.seasons} موسم</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditRatedDialog(item) }} className="w-8 h-8 text-neutral-400 hover:text-[#d4af37]"><Edit3 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeFromList(item.id) }} className="w-8 h-8 text-neutral-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Infinite scroll loader for ratings */}
+          {rtHasMore && <div ref={loaderRef} className="flex justify-center py-8">{isLoadingMore && <Loader2 className="w-8 h-8 animate-spin text-[#d4af37]" />}</div>}
+        </>
         )}
 
         {/* Watchlist Tab Content */}
