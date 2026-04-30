@@ -30,7 +30,7 @@ const TYPE_CONFIG: Record<TabType | 'book', { icon: typeof Film; label: string; 
 const GENRE_OPTIONS = ['Action','Adventure','Anime','Animation','Biography','Comedy','Comics','Crime','Disaster','Documentary','Drama','Fantasy','History','Horror','Mystery','Romance','Sci-Fi','Thriller','War','Western','Other']
 const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
 const PAGE_SIZE = 20
-const RATINGS_PREVIEW_SIZE = 5
+const RATINGS_PREVIEW_SIZE = 10
 
 const getDisplayTitle = (item: MediaItem): string => item.originalTitle || item.title || ''
 
@@ -272,8 +272,19 @@ export default function HussamArchivePage() {
   const clearFilters = () => { setSearchQuery(''); setFilterYear('all'); setFilterMinUserRating(''); setFilterStatus('all'); setFilterGenre('all'); setFilterType('all') }
   const TypeIcon = TYPE_CONFIG[activeTab].icon
 
-  // Movie Night Picker
-  const movieNightPick = () => { const rated = ratedList.filter(i => i.type === 'movie' || i.type === 'series' || i.type === 'anime'); if (!rated.length) { toast({ title: 'ماكو أعمال مقيّمة' }); return }; const picked = rated[Math.floor(Math.random() * rated.length)]; toast({ title: 'اختيار الليلة', description: `${picked.originalTitle || picked.title} (${picked.year}) - تقييمك: ${formatRating(picked.userRating)}` }) }
+  // Movie Night Picker — picks from watchlist (أريد مشاهدته)
+  const movieNightPick = async () => {
+    try {
+      const response = await fetch(`/api/watchlist?hasRating=false&page=1&limit=200`)
+      const data = await response.json()
+      const watchlist = (data.items || []).filter((i: any) => i.type === 'movie' || i.type === 'series' || i.type === 'anime')
+      if (!watchlist.length) { toast({ title: 'ماكو أعمال في أريد مشاهدته' }); return }
+      const picked = watchlist[Math.floor(Math.random() * watchlist.length)]
+      toast({ title: '🎬 اختيار الليلة', description: `${picked.originalTitle || picked.title} (${picked.year})` })
+    } catch {
+      toast({ title: 'خطأ في جلب الاقتراح' })
+    }
+  }
 
   // Print rated items
   // Print: compute filtered items based on print dialog selections
@@ -332,7 +343,7 @@ export default function HussamArchivePage() {
             <div><h1 className="text-lg sm:text-2xl font-bold">أرشيف حسام</h1><div className="flex items-center gap-2"><p className="text-neutral-500 text-sm">{mainTab === 'watchlist' ? 'قائمة المشاهدة' : 'التقييمات'}</p><span className={`text-xs flex items-center gap-1 ${syncStatus === 'synced' ? 'text-green-500' : syncStatus === 'syncing' ? 'text-yellow-500' : 'text-red-500'}`}>{syncStatus === 'synced' && <Cloud className="w-3 h-3" />}{syncStatus === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}{syncStatus === 'error' && <CloudOff className="w-3 h-3" />}{syncStatus === 'synced' ? 'متزامن' : syncStatus === 'syncing' ? 'مزامنة...' : 'خطأ'}</span></div></div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            {mainTab === 'ratings' && <Button onClick={movieNightPick} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="اختيار الليلة"><Dice5 className="w-5 h-5" /></Button>}
+            <Button onClick={movieNightPick} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="اختيار الليلة 🎲"><Dice5 className="w-5 h-5" /></Button>
             {mainTab === 'ratings' && <Button onClick={openPrintDialog} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="طباعة"><Printer className="w-5 h-5" /></Button>}
             {mainTab === 'watchlist' && <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>}
             <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Settings className="w-5 h-5" /></Button></PopoverTrigger><PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]"><div className="space-y-2"><Button onClick={exportData} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><Download className="w-4 h-4" />تصدير</Button><Button onClick={() => importInputRef.current?.click()} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><UploadIcon className="w-4 h-4" />استيراد</Button><input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} /></div></PopoverContent></Popover>
