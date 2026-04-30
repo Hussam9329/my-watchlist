@@ -143,10 +143,17 @@ function mapMovie(item) {
   };
 }
 function mapSeries(item) {
+  let genre = '';
+  if (Array.isArray(item.genres)) {
+    genre = item.genres[0] || '';
+  } else if (typeof item.genres === 'string') {
+    genre = item.genres.split(',')[0] || '';
+  }
   return {
     id: item.id,
     title: item.title,
     year: item.year,
+    genre: genre,
     seasons: item.seasons,
     rating: item.userRating,
     created_at: item.addedAt || item.updatedAt,
@@ -481,31 +488,60 @@ function renderSeries() {
 function updateDashboard() {
   const movies = allMoviesForStats || [];
   const series = allSeriesForStats || [];
+  const all = [...movies, ...series];
 
-  statTotal.textContent = movies.length + series.length;
+  // عدد الأعمال
+  statTotal.textContent = all.length;
+  document.getElementById('stat-movies').textContent = movies.length;
+  document.getElementById('stat-series').textContent = series.length;
 
+  // أكثر Genre (يشمل الكل)
   const genreMap = {};
-  movies.forEach((m) => {
+  all.forEach((m) => {
     const g = m.genre || 'Other';
     genreMap[g] = (genreMap[g] || 0) + 1;
   });
-  statTopGenre.textContent = Object.keys(genreMap).sort((a, b) => genreMap[b] - genreMap[a])[0] || '-';
+  const sortedGenres = Object.entries(genreMap).sort((a, b) => b[1] - a[1]);
+  statTopGenre.textContent = sortedGenres.length ? sortedGenres[0][0] : '-';
+  document.getElementById('stat-genre-count').textContent = Object.keys(genreMap).length;
 
-  const ratings = [...movies, ...series]
+  // متوسط التقييم (يشمل الكل)
+  const ratings = all
     .map((x) => Number(x.rating))
     .filter((x) => Number.isFinite(x));
   const avg = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
   statAvgRating.textContent = formatRating(avg);
 
+  // أعلى تقييم (يشمل الكل)
+  if (ratings.length) {
+    const maxRating = Math.max(...ratings);
+    const topItem = all.find(x => Number(x.rating) === maxRating);
+    document.getElementById('stat-max-rating').textContent = topItem ? formatRating(maxRating) + ' - ' + topItem.title : formatRating(maxRating);
+  } else {
+    document.getElementById('stat-max-rating').textContent = '-';
+  }
+
+  // أكثر سنة إنتاج (تشمل الكل)
   const yearMap = {};
-  movies.forEach((m) => {
+  all.forEach((m) => {
     const y = Number(m.year);
     if (Number.isInteger(y)) yearMap[y] = (yearMap[y] || 0) + 1;
   });
   statTopYear.textContent = Object.keys(yearMap).sort((a, b) => yearMap[b] - yearMap[a])[0] || '-';
 
+  // أكثر عقد (يشمل الكل)
+  const decadeMap = {};
+  all.forEach((m) => {
+    const y = Number(m.year);
+    if (Number.isInteger(y) && y >= 1930) {
+      const decade = Math.floor(y / 10) * 10 + 's';
+      decadeMap[decade] = (decadeMap[decade] || 0) + 1;
+    }
+  });
+  document.getElementById('stat-top-decade').textContent = Object.keys(decadeMap).sort((a, b) => decadeMap[b] - decadeMap[a])[0] || '-';
+
+  // عدد هذا الشهر (يشمل الكل)
   const now = new Date();
-  const all = [...movies, ...series];
   const monthly = all.filter((x) => {
     if (!x.created_at) return false;
     const d = new Date(x.created_at);
