@@ -99,6 +99,7 @@ export default function HussamArchivePage() {
   const [printMinRating, setPrintMinRating] = useState<string>('')
   const [printMaxRating, setPrintMaxRating] = useState<string>('')
   const [printGenre, setPrintGenre] = useState<string>('all')
+  const [printSortBy, setPrintSortBy] = useState<'rating' | 'title' | 'year' | 'type'>('title')
   const loaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const auth = localStorage.getItem('hussamvision_auth'); if (auth !== 'true') { window.location.href = '/'; return }; setIsAuthenticated(true) }, [])
@@ -299,15 +300,18 @@ export default function HussamArchivePage() {
     if (printMinRating) items = items.filter(i => (i.userRating || 0) >= Number(printMinRating))
     if (printMaxRating) items = items.filter(i => (i.userRating || 0) <= Number(printMaxRating))
     if (printGenre !== 'all') items = items.filter(i => i.genres?.includes(printGenre))
-    // Sort by rating desc first (for top-N)
+    // Sort by rating desc first (for top-N selection)
     items.sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
     if (printFilter === 'top10') items = items.slice(0, 10)
     else if (printFilter === 'top25') items = items.slice(0, 25)
     else if (printFilter === 'top50') items = items.slice(0, 50)
-    // Final alphabetical sort for printing
-    items.sort((a, b) => (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title))
+    // Apply user-selected sort order
+    if (printSortBy === 'rating') items.sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
+    else if (printSortBy === 'title') items.sort((a, b) => (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title))
+    else if (printSortBy === 'year') items.sort((a, b) => Number(b.year) - Number(a.year))
+    else if (printSortBy === 'type') items.sort((a, b) => a.type.localeCompare(b.type) || (b.userRating || 0) - (a.userRating || 0))
     return items
-  }, [printAllItems, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter])
+  }, [printAllItems, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter, printSortBy])
 
   const printYears = useMemo(() => Array.from(new Set(printAllItems.map(i => i.year))).sort((a, b) => Number(b) - Number(a)), [printAllItems])
   const printGenres = useMemo(() => { const g = new Set<string>(); printAllItems.forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [printAllItems])
@@ -325,7 +329,7 @@ export default function HussamArchivePage() {
     printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 250)
   }
 
-  const resetPrintFilters = () => { setPrintFilter('all'); setPrintType('all'); setPrintYear('all'); setPrintMinRating(''); setPrintMaxRating(''); setPrintGenre('all') }
+  const resetPrintFilters = () => { setPrintFilter('all'); setPrintType('all'); setPrintYear('all'); setPrintMinRating(''); setPrintMaxRating(''); setPrintGenre('all'); setPrintSortBy('title') }
 
   const openPrintDialog = async () => { resetPrintFilters(); setShowPrintDialog(true); setIsPrintLoading(true); const allItems = await fetchAllRatedItems(); setPrintAllItems(allItems); setIsPrintLoading(false) }
 
@@ -620,6 +624,21 @@ export default function HussamArchivePage() {
               </div>
             </div>
 
+            {/* Sort Order */}
+            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><ArrowUpDown className="w-4 h-4" />ترتيب القائمة حسب</label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {([
+                  { key: 'title' as const, label: 'الأحرف' },
+                  { key: 'rating' as const, label: 'التقييم' },
+                  { key: 'year' as const, label: 'السنة' },
+                  { key: 'type' as const, label: 'النوع' },
+                ]).map((opt) => (
+                  <button key={opt.key} onClick={() => setPrintSortBy(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all ${printSortBy === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+
             {/* Rating Range */}
             <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
               <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4" />نطاق التقييم</label>
@@ -633,7 +652,7 @@ export default function HussamArchivePage() {
             {/* Preview Summary */}
             <div className="p-4 rounded-xl bg-gradient-to-br from-[#d4af37]/10 to-[#b8960f]/5 border border-[#d4af37]/20">
               <div className="flex items-center justify-between">
-                <div><p className="text-sm text-neutral-300">عدد الأعمال المطلوب طباعتها</p><p className="text-xs text-neutral-500 mt-0.5">مرتبة أبجدياً</p></div>
+                <div><p className="text-sm text-neutral-300">عدد الأعمال المطلوب طباعتها</p><p className="text-xs text-neutral-500 mt-0.5">مرتبة حسب: {printSortBy === 'title' ? 'الأحرف' : printSortBy === 'rating' ? 'التقييم' : printSortBy === 'year' ? 'السنة' : 'النوع'}</p></div>
                 <div className="text-3xl font-bold text-[#d4af37]">{printPreviewItems.length}</div>
               </div>
               {printPreviewItems.length > 0 && (
