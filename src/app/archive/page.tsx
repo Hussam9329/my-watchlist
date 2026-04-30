@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight, Dice5, Printer } from 'lucide-react'
+import { Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight, Dice5, Printer, Trophy, SlidersHorizontal } from 'lucide-react'
 
 interface MediaItem { id: string; title: string; originalTitle?: string; year: string; type: string; poster: string; rating: string; overview: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number; tags: string[]; notes: string; favorite: boolean; addedAt: string; watchedAt?: string; watched: boolean; userRating?: number }
 interface SearchResult { title: string; originalTitle: string; year: string; rating: string; overview: string; poster?: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number }
@@ -90,6 +90,13 @@ export default function HussamArchivePage() {
   const [rtPage, setRtPage] = useState(1); const [rtTotal, setRtTotal] = useState(0); const [rtHasMore, setRtHasMore] = useState(false)
   const [ratingsStats, setRatingsStats] = useState<any>(null)
   const [ratingSubTab, setRatingSubTab] = useState<'movie' | 'series' | 'anime'>('movie')
+  const [showPrintDialog, setShowPrintDialog] = useState(false)
+  const [printFilter, setPrintFilter] = useState<'all' | 'top10' | 'top25' | 'top50' | 'custom'>('all')
+  const [printType, setPrintType] = useState<'all' | 'movie' | 'series' | 'anime'>('all')
+  const [printYear, setPrintYear] = useState<string>('all')
+  const [printMinRating, setPrintMinRating] = useState<string>('')
+  const [printMaxRating, setPrintMaxRating] = useState<string>('')
+  const [printGenre, setPrintGenre] = useState<string>('all')
   const loaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const auth = localStorage.getItem('hussamvision_auth'); if (auth !== 'true') { window.location.href = '/'; return }; setIsAuthenticated(true) }, [])
@@ -216,15 +223,43 @@ export default function HussamArchivePage() {
   const movieNightPick = () => { const rated = ratedList.filter(i => i.type === 'movie' || i.type === 'series' || i.type === 'anime'); if (!rated.length) { toast({ title: 'ماكو أعمال مقيّمة' }); return }; const picked = rated[Math.floor(Math.random() * rated.length)]; toast({ title: 'اختيار الليلة', description: `${picked.originalTitle || picked.title} (${picked.year}) - تقييمك: ${formatRating(picked.userRating)}` }) }
 
   // Print rated items
-  const printRatedItems = () => {
-    const items = mainTab === 'ratings' ? filteredRatedItems : filteredItems
-    if (!items.length) { toast({ title: 'لا توجد نتائج للطباعة' }); return }
-    const rows = items.map((m, idx) => `<tr><td>${idx + 1}</td><td>${m.originalTitle || m.title}</td><td>${m.year}</td><td>${m.genres?.[0] || '-'}</td><td>${formatRating(m.userRating)}</td></tr>`).join('')
+  // Print: compute filtered items based on print dialog selections
+  const printPreviewItems = useMemo(() => {
+    let items = [...ratedList]
+    if (printType !== 'all') items = items.filter(i => i.type === printType)
+    if (printYear !== 'all') items = items.filter(i => i.year === printYear)
+    if (printMinRating) items = items.filter(i => (i.userRating || 0) >= Number(printMinRating))
+    if (printMaxRating) items = items.filter(i => (i.userRating || 0) <= Number(printMaxRating))
+    if (printGenre !== 'all') items = items.filter(i => i.genres?.includes(printGenre))
+    // Sort by rating desc first (for top-N)
+    items.sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
+    if (printFilter === 'top10') items = items.slice(0, 10)
+    else if (printFilter === 'top25') items = items.slice(0, 25)
+    else if (printFilter === 'top50') items = items.slice(0, 50)
+    // Final alphabetical sort for printing
+    items.sort((a, b) => (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title))
+    return items
+  }, [ratedList, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter])
+
+  const printYears = useMemo(() => Array.from(new Set(ratedList.map(i => i.year))).sort((a, b) => Number(b) - Number(a)), [ratedList])
+  const printGenres = useMemo(() => { const g = new Set<string>(); ratedList.forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [ratedList])
+
+  const executePrint = () => {
+    const items = printPreviewItems
+    if (!items.length) { toast({ title: 'لا توجد نتائج للطباعة', description: 'غيّر معايير التصفية', variant: 'destructive' }); return }
+    const typeLabel = printType === 'all' ? 'الكل' : TYPE_CONFIG[printType as TabType]?.label || printType
+    const yearLabel = printYear === 'all' ? 'كل السنوات' : printYear
+    const filterLabel = printFilter === 'all' ? 'الكل' : printFilter === 'top10' ? 'أفضل 10' : printFilter === 'top25' ? 'أفضل 25' : 'أفضل 50'
+    const rows = items.map((m, idx) => `<tr><td>${idx + 1}</td><td>${m.originalTitle || m.title}</td><td>${m.year}</td><td>${TYPE_CONFIG[m.type as TabType]?.label || m.type}</td><td>${m.genres?.[0] || '-'}</td><td>${formatRating(m.userRating)}</td></tr>`).join('')
     const printWindow = window.open('', '_blank', 'width=1100,height=800')
     if (!printWindow) { toast({ title: 'المتصفح منع فتح نافذة الطباعة' }); return }
-    printWindow.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>طباعة التقييمات</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:22px;color:#111}h1{font-size:22px}.count{margin:8px 0 12px;font-weight:700}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:8px;font-size:12px;text-align:center}th{background:#f1f1f1}</style></head><body><h1>قائمة التقييمات المفلترة</h1><div class="count">عدد النتائج: ${items.length}</div><table><thead><tr><th>#</th><th>اسم العمل</th><th>السنة</th><th>التصنيف</th><th>تقييمي</th></tr></thead><tbody>${rows}</tbody></table></body></html>`)
+    printWindow.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>طباعة التقييمات</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:22px;color:#111}h1{font-size:22px;border-bottom:2px solid #d4af37;padding-bottom:8px}.meta{margin:8px 0 4px;font-size:13px;color:#555}.count{margin:8px 0 16px;font-weight:700;font-size:14px;color:#333}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:8px 10px;font-size:12px;text-align:center}th{background:#d4af37;color:#111;font-weight:700}tr:nth-child(even){background:#f9f6ee}td:first-child{font-weight:700;color:#555}.rating-high{color:#16a34a;font-weight:700}.rating-mid{color:#ca8a04;font-weight:700}.rating-low{color:#dc2626;font-weight:700}@media print{body{padding:10px}h1{font-size:18px}}</style></head><body><h1>قائمة تقييماتي</h1><div class="meta">النوع: ${typeLabel} | السنة: ${yearLabel} | الاختيار: ${filterLabel}${printMinRating ? ' | تقييم من ' + printMinRating : ''}${printMaxRating ? ' إلى ' + printMaxRating : ''}${printGenre !== 'all' ? ' | التصنيف: ' + printGenre : ''}</div><div class="count">عدد الأعمال: ${items.length}</div><table><thead><tr><th>#</th><th>اسم العمل</th><th>السنة</th><th>النوع</th><th>التصنيف</th><th>تقييمي</th></tr></thead><tbody>${rows}</tbody></table></body></html>`)
     printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 250)
   }
+
+  const resetPrintFilters = () => { setPrintFilter('all'); setPrintType('all'); setPrintYear('all'); setPrintMinRating(''); setPrintMaxRating(''); setPrintGenre('all') }
+
+  const openPrintDialog = () => { resetPrintFilters(); setShowPrintDialog(true) }
 
   if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
 
@@ -241,7 +276,7 @@ export default function HussamArchivePage() {
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             {mainTab === 'ratings' && <Button onClick={movieNightPick} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="اختيار الليلة"><Dice5 className="w-5 h-5" /></Button>}
-            {mainTab === 'ratings' && <Button onClick={printRatedItems} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="طباعة"><Printer className="w-5 h-5" /></Button>}
+            {mainTab === 'ratings' && <Button onClick={openPrintDialog} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="طباعة"><Printer className="w-5 h-5" /></Button>}
             {mainTab === 'watchlist' && <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>}
             <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Settings className="w-5 h-5" /></Button></PopoverTrigger><PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]"><div className="space-y-2"><Button onClick={exportData} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><Download className="w-4 h-4" />تصدير</Button><Button onClick={() => importInputRef.current?.click()} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><UploadIcon className="w-4 h-4" />استيراد</Button><input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} /></div></PopoverContent></Popover>
             {mainTab === 'watchlist' && <Button onClick={() => { resetForm(); setShowAddDialog(true) }} className="bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة</span></Button>}
@@ -468,6 +503,84 @@ export default function HussamArchivePage() {
         </DialogContent></Dialog>
 
         {/* Add to Watchlist Dialog */}
+        {/* Print Customization Dialog */}
+        <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Printer className="w-5 h-5 text-[#d4af37]" />تخصيص الطباعة</DialogTitle></DialogHeader>
+          <div className="space-y-5 mt-4">
+            {/* Quick Selections */}
+            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Trophy className="w-4 h-4" />اختيار سريع</label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {([
+                  { key: 'all' as const, label: 'الكل' },
+                  { key: 'top10' as const, label: 'أفضل 10' },
+                  { key: 'top25' as const, label: 'أفضل 25' },
+                  { key: 'top50' as const, label: 'أفضل 50' },
+                ]).map((opt) => (
+                  <button key={opt.key} onClick={() => setPrintFilter(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all ${printFilter === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Type Filter */}
+            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><SlidersHorizontal className="w-4 h-4" />حسب النوع</label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {([
+                  { key: 'all' as const, label: 'الكل', Icon: Star },
+                  { key: 'movie' as const, label: 'أفلام', Icon: Film },
+                  { key: 'series' as const, label: 'مسلسلات', Icon: Tv },
+                  { key: 'anime' as const, label: 'أنمي', Icon: Sparkles },
+                ]).map((opt) => (
+                  <button key={opt.key} onClick={() => setPrintType(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all flex flex-col items-center gap-1 ${printType === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}><opt.Icon className="w-4 h-4" /><span>{opt.label}</span></button>
+                ))}
+              </div>
+            </div>
+
+            {/* Year & Genre & Rating */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+                <label className="text-sm text-neutral-400 mb-2 block">حسب السنة</label>
+                <Select value={printYear} onValueChange={setPrintYear}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="all">كل السنوات</SelectItem>{printYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select>
+              </div>
+              <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+                <label className="text-sm text-neutral-400 mb-2 block">حسب التصنيف</label>
+                <Select value={printGenre} onValueChange={setPrintGenre}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="all">كل التصنيفات</SelectItem>{printGenres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
+              </div>
+            </div>
+
+            {/* Rating Range */}
+            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
+              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4" />نطاق التقييم</label>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex-1"><Input type="number" min="0" max="100" step="0.01" value={printMinRating} onChange={(e) => setPrintMinRating(e.target.value)} placeholder="من (مثال: 70)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
+                <span className="text-neutral-500">—</span>
+                <div className="flex-1"><Input type="number" min="0" max="100" step="0.01" value={printMaxRating} onChange={(e) => setPrintMaxRating(e.target.value)} placeholder="إلى (مثال: 100)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
+              </div>
+            </div>
+
+            {/* Preview Summary */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-[#d4af37]/10 to-[#b8960f]/5 border border-[#d4af37]/20">
+              <div className="flex items-center justify-between">
+                <div><p className="text-sm text-neutral-300">عدد الأعمال المطلوب طباعتها</p><p className="text-xs text-neutral-500 mt-0.5">مرتبة أبجدياً</p></div>
+                <div className="text-3xl font-bold text-[#d4af37]">{printPreviewItems.length}</div>
+              </div>
+              {printPreviewItems.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-[#2a2a2a] max-h-32 overflow-y-auto">
+                  <p className="text-xs text-neutral-500 mb-1">معاينة الأسماء:</p>
+                  <p className="text-xs text-neutral-300 leading-relaxed">{printPreviewItems.slice(0, 15).map(i => i.originalTitle || i.title).join(' • ')}{printPreviewItems.length > 15 ? ` ... +${printPreviewItems.length - 15} آخر` : ''}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button onClick={executePrint} disabled={printPreviewItems.length === 0} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Printer className="w-4 h-4" />طباعة ({printPreviewItems.length})</Button>
+              <Button onClick={resetPrintFilters} variant="ghost" className="text-neutral-400 gap-1"><X className="w-4 h-4" />إعادة تعيين</Button>
+              <Button onClick={() => setShowPrintDialog(false)} variant="ghost" className="text-neutral-400">إلغاء</Button>
+            </div>
+          </div>
+        </DialogContent></Dialog>
+
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Plus className="w-5 h-5 text-[#d4af37]" />إضافة {TYPE_CONFIG[addType].label} جديد</DialogTitle></DialogHeader><div className="space-y-4 mt-4"><div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">نوع العمل</label><div className="grid grid-cols-3 gap-2">{(['movie', 'series', 'anime'] as const).map((type) => { const c = TYPE_CONFIG[type]; const I = c.icon; return <button key={type} onClick={() => { setAddType(type); setShowResults(false) }} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 ${addType === type ? 'bg-gradient-to-br ' + c.color + ' text-[#0a0a0a]' : 'bg-[#2a2a2a]/50 text-neutral-400'}`}><I className="w-5 h-5" /><span className="text-xs">{c.label}</span></button> })}</div></div><div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">ابحث لجلب المعلومات تلقائياً</label><div className="flex gap-2"><Input value={metaSearchQuery} onChange={(e) => setMetaSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchMetadata()} placeholder="ابحث بالإنجليزي أو العربي..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-10" /><Button onClick={fetchMetadata} disabled={isFetching || !metaSearchQuery.trim()} className="bg-[#d4af37] text-[#0a0a0a] font-bold px-4">{isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}</Button></div>{searchError && <p className="text-red-400 text-sm mt-2">{searchError}</p>}</div>{showResults && searchResults.length > 0 && <div className="max-h-60 overflow-y-auto space-y-2 bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a]">{searchResults.map((r, idx) => <button key={idx} onClick={() => selectAndAdd(r)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[#2a2a2a] text-right transition-colors">{r.poster && <img src={r.poster} alt="" className="w-10 h-14 rounded object-cover flex-shrink-0" />}<div className="flex-1 min-w-0"><p className="font-bold text-sm line-clamp-1">{r.originalTitle || r.title}</p><p className="text-xs text-neutral-400">{r.year} {r.rating && `• ⭐ ${r.rating}`}</p></div><Plus className="w-4 h-4 text-[#d4af37] flex-shrink-0" /></button>)}</div>}<div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">أو أدخل البيانات يدوياً</label><div className="space-y-3"><Input value={formData.originalTitle} onChange={(e) => setFormData(p => ({ ...p, originalTitle: e.target.value, title: e.target.value }))} placeholder="اسم العمل (إنجليزي)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><div className="grid grid-cols-2 gap-3"><Input value={formData.year} onChange={(e) => setFormData(p => ({ ...p, year: e.target.value }))} placeholder="السنة" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><Input value={formData.genres} onChange={(e) => setFormData(p => ({ ...p, genres: e.target.value }))} placeholder="التصنيف" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>{(addType === 'series' || addType === 'anime') && <div className="grid grid-cols-2 gap-3"><Input value={formData.seasons} onChange={(e) => setFormData(p => ({ ...p, seasons: e.target.value }))} placeholder="عدد المواسم" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><Input value={formData.episodes} onChange={(e) => setFormData(p => ({ ...p, episodes: e.target.value }))} placeholder="عدد الحلقات" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>}<Textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات (اختياري)" className="bg-[#1a1a1a] border-[#2a2a2a] min-h-[60px]" /></div></div><div className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-colors ${isDragOver ? 'border-[#d4af37] bg-[#d4af37]/5' : 'border-[#2a2a2a]'}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handlePosterUpload(e.target.files[0])} />{formData.poster ? <div className="relative inline-block"><img src={formData.poster} alt="poster" className="h-24 rounded-lg mx-auto" /><Button variant="ghost" size="icon" onClick={() => setFormData(p => ({ ...p, poster: '' }))} className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white rounded-full"><X className="w-3 h-3" /></Button></div> : <div className="py-2 cursor-pointer" onClick={() => fileInputRef.current?.click()}><ImageIcon className="w-6 h-6 text-neutral-500 mx-auto mb-1" /><p className="text-xs text-neutral-400">اسحب صورة أو اضغط</p></div>}</div><div className="flex gap-2"><Button onClick={handleAddItem} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">إضافة</Button><Button onClick={() => { setShowAddDialog(false); resetForm() }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div></div></DialogContent></Dialog>
 
       </div>
