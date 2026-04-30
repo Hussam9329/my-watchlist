@@ -10,13 +10,16 @@ function formatItem(item: any) {
   }
 }
 
-// GET - جلب جميع العناصر (مع دعم الفلترة حسب النوع والبحث والتقييم)
+// GET - جلب جميع العناصر (مع دعم الفلترة حسب النوع والبحث والتقييم + Pagination)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const search = searchParams.get('search')
     const hasRating = searchParams.get('hasRating') // 'true' = فقط المقيّمة, 'false' = فقط غير المقيّمة
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')))
+    const skip = (page - 1) * limit
 
     const where: any = {}
     if (type) where.type = type
@@ -32,12 +35,23 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const items = await prisma.mediaItem.findMany({
-      where,
-      orderBy: { addedAt: 'desc' }
-    })
+    const [items, total] = await Promise.all([
+      prisma.mediaItem.findMany({
+        where,
+        orderBy: { addedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.mediaItem.count({ where })
+    ])
     const formattedItems = items.map(formatItem)
-    return NextResponse.json({ items: formattedItems })
+    return NextResponse.json({
+      items: formattedItems,
+      total,
+      page,
+      limit,
+      hasMore: skip + items.length < total
+    })
   } catch (error) {
     console.error('Fetch error:', error)
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 })

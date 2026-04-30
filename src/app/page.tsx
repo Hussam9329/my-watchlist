@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, BookOpen, Gamepad2, Star, Lock } from 'lucide-react'
+import { ArrowLeft, BookOpen, Gamepad2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -71,10 +71,9 @@ export default function HussamVisionHome() {
   }
 
   const cards = [
-    { href: '/archive', icon: BookOpen, title: 'أريد مشاهدته', desc: 'تتبع أفلامك ومسلسلاتك وأنمياتك', color: 'amber', border: 'border-indigo-500/20', gradient: 'from-amber-500/15 to-amber-700/10', iconBorder: 'border-amber-500/25', iconShadow: 'shadow-amber-500/10', textGradient: 'from-amber-300 via-yellow-400 to-amber-500', textColor: 'text-blue-400' },
+    { href: '/archive', icon: BookOpen, title: 'أرشيف حسام', desc: 'أرشيفك الشامل: أفلام، مسلسلات، أنمي وتقييمات', color: 'amber', border: 'border-indigo-500/20', gradient: 'from-amber-500/15 to-amber-700/10', iconBorder: 'border-amber-500/25', iconShadow: 'shadow-amber-500/10', textGradient: 'from-amber-300 via-yellow-400 to-amber-500', textColor: 'text-blue-400' },
     { href: '/books', icon: BookOpen, title: 'أريد قرائته', desc: 'تتبع كتبك ومؤلفاتك المفضلة', color: 'emerald', border: 'border-emerald-500/20', gradient: 'from-emerald-500/15 to-emerald-700/10', iconBorder: 'border-emerald-500/25', iconShadow: 'shadow-emerald-500/10', textGradient: 'from-emerald-300 via-green-400 to-emerald-500', textColor: 'text-emerald-400' },
     { href: '/games', icon: Gamepad2, title: 'أريد لعبها', desc: 'تتبع ألعابك المفضلة على كل المنصات', color: 'teal', border: 'border-teal-500/20', gradient: 'from-teal-500/15 to-cyan-700/10', iconBorder: 'border-teal-500/25', iconShadow: 'shadow-teal-500/10', textGradient: 'from-teal-300 via-emerald-400 to-teal-500', textColor: 'text-teal-400' },
-    { href: '/ratings', icon: Star, title: 'تقييماتي', desc: 'قيّم أعمالك المفضلة بتفصيل', color: 'yellow', border: 'border-yellow-500/20', gradient: 'from-yellow-500/15 to-amber-700/10', iconBorder: 'border-yellow-500/25', iconShadow: 'shadow-yellow-500/10', textGradient: 'from-yellow-300 via-amber-400 to-yellow-500', textColor: 'text-yellow-400' },
   ]
 
   return (
@@ -96,7 +95,7 @@ export default function HussamVisionHome() {
         </div>
 
         {/* بطاقات التطبيقات */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 w-full max-w-6xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 lg:gap-8 w-full max-w-4xl">
           {cards.map((card) => {
             const Icon = card.icon
             return (
