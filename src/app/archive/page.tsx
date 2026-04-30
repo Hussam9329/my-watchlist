@@ -236,27 +236,22 @@ export default function HussamArchivePage() {
           <button onClick={() => { setMainTab('ratings'); setSearchQuery(''); clearFilters() }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'ratings' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /><span>تقييماتي</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'ratings' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{rtTotal}</span></div></button>
         </div>
 
-        {/* Ratings Stats Dashboard */}
-        {mainTab === 'ratings' && showStats && ratingsStats && (
-          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-6">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#d4af37]" />إحصائيات التقييمات</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#d4af37]">{ratingsStats.totalRated || 0}</p><p className="text-xs text-neutral-400">إجمالي الأعمال</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#f0d77a]">{ratingsStats.movieCount || 0}</p><p className="text-xs text-neutral-400">أفلام</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#e6c65a]">{ratingsStats.seriesCount || 0}</p><p className="text-xs text-neutral-400">مسلسلات</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#c9a227]">{ratingsStats.animeCount || 0}</p><p className="text-xs text-neutral-400">أنمي</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#d4af37]">{formatRating(ratingsStats.avgRating)}</p><p className="text-xs text-neutral-400">متوسط التقييم</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-sm font-bold text-green-400 truncate">{ratingsStats.maxRatingTitle || '-'}</p><p className="text-xs text-neutral-400">أعلى تقييم ({formatRating(ratingsStats.maxRating)})</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#e6c65a]">{ratingsStats.topGenre || '-'}</p><p className="text-xs text-neutral-400">أكثر تصنيف</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#c9a227]">{ratingsStats.topYear || '-'}</p><p className="text-xs text-neutral-400">أكثر سنة</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#d4af37]">{ratingsStats.topDecade || '-'}</p><p className="text-xs text-neutral-400">أكثر عقد</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]"><p className="text-xl font-bold text-[#f0d77a]">{ratingsStats.genreCount || 0}</p><p className="text-xs text-neutral-400">عدد التصنيفات</p></div>
-            </div>
+        {/* Ratings Tab: Old Design via iframe */}
+        {mainTab === 'ratings' && (
+          <div className="-mx-3 sm:-mx-4 -mb-4 sm:-mb-8">
+            <iframe
+              src="/ratings/index.html"
+              style={{ width: '100%', height: 'calc(100vh - 140px)', border: 'none', display: 'block' }}
+              title="تقييماتي"
+            />
           </div>
         )}
 
+        {/* Watchlist Tab Content */}
+        {mainTab === 'watchlist' && (
+        <>
         {/* Watchlist Stats */}
-        {mainTab === 'watchlist' && showStats && (
+        {showStats && (
           <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-6 mb-6"><h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#d4af37]" />إحصائيات {TYPE_CONFIG[activeTab].plural}</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#d4af37]">{stats.total}</p><p className="text-sm text-neutral-400">إجمالي</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#f0d77a]">{stats.watched}</p><p className="text-sm text-neutral-400">تمت المشاهدة</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#e6c65a]">{stats.favorite}</p><p className="text-sm text-neutral-400">مفضلة</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#c9a227]">{stats.avgRating.toFixed(1)}</p><p className="text-sm text-neutral-400">متوسط التقييم</p></div></div></div>
         )}
 
@@ -319,7 +314,9 @@ export default function HussamArchivePage() {
         )}
 
         {/* Infinite scroll loader */}
-        {((mainTab === 'watchlist' && wlHasMore) || (mainTab === 'ratings' && rtHasMore)) && <div ref={loaderRef} className="flex justify-center py-8">{isLoadingMore && <Loader2 className="w-8 h-8 animate-spin text-[#d4af37]" />}</div>}
+        {(wlHasMore) && <div ref={loaderRef} className="flex justify-center py-8">{isLoadingMore && <Loader2 className="w-8 h-8 animate-spin text-[#d4af37]" />}</div>}
+        </>
+        )}
 
         {/* Detail Dialog */}
         <Dialog open={showDetails} onOpenChange={setShowDetails}><DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto">{selectedItem && <><DialogHeader><DialogTitle className="text-xl english-title">{getDisplayTitle(selectedItem)}</DialogTitle></DialogHeader><div className="mt-4 space-y-4"><div className="flex gap-4"><div className="w-32 h-48 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{selectedItem.poster ? <img src={selectedItem.poster} alt="" className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center ${TYPE_CONFIG[selectedItem.type as TabType]?.bgColor || 'bg-[#1a1a1a]'}`}>{(() => { const I = TYPE_CONFIG[selectedItem.type as TabType]?.icon || Film; return <I className="w-12 h-12 text-neutral-500" /> })()}</div>}</div><div className="flex-1"><div className="flex items-center gap-2 mb-2 flex-wrap"><Badge className={`bg-gradient-to-r ${TYPE_CONFIG[selectedItem.type as TabType]?.color || 'from-[#d4af37] to-[#b8960f]'} text-white`}>{TYPE_CONFIG[selectedItem.type as TabType]?.label || selectedItem.type}</Badge><span className="text-[#d4af37]">{selectedItem.year}</span>{mainTab === 'ratings' && selectedItem.userRating != null && <Badge className={`bg-[#d4af37]/20 ${getRatingClass(selectedItem.userRating)} font-bold`}>تقييمي: {formatRating(selectedItem.userRating)}/100</Badge>}</div>{selectedItem.seasons && <p className="text-sm text-neutral-400">{selectedItem.seasons} مواسم</p>}{selectedItem.genres?.length > 0 && <div className="flex flex-wrap gap-1 mt-2">{selectedItem.genres.map(g => <Badge key={g} className="bg-[#2a2a2a] text-neutral-300 text-[10px]">{g}</Badge>)}</div>}</div></div>{selectedItem.overview && <div><h4 className="font-medium mb-1 text-[#e6c65a]">الملخص</h4><p className="text-sm text-neutral-300">{selectedItem.overview}</p></div>}{selectedItem.notes && <div><h4 className="font-medium mb-1 text-[#e6c65a]">ملاحظاتي</h4><p className="text-sm text-neutral-300">{selectedItem.notes}</p></div>}
