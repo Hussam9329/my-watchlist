@@ -252,7 +252,19 @@ export default function HussamArchivePage() {
   const toggleFavorite = async (id: string) => { const list = mainTab === 'watchlist' ? watchList : ratedList; const item = list.find(i => i.id === id); if (!item) return; try { await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ favorite: !item.favorite }) }); if (mainTab === 'watchlist') setWatchList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); else setRatedList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); toast({ title: item.favorite ? 'أُزيل من المفضلة' : 'أُضيف للمفضلة' }) } catch {} }
 
   // Rate item 0-100 — moves from watchlist to ratings
-  const rateItem = async (id: string, rating: number, genre?: string) => { try { const patchData: any = { userRating: rating, watched: true }; if (genre) patchData.genres = genre; await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchData) }); const item = watchList.find(i => i.id === id); if (item) { setWatchList(p => p.filter(i => i.id !== id)); const updatedItem = { ...item, userRating: rating, watched: true, ...(genre ? { genres: [genre] } : {}) }; setRatedList(p => [updatedItem, ...p]) }; if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }; toast({ title: 'تم التقييم!', description: `تم تقييم "${item?.originalTitle || item?.title}" بـ ${formatRating(rating)}/100 ونقله للتقييمات` }); fetchRatingsStats() } catch {} }
+  // Rate item — strip everything except name + year, move to ratings
+  const rateItem = async (id: string, rating: number, genre?: string) => { try {
+    const patchData: any = { userRating: rating, watched: true, poster: null, overview: '', rating: '', notes: '', tags: '', favorite: false, duration: '', status: '' }
+    if (genre) patchData.genres = genre; else patchData.genres = ''
+    await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchData) })
+    const item = watchList.find(i => i.id === id)
+    if (item) { setWatchList(p => p.filter(i => i.id !== id))
+      // Only keep: id, title, originalTitle, year, type, userRating, watched, genres (entered), addedAt
+      const cleanItem: MediaItem = { id: item.id, title: item.title, originalTitle: item.originalTitle, year: item.year, type: item.type, poster: '', rating: '', overview: '', genres: genre ? [genre] : [], episodes: undefined, seasons: undefined, duration: '', status: '', author: undefined, pages: undefined, tags: [], notes: '', favorite: false, addedAt: item.addedAt, watchedAt: undefined, watched: true, userRating: rating }
+      setRatedList(p => [cleanItem, ...p]) }
+    if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }
+    toast({ title: 'تم التقييم!', description: `تم تقييم "${item?.originalTitle || item?.title}" بـ ${formatRating(rating)}/100 ونقله للتقييمات` }); fetchRatingsStats()
+  } catch {} }
 
   const exportData = () => { const d = JSON.stringify(mainTab === 'watchlist' ? watchList : ratedList, null, 2); const b = new Blob([d], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${mainTab === 'watchlist' ? 'watchlist' : 'ratings'}_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(u); toast({ title: 'تم التصدير' }) }
   const importData = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = async (ev) => { try { const imp = JSON.parse(ev.target?.result as string); if (Array.isArray(imp)) { for (const item of imp) await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }); if (mainTab === 'watchlist') fetchWatchList(1); else fetchRatedList(1); toast({ title: 'تم الاستيراد', description: `تم استيراد ${imp.length} عنصر` }) } } catch {} }; r.readAsText(f) } }
