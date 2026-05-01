@@ -91,13 +91,13 @@ export default function GamesPage() {
   const fetchGameList = useCallback(async () => {
     try {
       setSyncStatus('syncing')
-      const response = await fetch('/api/watchlist')
+      const response = await fetch('/api/watchlist?type=game&limit=100')
       const data = await response.json()
       if (data.items && Array.isArray(data.items)) {
-        setGameList(data.items.filter((i: any) => i.type === 'game'))
+        setGameList(data.items)
         setSyncStatus('synced')
       } else if (Array.isArray(data)) {
-        setGameList(data.filter((i: any) => i.type === 'game'))
+        setGameList(data)
         setSyncStatus('synced')
       } else {
         setGameList([])

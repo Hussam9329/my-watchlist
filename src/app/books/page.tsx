@@ -101,13 +101,13 @@ export default function WatchListPage() {
   const fetchWatchList = useCallback(async () => {
     try {
       setSyncStatus('syncing')
-      const response = await fetch('/api/watchlist')
+      const response = await fetch('/api/watchlist?type=book&limit=100')
       const data = await response.json()
       if (data.items && Array.isArray(data.items)) { 
-        setWatchList(data.items.filter((i: any) => i.type === 'book'))
+        setWatchList(data.items)
         setSyncStatus('synced')
       } else if (Array.isArray(data)) {
-        setWatchList(data.filter((i: any) => i.type === 'book'))
+        setWatchList(data)
         setSyncStatus('synced')
       } else {
         setWatchList([])
