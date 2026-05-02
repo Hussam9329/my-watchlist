@@ -1,681 +1,2498 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useToast } from '@/hooks/use-toast'
-import { Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Image as ImageIcon, Search, Loader2, Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight, Dice5, Printer, Trophy, SlidersHorizontal } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { toast } from 'sonner'
+import {
+  Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Search, Loader2,
+  Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
+  BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff,
+  ArrowRight, Dice5, Printer, Trophy, SlidersHorizontal, Share2, FileText
+} from 'lucide-react'
 
-interface MediaItem { id: string; title: string; originalTitle?: string; year: string; type: string; poster: string; rating: string; overview: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number; tags: string[]; notes: string; favorite: boolean; addedAt: string; watchedAt?: string; watched: boolean; userRating?: number }
-interface SearchResult { title: string; originalTitle: string; year: string; rating: string; overview: string; poster?: string; genres: string[]; episodes?: number; seasons?: number; duration?: string; status?: string; author?: string; pages?: number }
-type TabType = 'all' | 'anime' | 'series' | 'movie'
-type MainTab = 'watchlist' | 'ratings'
-type ViewMode = 'grid' | 'list'
-type SortBy = 'addedAt' | 'title' | 'year' | 'rating' | 'userRating'
-type SortOrder = 'asc' | 'desc'
+// ==================== Types ====================
+interface MediaItem {
+  id: string
+  title: string
+  originalTitle?: string | null
+  year: string
+  type: string
+  poster?: string | null
+  rating?: string | null
+  overview?: string | null
+  genres: string[]
+  episodes?: number | null
+  seasons?: number | null
+  duration?: string | null
+  status?: string | null
+  author?: string | null
+  pages?: number | null
+  tags: string[]
+  notes: string
+  favorite: boolean
+  watched: boolean
+  watchedAt?: string | null
+  userRating?: number | null
+  rewatch: boolean
+  runtime?: number | null
+  ratingStatus: string
+  addedAt: string
+  updatedAt: string
+}
 
-const TYPE_CONFIG: Record<TabType | 'book', { icon: typeof Film; label: string; plural: string; color: string; bgColor: string }> = {
-  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
+interface MetadataResult {
+  title: string
+  originalTitle?: string
+  year?: string
+  poster?: string | null
+  overview?: string
+  rating?: string | null
+  type?: string
+  genres?: string[]
+  author?: string
+  pages?: number | null
+  episodes?: number | null
+  seasons?: number | null
+  duration?: string
+  status?: string
+  runtime?: number | null
+}
+
+interface StatsData {
+  totalRated: number
+  topGenre: string
+  avgRating: number
+  topYear: string
+  topDecade: string
+  thisMonth: number
+  movieCount: number
+  seriesCount: number
+  animeCount: number
+  avgMovieRating: number
+  avgSeriesRating: number
+  avgAnimeRating: number
+  genreCount: number
+  maxRating: number
+  maxRatingTitle: string
+}
+
+// ==================== Constants ====================
+const APP_PASSWORD = '204871'
+
+const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
   series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
-  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' }
+  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
+  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
+  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
 }
 
-const GENRE_OPTIONS = ['Action','Adventure','Anime','Animation','Biography','Comedy','Comics','Crime','Disaster','Documentary','Drama','Fantasy','History','Horror','Mystery','Romance','Sci-Fi','Thriller','War','Western','Other']
-const YEARS_RANGE = Array.from({ length: 100 }, (_, i) => (new Date().getFullYear() - i).toString())
-const PAGE_SIZE = 20
-const RATINGS_PREVIEW_SIZE = 10
+const SORT_OPTIONS = [
+  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
+  { value: 'addedAt_asc', label: 'أضيف أولاً' },
+  { value: 'title_asc', label: 'الاسم أ-ي' },
+  { value: 'title_desc', label: 'الاسم ي-أ' },
+  { value: 'year_desc', label: 'السنة (جديد)' },
+  { value: 'year_asc', label: 'السنة (قديم)' },
+  { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
+  { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
+  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
+]
 
-const getDisplayTitle = (item: MediaItem): string => item.originalTitle || item.title || ''
+const RATING_STATUSES = [
+  { value: 'watched', label: 'تمت المشاهدة' },
+  { value: 'rewatching', label: 'إعادة مشاهدة' },
+  { value: 'dropped', label: 'متروك' },
+  { value: 'on_hold', label: 'معلق' },
+]
+
+// ==================== Helpers ====================
+function formatRating(num: number | null | undefined) {
+  if (num == null) return '-'
+  const n = Math.round(Number(num) * 100) / 100
+  return Number.isInteger(n) ? String(n) : n.toFixed(2)
+}
+
+function getRatingColor(rating: number) {
+  if (rating >= 70) return 'text-green-400'
+  if (rating >= 40) return 'text-yellow-400'
+  return 'text-red-400'
+}
+
+function getRatingBg(rating: number) {
+  if (rating >= 70) return 'bg-green-500/20 border-green-500/30 text-green-400'
+  if (rating >= 40) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+  return 'bg-red-500/20 border-red-500/30 text-red-400'
+}
+
+function getRatingBarColor(rating: number) {
+  if (rating >= 70) return 'bg-green-500'
+  if (rating >= 40) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
 
 const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = (e) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); let { width, height } = img; if (width > maxWidth || height > maxHeight) { const ratio = Math.min(maxWidth / width, maxHeight / height); width *= ratio; height *= ratio }; canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); if (!ctx) { reject(new Error('No context')); return }; ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', quality)) }; img.onerror = () => reject(new Error('Load failed')); img.src = e.target?.result as string }
-    reader.onerror = () => reject(new Error('Read failed')); reader.readAsDataURL(file)
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let { width, height } = img
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height)
+          width *= ratio; height *= ratio
+        }
+        canvas.width = width; canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('No context')); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => reject(new Error('Load failed'))
+      img.src = e.target?.result as string
+    }
+    reader.onerror = () => reject(new Error('Read failed'))
+    reader.readAsDataURL(file)
   })
 }
 
-function formatRating(num: number | null | undefined) { if (num == null) return '-'; const n = Math.round(Number(num) * 100) / 100; return Number.isInteger(n) ? String(n) : n.toFixed(2) }
-function getRatingClass(rating: number) { if (rating >= 70) return 'text-green-400'; if (rating >= 40) return 'text-yellow-400'; return 'text-red-400' }
-function getRatingBg(rating: number) { if (rating >= 70) return 'bg-green-500/20 border-green-500/30 text-green-400'; if (rating >= 40) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'; return 'bg-red-500/20 border-red-500/30 text-red-400' }
+function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
+  return {
+    title: item.title || '',
+    originalTitle: item.originalTitle || '',
+    year: item.year || '',
+    type: item.type || 'movie',
+    poster: item.poster || '',
+    rating: item.rating || '',
+    overview: item.overview || '',
+    genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
+    episodes: item.episodes != null ? String(item.episodes) : '',
+    seasons: item.seasons != null ? String(item.seasons) : '',
+    duration: item.duration || '',
+    status: item.status || '',
+    author: item.author || '',
+    pages: item.pages != null ? String(item.pages) : '',
+    tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
+    notes: item.notes || '',
+    favorite: item.favorite ? 'true' : 'false',
+    watched: item.watched ? 'true' : 'false',
+    watchedAt: item.watchedAt || '',
+    userRating: item.userRating != null ? String(item.userRating) : '',
+    rewatch: item.rewatch ? 'true' : 'false',
+    runtime: item.runtime != null ? String(item.runtime) : '',
+    ratingStatus: item.ratingStatus || 'watched',
+  }
+}
 
-export default function HussamArchivePage() {
-  const { toast } = useToast()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [mainTab, setMainTab] = useState<MainTab>('watchlist')
-  const [activeTab, setActiveTab] = useState<TabType>('all')
-  const [watchList, setWatchList] = useState<MediaItem[]>([])
-  const [ratedList, setRatedList] = useState<MediaItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced')
-  const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showAddRatedDialog, setShowAddRatedDialog] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
-  const [showDetails, setShowDetails] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [showEditRatedDialog, setShowEditRatedDialog] = useState(false)
-  const [editingItem, setEditingItem] = useState<MediaItem | null>(null)
-  const [showQuickRate, setShowQuickRate] = useState(false)
-  const [quickRateItem, setQuickRateItem] = useState<MediaItem | null>(null)
-  const [quickRateValue, setQuickRateValue] = useState<string>('')
-  const [quickRateGenre, setQuickRateGenre] = useState<string>('')
-  const [addType, setAddType] = useState<'movie' | 'series' | 'anime'>('movie')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('addedAt')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
-  const [filterYear, setFilterYear] = useState<string>('all')
-  const [filterMinUserRating, setFilterMinUserRating] = useState<string>('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterGenre, setFilterGenre] = useState<string>('all')
-  const [filterType, setFilterType] = useState<string>('all')
-  const [showFilters, setShowFilters] = useState(false)
-  const [showStats, setShowStats] = useState(false)
-  const [metaSearchQuery, setMetaSearchQuery] = useState('')
-  const [isFetching, setIsFetching] = useState(false)
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [showResults, setShowResults] = useState(false)
-  const [searchError, setSearchError] = useState('')
-  const [formData, setFormData] = useState({ title: '', originalTitle: '', year: new Date().getFullYear().toString(), rating: '', overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '', author: '', pages: '', tags: '', notes: '', poster: '', userRating: '' })
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const importInputRef = useRef<HTMLInputElement>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [wlPage, setWlPage] = useState(1); const [wlTotal, setWlTotal] = useState(0); const [wlHasMore, setWlHasMore] = useState(false)
-  const [rtPage, setRtPage] = useState(1); const [rtTotal, setRtTotal] = useState(0); const [rtHasMore, setRtHasMore] = useState(false)
-  const [ratingsStats, setRatingsStats] = useState<any>(null)
-  const [ratingSubTab, setRatingSubTab] = useState<'movie' | 'series' | 'anime'>('movie')
-  const [showPrintDialog, setShowPrintDialog] = useState(false)
-  const [printFilter, setPrintFilter] = useState<'all' | 'top10' | 'top25' | 'top50' | 'custom'>('all')
-  const [printType, setPrintType] = useState<'all' | 'movie' | 'series' | 'anime'>('all')
-  const [printYear, setPrintYear] = useState<string>('all')
-  const [printMinRating, setPrintMinRating] = useState<string>('')
-  const [printMaxRating, setPrintMaxRating] = useState<string>('')
-  const [printGenre, setPrintGenre] = useState<string>('all')
-  const [printSortBy, setPrintSortBy] = useState<'rating' | 'title' | 'year' | 'type'>('title')
-  const loaderRef = useRef<HTMLDivElement>(null)
+// ==================== Skeleton Grid ====================
+function SkeletonGrid({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="aspect-[2/3] rounded-xl skeleton-shimmer" />
+      ))}
+    </div>
+  )
+}
 
-  useEffect(() => { const auth = localStorage.getItem('hussamvision_auth'); if (auth !== 'true') { window.location.href = '/'; return }; setIsAuthenticated(true) }, [])
+// ==================== Memoized Card ====================
+interface MediaCardProps {
+  item: MediaItem
+  onClick: () => void
+  onQuickRate: () => void
+  onToggleFavorite: () => void
+  onToggleWatched: () => void
+  viewMode: 'grid' | 'list'
+}
 
-  const fetchWatchList = useCallback(async (page = 1, append = false) => {
-    try { if (page === 1) setSyncStatus('syncing'); else setIsLoadingMore(true)
-      const response = await fetch(`/api/watchlist?hasRating=false&page=${page}&limit=${PAGE_SIZE}`)
-      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game' && (i.userRating === null || i.userRating === undefined))
-      if (append) setWatchList(prev => [...prev, ...items]); else setWatchList(items)
-      setWlTotal(data.total || 0); setWlHasMore(data.hasMore || false); setWlPage(page); setSyncStatus('synced')
-    } catch { setSyncStatus('error') } finally { setIsLoading(false); setIsLoadingMore(false) }
-  }, [])
+const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode }: MediaCardProps) {
+  const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
+  const TypeIcon = typeConf.icon
 
-  const fetchRatedList = useCallback(async (page = 1, append = false) => {
-    try { if (page === 1) setSyncStatus('syncing'); else setIsLoadingMore(true)
-      const response = await fetch(`/api/watchlist?hasRating=true&page=${page}&limit=${PAGE_SIZE}`)
-      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
-      if (append) setRatedList(prev => [...prev, ...items]); else setRatedList(items)
-      setRtTotal(data.total || 0); setRtHasMore(data.hasMore || false); setRtPage(page); setSyncStatus('synced')
-    } catch { setSyncStatus('error') } finally { setIsLoading(false); setIsLoadingMore(false) }
-  }, [])
-
-  // Fetch rated items preview (last 5 only) — fast initial load
-  const fetchRatedPreview = useCallback(async () => {
-    try { setSyncStatus('syncing')
-      const response = await fetch(`/api/watchlist?hasRating=true&page=1&limit=${RATINGS_PREVIEW_SIZE}`)
-      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
-      setRatedList(items); setRtTotal(data.total || 0); setRtHasMore(true); setRtPage(1); setSyncStatus('synced')
-    } catch { setSyncStatus('error') } finally { setIsLoading(false); setIsLoadingMore(false) }
-  }, [])
-
-  // Search rated items from the FULL database (server-side)
-  const [isSearchingRatings, setIsSearchingRatings] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const searchRatedItems = useCallback(async (query: string, type?: string) => {
-    if (!query.trim()) { fetchRatedPreview(); return }
-    try { setIsSearchingRatings(true)
-      const params = new URLSearchParams({ hasRating: 'true', search: query.trim(), page: '1', limit: '200' })
-      if (type && type !== 'all') params.set('type', type)
-      const response = await fetch(`/api/watchlist?${params}`)
-      const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
-      setRatedList(items); setRtTotal(data.total || 0); setRtHasMore(false); setRtPage(1)
-    } catch {} finally { setIsSearchingRatings(false) }
-  }, [fetchRatedPreview])
-
-  // Fetch ALL rated items from database (for print)
-  const fetchAllRatedItems = useCallback(async () => {
-    try {
-      const allItems: MediaItem[] = []; let page = 1; let hasMore = true
-      while (hasMore) {
-        const response = await fetch(`/api/watchlist?hasRating=true&page=${page}&limit=100`)
-        const data = await response.json(); const items = (data.items || []).filter((i: any) => i.type !== 'book' && i.type !== 'game')
-        allItems.push(...items); hasMore = data.hasMore || false; page++
-      }
-      return allItems
-    } catch { return [] }
-  }, [])
-
-  const fetchRatingsStats = useCallback(async () => { try { const res = await fetch('/api/ratings-stats'); const data = await res.json(); setRatingsStats(data) } catch {} }, [])
-
-  useEffect(() => { if (!isAuthenticated) return; if (mainTab === 'watchlist') fetchWatchList(1); else { fetchRatedPreview(); fetchRatingsStats() } }, [isAuthenticated, mainTab])
-  useEffect(() => { if (activeTab !== 'all') setAddType(activeTab as typeof addType) }, [activeTab])
-
-  useEffect(() => { if (!loaderRef.current) return; const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting && !isLoadingMore) { if (mainTab === 'watchlist' && wlHasMore) fetchWatchList(wlPage + 1, true); else if (mainTab === 'ratings' && rtHasMore && !searchQuery.trim()) fetchRatedList(rtPage + 1, true) } }, { threshold: 0.1 }); observer.observe(loaderRef.current); return () => observer.disconnect() }, [mainTab, wlHasMore, rtHasMore, wlPage, rtPage, isLoadingMore, fetchWatchList, fetchRatedList, searchQuery])
-
-  const currentList = mainTab === 'watchlist' ? watchList : ratedList
-
-  const allGenres = useMemo(() => { const g = new Set<string>(); currentList.filter(i => i.type !== 'book' && i.type !== 'game').forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [currentList])
-
-  const filteredItems = useMemo(() => {
-    let items = activeTab === 'all' ? currentList.filter(i => i.type !== 'book' && i.type !== 'game') : currentList.filter(i => i.type === activeTab)
-    if (activeTab === 'all' && filterType !== 'all') items = items.filter(i => i.type === filterType)
-    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); items = items.filter(i => i.title.toLowerCase().includes(q) || i.originalTitle?.toLowerCase().includes(q)) }
-    if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
-    if (filterMinUserRating) items = items.filter(i => (i.userRating || 0) >= Number(filterMinUserRating))
-    if (filterGenre !== 'all') items = items.filter(i => i.genres?.includes(filterGenre))
-    if (filterStatus === 'favorite') items = items.filter(i => i.favorite)
-    items.sort((a, b) => { let c = 0; if (sortBy === 'title') c = (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title); else if (sortBy === 'year') c = parseInt(a.year) - parseInt(b.year); else if (sortBy === 'rating') c = (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0); else if (sortBy === 'userRating') c = (a.userRating || 0) - (b.userRating || 0); else c = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime(); return sortOrder === 'asc' ? c : -c })
-    return items
-  }, [currentList, activeTab, searchQuery, filterYear, filterMinUserRating, filterStatus, filterGenre, filterType, sortBy, sortOrder])
-
-  const stats = useMemo(() => { const items = activeTab === 'all' ? currentList.filter(i => i.type !== 'book' && i.type !== 'game') : currentList.filter(i => i.type === activeTab); return { total: items.length, watched: items.filter(i => i.watched).length, favorite: items.filter(i => i.favorite).length, avgRating: items.reduce((a, i) => a + (parseFloat(i.rating) || 0), 0) / (items.length || 1) } }, [currentList, activeTab])
-
-  const tabStats = useMemo(() => ({
-    all: { total: currentList.filter(i => i.type !== 'book' && i.type !== 'game').length, watched: currentList.filter(i => i.type !== 'book' && i.type !== 'game' && i.watched).length },
-    anime: { total: currentList.filter(i => i.type === 'anime').length, watched: currentList.filter(i => i.type === 'anime' && i.watched).length },
-    series: { total: currentList.filter(i => i.type === 'series').length, watched: currentList.filter(i => i.type === 'series' && i.watched).length },
-    movie: { total: currentList.filter(i => i.type === 'movie').length, watched: currentList.filter(i => i.type === 'movie' && i.watched).length }
-  }), [currentList])
-
-  // Debounced search for ratings — search from full database
-  useEffect(() => { if (mainTab !== 'ratings') return; if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); if (!searchQuery.trim()) return; searchTimeoutRef.current = setTimeout(() => { searchRatedItems(searchQuery, ratingSubTab) }, 300); return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) } }, [searchQuery, mainTab, ratingSubTab, searchRatedItems])
-
-  const filteredRatedItems = useMemo(() => {
-    let items = ratedList.filter(i => i.type === ratingSubTab)
-    if (!searchQuery.trim()) { /* when not searching, only apply client-side filters */ }
-    if (filterYear !== 'all') items = items.filter(i => i.year === filterYear)
-    if (filterMinUserRating) items = items.filter(i => (i.userRating || 0) >= Number(filterMinUserRating))
-    if (filterGenre !== 'all') items = items.filter(i => i.genres?.includes(filterGenre))
-    items.sort((a, b) => { let c = 0; if (sortBy === 'title') c = (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title); else if (sortBy === 'year') c = parseInt(a.year) - parseInt(b.year); else if (sortBy === 'rating') c = (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0); else if (sortBy === 'userRating') c = (a.userRating || 0) - (b.userRating || 0); else c = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime(); return sortOrder === 'asc' ? c : -c })
-    return items
-  }, [ratedList, ratingSubTab, searchQuery, filterYear, filterMinUserRating, filterGenre, sortBy, sortOrder])
-
-  const handlePosterUpload = useCallback(async (file: File) => { if (file?.type.startsWith('image/')) { try { const c = await compressImage(file); setFormData(p => ({ ...p, poster: c })) } catch {} } }, [])
-  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true) }, [])
-  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false) }, [])
-  const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); handlePosterUpload(e.dataTransfer.files[0]) }, [handlePosterUpload])
-
-  const fetchMetadata = async () => { if (!metaSearchQuery.trim()) return; setIsFetching(true); setSearchResults([]); setSearchError(''); try { const res = await fetch('/api/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: metaSearchQuery, type: addType }) }); const data = await res.json(); if (data.results?.length > 0) { setSearchResults(data.results); setShowResults(true) } else setSearchError(data.error || 'لم يتم العثور على نتائج') } catch { setSearchError('حدث خطأ') } finally { setIsFetching(false) } }
-
-  const selectResult = (r: SearchResult) => { setFormData(p => ({ ...p, title: r.originalTitle || r.title, originalTitle: r.originalTitle || r.title, year: r.year || p.year, rating: r.rating || '', overview: r.overview || '', poster: r.poster || '', genres: r.genres?.join(', ') || '', episodes: r.episodes?.toString() || '', seasons: r.seasons?.toString() || '' })); setSearchResults([]); setShowResults(false); setSearchError('') }
-
-  const selectAndAdd = async (r: SearchResult) => { try { const response = await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: r.originalTitle || r.title, originalTitle: r.originalTitle || r.title, year: r.year, type: addType, poster: r.poster || '', rating: r.rating || '', overview: r.overview || '', genres: r.genres?.join(', ') || '', episodes: r.episodes || null, seasons: r.seasons || null, tags: '', notes: '' }) }); const newItem = await response.json(); if (response.status === 409) { toast({ title: 'موجود مسبقاً!', description: newItem.error, variant: 'destructive' }); return }; if (newItem?.id) { setWatchList(prev => [newItem, ...prev]); setShowAddDialog(false); resetForm(); toast({ title: 'تمت الإضافة', description: `تم إضافة "${r.originalTitle || r.title}"` }) } } catch { toast({ title: 'خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' }) } }
-
-  const handleAddItem = async () => { if (!formData.originalTitle.trim() && !formData.title.trim()) return; try { const response = await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: formData.title, originalTitle: formData.originalTitle, year: formData.year, type: addType, poster: formData.poster, rating: formData.rating, overview: formData.overview, genres: formData.genres, episodes: formData.episodes, seasons: formData.seasons, duration: formData.duration, status: formData.status, author: formData.author, pages: formData.pages, tags: formData.tags, notes: formData.notes }) }); const newItem = await response.json(); if (response.status === 409) { toast({ title: 'موجود مسبقاً!', description: newItem.error, variant: 'destructive' }); return }; if (newItem?.id) { setWatchList(prev => [newItem, ...prev]); setShowAddDialog(false); resetForm(); toast({ title: 'تمت الإضافة', description: `تم إضافة "${formData.originalTitle || formData.title}"` }) } } catch { toast({ title: 'خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' }) } }
-
-  // Add rated item directly (from ratings tab) — like old تقييماتي
-  const handleAddRatedItem = async () => {
-    if (!formData.title.trim()) return toast({ title: 'خطأ', description: 'اسم العمل مطلوب', variant: 'destructive' })
-    const rating = parseFloat(formData.userRating)
-    if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب يكون بين 0 و 100', variant: 'destructive' })
-    try {
-      const response = await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: formData.title, originalTitle: formData.title, year: formData.year, type: addType, genres: formData.genres, userRating: rating, ratingStatus: 'watched', seasons: formData.seasons ? parseInt(formData.seasons) : null, rewatch: false }) })
-      const newItem = await response.json()
-      if (response.status === 409) { toast({ title: 'موجود مسبقاً!', description: newItem.error, variant: 'destructive' }); return }
-      if (newItem?.id) { setRatedList(prev => [newItem, ...prev]); setShowAddRatedDialog(false); resetForm(); fetchRatingsStats(); toast({ title: 'تمت الإضافة', description: `تمت إضافة "${formData.title}" بتقييم ${rating}/100` }) }
-    } catch { toast({ title: 'خطأ', description: 'حدث خطأ أثناء الإضافة', variant: 'destructive' }) }
+  if (viewMode === 'list') {
+    return (
+      <div
+        className="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 active:scale-[0.97] transition-transform cursor-pointer"
+        onClick={onClick}
+      >
+        <div className="w-12 h-16 rounded-lg overflow-hidden bg-[#2a2a2a] shrink-0">
+          {item.poster ? (
+            <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <TypeIcon className="w-5 h-5 text-[#555]" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-[#888]">{item.year}</span>
+            {item.userRating != null && (
+              <span className={`text-xs font-bold ${getRatingColor(item.userRating)}`}>
+                {formatRating(item.userRating)}
+              </span>
+            )}
+            {item.rating && (
+              <span className="text-xs text-[#666]">⭐ {item.rating}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+          {item.favorite && <Heart className="w-4 h-4 text-red-400 fill-red-400" />}
+          {item.watched && <Eye className="w-4 h-4 text-green-400" />}
+        </div>
+      </div>
+    )
   }
 
-  const resetForm = () => { setMetaSearchQuery(''); setSearchResults([]); setShowResults(false); setSearchError(''); setFormData({ title: '', originalTitle: '', year: new Date().getFullYear().toString(), rating: '', overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '', author: '', pages: '', tags: '', notes: '', poster: '', userRating: '' }) }
+  return (
+    <div
+      className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden active:scale-[0.97] transition-transform cursor-pointer hover:border-[#3a3a3a]"
+      onClick={onClick}
+    >
+      {/* Poster */}
+      <div className="aspect-[2/3] relative bg-[#2a2a2a]">
+        {item.poster ? (
+          <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <TypeIcon className="w-10 h-10 text-[#444]" />
+          </div>
+        )}
+        {/* Badges overlay */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1">
+          {item.favorite && (
+            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+              <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+            </div>
+          )}
+          {item.watched && (
+            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+              <Eye className="w-3.5 h-3.5 text-green-400" />
+            </div>
+          )}
+        </div>
+        {/* Type badge */}
+        <div className="absolute top-2 left-2">
+          <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-l ${typeConf.color} text-black`}>
+            {typeConf.label}
+          </div>
+        </div>
+        {/* Rating overlay */}
+        {item.userRating != null && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
+            <div className={`text-lg font-bold ${getRatingColor(item.userRating)}`}>
+              {formatRating(item.userRating)}
+            </div>
+          </div>
+        )}
+        {item.userRating == null && item.rating && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
+            <div className="text-sm font-bold text-[#d4af37]">⭐ {item.rating}</div>
+          </div>
+        )}
+        {/* Quick actions on hover (desktop) */}
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onQuickRate}
+            className="w-10 h-10 rounded-full bg-[#d4af37] text-black flex items-center justify-center hover:scale-110 transition-transform"
+            title="تقييم"
+          >
+            <Star className="w-5 h-5" />
+          </button>
+          <button
+            onClick={onToggleFavorite}
+            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            title={item.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+          >
+            <Heart className={`w-5 h-5 ${item.favorite ? 'text-red-400 fill-red-400' : ''}`} />
+          </button>
+          <button
+            onClick={onToggleWatched}
+            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            title={item.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
+          >
+            {item.watched ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+      {/* Info */}
+      <div className="p-2.5">
+        <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs text-[#888]">{item.year}</span>
+          {item.genres && item.genres.length > 0 && (
+            <span className="text-[10px] text-[#666] truncate max-w-[80px]">{item.genres[0]}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
 
-  // Watchlist edit: only notes + poster
-  // Quick rate from watchlist — opens rating dialog
-  const openQuickRate = (item: MediaItem) => { setQuickRateItem(item); setQuickRateValue(''); setQuickRateGenre(item.genres?.[0] || ''); setShowQuickRate(true) }
-  const handleQuickRate = () => { if (!quickRateItem) return; const r = parseFloat(quickRateValue); if (isNaN(r) || r < 0 || r > 100) { toast({ title: 'خطأ', description: 'التقييم يجب يكون بين 0 و 100', variant: 'destructive' }); return }; rateItem(quickRateItem.id, r, quickRateGenre); setShowQuickRate(false); setQuickRateItem(null); setQuickRateValue(''); setQuickRateGenre('') }
+// ==================== Main Component ====================
+export default function ArchivePage() {
+  const isMobile = useIsMobile()
 
-  const openEditDialog = (item: MediaItem) => { setEditingItem(item); setFormData({ title: item.title, originalTitle: item.originalTitle || '', year: item.year, rating: item.rating, overview: item.overview, genres: item.genres?.join(', ') || '', episodes: item.episodes?.toString() || '', seasons: item.seasons?.toString() || '', duration: item.duration || '', status: item.status || '', author: item.author || '', pages: item.pages?.toString() || '', tags: item.tags?.join(', ') || '', notes: item.notes, poster: item.poster, userRating: '' }); setShowDetails(false); setShowEditDialog(true) }
+  // Auth
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
 
-  // Ratings edit: FULL edit (title, year, genre, rating, seasons) — like old تقييماتي
-  const openEditRatedDialog = (item: MediaItem) => { setEditingItem(item); setFormData({ title: item.title, originalTitle: item.originalTitle || '', year: item.year, rating: item.rating, overview: item.overview, genres: Array.isArray(item.genres) ? item.genres[0] || '' : ((item.genres as any || '').split(',')[0] || ''), episodes: item.episodes?.toString() || '', seasons: item.seasons?.toString() || '', duration: item.duration || '', status: item.status || '', author: item.author || '', pages: item.pages?.toString() || '', tags: item.tags?.join(', ') || '', notes: item.notes, poster: item.poster, userRating: item.userRating?.toString() || '' }); setShowDetails(false); setShowEditRatedDialog(true) }
+  // Main tabs
+  const [mainTab, setMainTab] = useState<'watchlist' | 'ratings' | 'stats'>('watchlist')
 
-  const handleSaveEdit = async () => { if (!editingItem) return; try { setSyncStatus('syncing'); const res = await fetch(`/api/watchlist/${editingItem.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: formData.notes || '', poster: formData.poster || null, favorite: editingItem.favorite, watched: editingItem.watched }) }); const data = await res.json(); if (data) { setWatchList(p => p.map(i => i.id === editingItem.id ? data : i)); setSyncStatus('synced'); toast({ title: 'تم التعديل', description: 'تم حفظ التعديلات' }) }; setShowEditDialog(false); setEditingItem(null); resetForm() } catch { setSyncStatus('error'); toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحفظ', variant: 'destructive' }) } }
+  // Watchlist state
+  const [wlType, setWlType] = useState('all')
+  const [wlItems, setWlItems] = useState<MediaItem[]>([])
+  const [wlLoading, setWlLoading] = useState(true)
+  const [wlPage, setWlPage] = useState(1)
+  const [wlHasMore, setWlHasMore] = useState(false)
+  const [wlTotal, setWlTotal] = useState(0)
 
-  // Save rated item edit — full edit like old تقييماتي
-  const handleSaveRatedEdit = async () => { if (!editingItem) return; try { setSyncStatus('syncing'); const rating = parseFloat(formData.userRating); if (isNaN(rating) || rating < 0 || rating > 100) return toast({ title: 'خطأ', description: 'التقييم يجب يكون بين 0 و 100', variant: 'destructive' }); const res = await fetch(`/api/watchlist/${editingItem.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: formData.title, originalTitle: formData.title, year: formData.year, type: editingItem.type, genres: formData.genres, userRating: rating, ratingStatus: 'watched', seasons: formData.seasons ? parseInt(formData.seasons) : null, rewatch: false, notes: formData.notes || '' }) }); const data = await res.json(); if (data) { setRatedList(p => p.map(i => i.id === editingItem.id ? data : i)); setSyncStatus('synced'); toast({ title: 'تم التعديل', description: 'تم حفظ التعديلات' }); fetchRatingsStats() }; setShowEditRatedDialog(false); setEditingItem(null); resetForm() } catch { setSyncStatus('error'); toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحفظ', variant: 'destructive' }) } }
+  // Ratings state
+  const [rtType, setRtType] = useState('movie')
+  const [rtItems, setRtItems] = useState<MediaItem[]>([])
+  const [rtLoading, setRtLoading] = useState(true)
+  const [rtPage, setRtPage] = useState(1)
+  const [rtHasMore, setRtHasMore] = useState(false)
+  const [rtTotal, setRtTotal] = useState(0)
 
-  const removeFromList = async (id: string) => { try { setSyncStatus('syncing'); const list = mainTab === 'watchlist' ? watchList : ratedList; const item = list.find(i => i.id === id); await fetch(`/api/watchlist/${id}`, { method: 'DELETE' }); if (mainTab === 'watchlist') setWatchList(p => p.filter(i => i.id !== id)); else setRatedList(p => p.filter(i => i.id !== id)); setSyncStatus('synced'); if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }; toast({ title: 'تم الحذف', description: `تم حذف "${item?.originalTitle || item?.title}"` }); if (mainTab === 'ratings') fetchRatingsStats() } catch { setSyncStatus('error'); toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحذف', variant: 'destructive' }) } }
+  // Stats
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
 
-  const toggleWatched = async (id: string) => { const list = mainTab === 'watchlist' ? watchList : ratedList; const item = list.find(i => i.id === id); if (!item) return; try { await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ watched: !item.watched }) }); if (mainTab === 'watchlist') setWatchList(p => p.map(i => i.id === id ? { ...i, watched: !i.watched } : i)); else setRatedList(p => p.map(i => i.id === id ? { ...i, watched: !i.watched } : i)); toast({ title: item.watched ? 'لم يُشاهد' : 'تمت المشاهدة', description: item.watched ? 'تم إلغاء حالة المشاهدة' : 'تم تحديده كمشاهد' }) } catch {} }
+  // UI state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [sortBy, setSortBy] = useState('addedAt_desc')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterGenre, setFilterGenre] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [filterRatingMin, setFilterRatingMin] = useState('')
+  const [filterRatingMax, setFilterRatingMax] = useState('')
 
-  const toggleFavorite = async (id: string) => { const list = mainTab === 'watchlist' ? watchList : ratedList; const item = list.find(i => i.id === id); if (!item) return; try { await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ favorite: !item.favorite }) }); if (mainTab === 'watchlist') setWatchList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); else setRatedList(p => p.map(i => i.id === id ? { ...i, favorite: !i.favorite } : i)); toast({ title: item.favorite ? 'أُزيل من المفضلة' : 'أُضيف للمفضلة' }) } catch {} }
+  // Modals
+  const [showDetails, setShowDetails] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [showQuickRate, setShowQuickRate] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Rate item 0-100 — moves from watchlist to ratings
-  // Rate item — strip everything except name + year, move to ratings
-  const rateItem = async (id: string, rating: number, genre?: string) => { try {
-    const patchData: any = { userRating: rating, watched: true, poster: null, overview: '', rating: '', notes: '', tags: '', favorite: false, duration: '', status: '' }
-    if (genre) patchData.genres = genre; else patchData.genres = ''
-    await fetch(`/api/watchlist/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchData) })
-    const item = watchList.find(i => i.id === id)
-    if (item) { setWatchList(p => p.filter(i => i.id !== id))
-      // Only keep: id, title, originalTitle, year, type, userRating, watched, genres (entered), addedAt
-      const cleanItem: MediaItem = { id: item.id, title: item.title, originalTitle: item.originalTitle, year: item.year, type: item.type, poster: '', rating: '', overview: '', genres: genre ? [genre] : [], episodes: undefined, seasons: undefined, duration: '', status: '', author: undefined, pages: undefined, tags: [], notes: '', favorite: false, addedAt: item.addedAt, watchedAt: undefined, watched: true, userRating: rating }
-      setRatedList(p => [cleanItem, ...p]) }
-    if (selectedItem?.id === id) { setShowDetails(false); setSelectedItem(null) }
-    toast({ title: 'تم التقييم!', description: `تم تقييم "${item?.originalTitle || item?.title}" بـ ${formatRating(rating)}/100 ونقله للتقييمات` }); fetchRatingsStats()
-  } catch {} }
+  // Print preview
+  const [showPrintPreview, setShowPrintPreview] = useState(false)
+  const [printType, setPrintType] = useState('all')
+  const [printSortBy, setPrintSortBy] = useState('userRating_desc')
+  const [printGenreFilter, setPrintGenreFilter] = useState('')
+  const [printYearFilter, setPrintYearFilter] = useState('')
+  const [printRatingMin, setPrintRatingMin] = useState('')
+  const [printRatingMax, setPrintRatingMax] = useState('')
+  const [allRatedItems, setAllRatedItems] = useState<MediaItem[]>([])
 
-  const exportData = () => { const d = JSON.stringify(mainTab === 'watchlist' ? watchList : ratedList, null, 2); const b = new Blob([d], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${mainTab === 'watchlist' ? 'watchlist' : 'ratings'}_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(u); toast({ title: 'تم التصدير' }) }
-  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = async (ev) => { try { const imp = JSON.parse(ev.target?.result as string); if (Array.isArray(imp)) { for (const item of imp) await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }); if (mainTab === 'watchlist') fetchWatchList(1); else fetchRatedList(1); toast({ title: 'تم الاستيراد', description: `تم استيراد ${imp.length} عنصر` }) } } catch {} }; r.readAsText(f) } }
+  // Form state
+  const [formData, setFormData] = useState<Record<string, string>>({
+    title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
+    overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
+    author: '', pages: '', tags: '', notes: '', favorite: 'false', watched: 'false',
+    watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
+  })
+  const [formSubmitting, setFormSubmitting] = useState(false)
 
-  const clearFilters = () => { setSearchQuery(''); setFilterYear('all'); setFilterMinUserRating(''); setFilterStatus('all'); setFilterGenre('all'); setFilterType('all') }
-  const TypeIcon = TYPE_CONFIG[activeTab].icon
+  // Metadata search
+  const [metaQuery, setMetaQuery] = useState('')
+  const [metaResults, setMetaResults] = useState<MetadataResult[]>([])
+  const [metaLoading, setMetaLoading] = useState(false)
 
-  // Movie Night Picker — picks from watchlist (أريد مشاهدته)
-  const movieNightPick = async () => {
-    try {
-      const response = await fetch(`/api/watchlist?hasRating=false&page=1&limit=200`)
-      const data = await response.json()
-      const watchlist = (data.items || []).filter((i: any) => i.type === 'movie' || i.type === 'series' || i.type === 'anime')
-      if (!watchlist.length) { toast({ title: 'ماكو أعمال في أريد مشاهدته' }); return }
-      const picked = watchlist[Math.floor(Math.random() * watchlist.length)]
-      toast({ title: '🎬 اختيار الليلة', description: `${picked.originalTitle || picked.title} (${picked.year})` })
-    } catch {
-      toast({ title: 'خطأ في جلب الاقتراح' })
+  // Image upload
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  // Movie night
+  const [movieNightResult, setMovieNightResult] = useState<MediaItem | null>(null)
+  const [showMovieNight, setShowMovieNight] = useState(false)
+
+  // Refs
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+
+  // ==================== Auth ====================
+  const [isAuthChecked, setIsAuthChecked] = useState(false)
+  useEffect(() => {
+    const auth = localStorage.getItem('hussamvision_auth')
+    if (auth === 'true') {
+      // Use callback form to avoid cascading render warning
+      setIsAuthenticated(() => true)
+    }
+    setIsAuthChecked(true)
+  }, [])
+
+  const handleLogin = () => {
+    if (passwordInput === APP_PASSWORD) {
+      setIsAuthenticated(true)
+      localStorage.setItem('hussamvision_auth', 'true')
+      toast.success('مرحباً بك!')
+    } else {
+      toast.error('كلمة المرور غير صحيحة')
     }
   }
 
-  // Print rated items
-  // Print: compute filtered items based on print dialog selections
-  // Print data: separate full list loaded from DB for printing
-  const [printAllItems, setPrintAllItems] = useState<MediaItem[]>([])
-  const [isPrintLoading, setIsPrintLoading] = useState(false)
-
-  const printPreviewItems = useMemo(() => {
-    let items = [...printAllItems]
-    if (printType !== 'all') items = items.filter(i => i.type === printType)
-    if (printYear !== 'all') items = items.filter(i => i.year === printYear)
-    if (printMinRating) items = items.filter(i => (i.userRating || 0) >= Number(printMinRating))
-    if (printMaxRating) items = items.filter(i => (i.userRating || 0) <= Number(printMaxRating))
-    if (printGenre !== 'all') items = items.filter(i => i.genres?.includes(printGenre))
-    // Sort by rating desc first (for top-N selection)
-    items.sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
-    if (printFilter === 'top10') items = items.slice(0, 10)
-    else if (printFilter === 'top25') items = items.slice(0, 25)
-    else if (printFilter === 'top50') items = items.slice(0, 50)
-    // Apply user-selected sort order
-    if (printSortBy === 'rating') items.sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
-    else if (printSortBy === 'title') items.sort((a, b) => (a.originalTitle || a.title).localeCompare(b.originalTitle || b.title))
-    else if (printSortBy === 'year') items.sort((a, b) => Number(b.year) - Number(a.year))
-    else if (printSortBy === 'type') items.sort((a, b) => a.type.localeCompare(b.type) || (b.userRating || 0) - (a.userRating || 0))
-    return items
-  }, [printAllItems, printType, printYear, printMinRating, printMaxRating, printGenre, printFilter, printSortBy])
-
-  const printYears = useMemo(() => Array.from(new Set(printAllItems.map(i => i.year))).sort((a, b) => Number(b) - Number(a)), [printAllItems])
-  const printGenres = useMemo(() => { const g = new Set<string>(); printAllItems.forEach(i => i.genres?.forEach((x: string) => g.add(x))); return Array.from(g).sort() }, [printAllItems])
-
-  const executePrint = () => {
-    const items = printPreviewItems
-    if (!items.length) { toast({ title: 'لا توجد نتائج للطباعة', description: 'غيّر معايير التصفية', variant: 'destructive' }); return }
-    const typeLabel = printType === 'all' ? 'الكل' : TYPE_CONFIG[printType as TabType]?.label || printType
-    const yearLabel = printYear === 'all' ? 'كل السنوات' : printYear
-    const filterLabel = printFilter === 'all' ? 'الكل' : printFilter === 'top10' ? 'أفضل 10' : printFilter === 'top25' ? 'أفضل 25' : 'أفضل 50'
-    const rows = items.map((m, idx) => `<tr><td>${idx + 1}</td><td>${m.originalTitle || m.title}</td><td>${m.year}</td><td>${TYPE_CONFIG[m.type as TabType]?.label || m.type}</td><td>${m.genres?.[0] || '-'}</td><td>${formatRating(m.userRating)}</td></tr>`).join('')
-    const printWindow = window.open('', '_blank', 'width=1100,height=800')
-    if (!printWindow) { toast({ title: 'المتصفح منع فتح نافذة الطباعة' }); return }
-    printWindow.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>طباعة التقييمات</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:22px;color:#111}h1{font-size:22px;border-bottom:2px solid #d4af37;padding-bottom:8px}.meta{margin:8px 0 4px;font-size:13px;color:#555}.count{margin:8px 0 16px;font-weight:700;font-size:14px;color:#333}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:8px 10px;font-size:12px;text-align:center}th{background:#d4af37;color:#111;font-weight:700}tr:nth-child(even){background:#f9f6ee}td:first-child{font-weight:700;color:#555}.rating-high{color:#16a34a;font-weight:700}.rating-mid{color:#ca8a04;font-weight:700}.rating-low{color:#dc2626;font-weight:700}@media print{body{padding:10px}h1{font-size:18px}}</style></head><body><h1>قائمة تقييماتي</h1><div class="meta">النوع: ${typeLabel} | السنة: ${yearLabel} | الاختيار: ${filterLabel}${printMinRating ? ' | تقييم من ' + printMinRating : ''}${printMaxRating ? ' إلى ' + printMaxRating : ''}${printGenre !== 'all' ? ' | التصنيف: ' + printGenre : ''}</div><div class="count">عدد الأعمال: ${items.length}</div><table><thead><tr><th>#</th><th>اسم العمل</th><th>السنة</th><th>النوع</th><th>التصنيف</th><th>تقييمي</th></tr></thead><tbody>${rows}</tbody></table></body></html>`)
-    printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 250)
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    localStorage.removeItem('hussamvision_auth')
+    setPasswordInput('')
   }
 
-  const resetPrintFilters = () => { setPrintFilter('all'); setPrintType('all'); setPrintYear('all'); setPrintMinRating(''); setPrintMaxRating(''); setPrintGenre('all'); setPrintSortBy('title') }
+  // ==================== Debounced Search ====================
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [searchQuery])
 
-  const openPrintDialog = async () => { resetPrintFilters(); setShowPrintDialog(true); setIsPrintLoading(true); const allItems = await fetchAllRatedItems(); setPrintAllItems(allItems); setIsPrintLoading(false) }
+  // ==================== Fetch Watchlist ====================
+  const fetchWatchlist = useCallback(async (page: number, reset = false) => {
+    setWlLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (wlType !== 'all') params.set('type', wlType)
+      params.set('hasRating', 'false')
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('page', String(page))
+      params.set('limit', '20')
+      const res = await fetch(`/api/watchlist?${params}`)
+      const data = await res.json()
+      if (reset) {
+        setWlItems(data.items || [])
+      } else {
+        setWlItems(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
+          return [...prev, ...newItems]
+        })
+      }
+      setWlTotal(data.total || 0)
+      setWlHasMore(data.hasMore || false)
+    } catch {
+      toast.error('خطأ في جلب البيانات')
+    } finally {
+      setWlLoading(false)
+    }
+  }, [wlType, debouncedSearch])
 
-  if (isLoading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-[#d4af37]" /></div>
+  // ==================== Fetch Ratings ====================
+  const fetchRatings = useCallback(async (page: number, reset = false) => {
+    setRtLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (rtType !== 'all') params.set('type', rtType)
+      params.set('hasRating', 'true')
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('page', String(page))
+      params.set('limit', '20')
+      const res = await fetch(`/api/watchlist?${params}`)
+      const data = await res.json()
+      if (reset) {
+        setRtItems(data.items || [])
+      } else {
+        setRtItems(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
+          return [...prev, ...newItems]
+        })
+      }
+      setRtTotal(data.total || 0)
+      setRtHasMore(data.hasMore || false)
+    } catch {
+      toast.error('خطأ في جلب البيانات')
+    } finally {
+      setRtLoading(false)
+    }
+  }, [rtType, debouncedSearch])
 
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="fixed inset-0 pointer-events-none"><div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#d4af37]/3 rounded-full" /><div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#b8960f]/3 rounded-full" /></div>
-      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8" dir="rtl">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3 sm:gap-5">
-            <Button onClick={() => { window.location.href = '/' }} variant="ghost" size="icon" className="text-neutral-500 hover:text-white hover:bg-[#1a1a1a]"><ArrowRight className="w-5 h-5" /></Button>
-            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center shadow-lg"><Bookmark className="w-5 h-5 sm:w-7 sm:h-7 text-[#0a0a0a]" /></div>
-            <div><h1 className="text-lg sm:text-2xl font-bold">أرشيف حسام</h1><div className="flex items-center gap-2"><p className="text-neutral-500 text-sm">{mainTab === 'watchlist' ? 'قائمة المشاهدة' : 'التقييمات'}</p><span className={`text-xs flex items-center gap-1 ${syncStatus === 'synced' ? 'text-green-500' : syncStatus === 'syncing' ? 'text-yellow-500' : 'text-red-500'}`}>{syncStatus === 'synced' && <Cloud className="w-3 h-3" />}{syncStatus === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}{syncStatus === 'error' && <CloudOff className="w-3 h-3" />}{syncStatus === 'synced' ? 'متزامن' : syncStatus === 'syncing' ? 'مزامنة...' : 'خطأ'}</span></div></div>
+  // ==================== Fetch Stats ====================
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true)
+    try {
+      const res = await fetch('/api/ratings-stats')
+      const data = await res.json()
+      setStats(data)
+    } catch {
+      toast.error('خطأ في جلب الإحصائيات')
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
+  // ==================== Effects ====================
+  useEffect(() => {
+    if (!isAuthenticated) return
+    setWlPage(1)
+    fetchWatchlist(1, true)
+  }, [isAuthenticated, wlType, debouncedSearch, fetchWatchlist])
+
+  useEffect(() => {
+    if (!isAuthenticated || mainTab !== 'ratings') return
+    setRtPage(1)
+    fetchRatings(1, true)
+  }, [isAuthenticated, mainTab, rtType, debouncedSearch, fetchRatings])
+
+  useEffect(() => {
+    if (!isAuthenticated || mainTab !== 'stats') return
+    fetchStats()
+  }, [isAuthenticated, mainTab, fetchStats])
+
+  // ==================== Infinite Scroll ====================
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect()
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          if (mainTab === 'watchlist' && wlHasMore && !wlLoading) {
+            const nextPage = wlPage + 1
+            setWlPage(nextPage)
+            fetchWatchlist(nextPage)
+          } else if (mainTab === 'ratings' && rtHasMore && !rtLoading) {
+            const nextPage = rtPage + 1
+            setRtPage(nextPage)
+            fetchRatings(nextPage)
+          }
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
+    return () => { if (observerRef.current) observerRef.current.disconnect() }
+  }, [mainTab, wlHasMore, rtHasMore, wlLoading, rtLoading, wlPage, rtPage, fetchWatchlist, fetchRatings])
+
+  // ==================== CRUD Operations ====================
+  const createItem = async () => {
+    if (!formData.title.trim() || !formData.year.trim()) {
+      toast.error('العنوان والسنة مطلوبان')
+      return
+    }
+    setFormSubmitting(true)
+    try {
+      const body: Record<string, unknown> = {
+        title: formData.title,
+        originalTitle: formData.originalTitle || null,
+        year: formData.year,
+        type: formData.type || 'movie',
+        poster: formData.poster || null,
+        rating: formData.rating || null,
+        overview: formData.overview || null,
+        genres: formData.genres,
+        episodes: formData.episodes ? parseInt(formData.episodes) : null,
+        seasons: formData.seasons ? parseInt(formData.seasons) : null,
+        duration: formData.duration || null,
+        status: formData.status || null,
+        author: formData.author || null,
+        pages: formData.pages ? parseInt(formData.pages) : null,
+        tags: formData.tags,
+        notes: formData.notes,
+        favorite: formData.favorite === 'true',
+        watched: formData.watched === 'true',
+        watchedAt: formData.watchedAt || null,
+        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
+        rewatch: formData.rewatch === 'true',
+        runtime: formData.runtime ? parseInt(formData.runtime) : null,
+        ratingStatus: formData.ratingStatus || 'watched',
+      }
+      const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        if (errData.duplicate) {
+          toast.error('هذا العمل موجود مسبقاً!')
+          return
+        }
+        throw new Error(errData.error)
+      }
+      toast.success('تمت الإضافة بنجاح')
+      setShowAddForm(false)
+      resetForm()
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة')
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
+
+  const updateItem = async () => {
+    if (!selectedItem) return
+    setFormSubmitting(true)
+    try {
+      const body: Record<string, unknown> = {
+        title: formData.title,
+        originalTitle: formData.originalTitle || null,
+        year: formData.year,
+        type: formData.type,
+        poster: formData.poster || null,
+        rating: formData.rating || null,
+        overview: formData.overview || null,
+        genres: formData.genres,
+        episodes: formData.episodes ? parseInt(formData.episodes) : null,
+        seasons: formData.seasons ? parseInt(formData.seasons) : null,
+        duration: formData.duration || null,
+        status: formData.status || null,
+        author: formData.author || null,
+        pages: formData.pages ? parseInt(formData.pages) : null,
+        tags: formData.tags,
+        notes: formData.notes,
+        favorite: formData.favorite === 'true',
+        watched: formData.watched === 'true',
+        watchedAt: formData.watchedAt || null,
+        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
+        rewatch: formData.rewatch === 'true',
+        runtime: formData.runtime ? parseInt(formData.runtime) : null,
+        ratingStatus: formData.ratingStatus || 'watched',
+      }
+      const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('خطأ في التحديث')
+      toast.success('تم التحديث بنجاح')
+      setShowEditForm(false)
+      setShowDetails(false)
+      setSelectedItem(null)
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch {
+      toast.error('خطأ في التحديث')
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
+
+  const deleteItem = async () => {
+    if (!selectedItem) return
+    try {
+      const res = await fetch(`/api/watchlist/${selectedItem.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('خطأ في الحذف')
+      toast.success('تم الحذف بنجاح')
+      setShowDeleteConfirm(false)
+      setShowDetails(false)
+      setSelectedItem(null)
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch {
+      toast.error('خطأ في الحذف')
+    }
+  }
+
+  const quickRate = async (rating: number) => {
+    if (!selectedItem) return
+    try {
+      const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }),
+      })
+      if (!res.ok) throw new Error('خطأ في التقييم')
+      toast.success(`تم التقييم: ${rating}/100`)
+      setShowQuickRate(false)
+      setShowDetails(false)
+      setSelectedItem(prev => prev ? { ...prev, userRating: rating, watched: true } : null)
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch {
+      toast.error('خطأ في التقييم')
+    }
+  }
+
+  const toggleFavorite = async (item: MediaItem) => {
+    try {
+      const res = await fetch(`/api/watchlist/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !item.favorite }),
+      })
+      if (!res.ok) throw new Error('خطأ')
+      const updated = await res.json()
+      setWlItems(prev => prev.map(i => i.id === item.id ? { ...i, favorite: !i.favorite } : i))
+      setRtItems(prev => prev.map(i => i.id === item.id ? { ...i, favorite: !i.favorite } : i))
+      if (selectedItem?.id === item.id) setSelectedItem(updated)
+    } catch {
+      toast.error('خطأ في التحديث')
+    }
+  }
+
+  const toggleWatched = async (item: MediaItem) => {
+    try {
+      const res = await fetch(`/api/watchlist/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watched: !item.watched, watchedAt: !item.watched ? new Date().toISOString().split('T')[0] : null }),
+      })
+      if (!res.ok) throw new Error('خطأ')
+      const updated = await res.json()
+      setWlItems(prev => prev.map(i => i.id === item.id ? { ...i, watched: !i.watched } : i))
+      setRtItems(prev => prev.map(i => i.id === item.id ? { ...i, watched: !i.watched } : i))
+      if (selectedItem?.id === item.id) setSelectedItem(updated)
+    } catch {
+      toast.error('خطأ في التحديث')
+    }
+  }
+
+  // ==================== Metadata Search ====================
+  const searchMetadata = async () => {
+    if (!metaQuery.trim()) return
+    setMetaLoading(true)
+    try {
+      const res = await fetch('/api/metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: metaQuery, type: formData.type || 'movie' }),
+      })
+      const data = await res.json()
+      setMetaResults(data.results || [])
+    } catch {
+      toast.error('خطأ في البحث')
+    } finally {
+      setMetaLoading(false)
+    }
+  }
+
+  const selectMetadata = (result: MetadataResult) => {
+    setFormData(prev => ({
+      ...prev,
+      title: result.title || prev.title,
+      originalTitle: result.originalTitle || prev.originalTitle,
+      year: result.year || prev.year,
+      poster: result.poster || prev.poster,
+      overview: result.overview || prev.overview,
+      rating: result.rating || prev.rating,
+      genres: result.genres ? result.genres.join(', ') : prev.genres,
+      author: result.author || prev.author,
+      pages: result.pages != null ? String(result.pages) : prev.pages,
+      episodes: result.episodes != null ? String(result.episodes) : prev.episodes,
+      seasons: result.seasons != null ? String(result.seasons) : prev.seasons,
+      duration: result.duration || prev.duration,
+      status: result.status || prev.status,
+      runtime: result.runtime != null ? String(result.runtime) : prev.runtime,
+    }))
+    setMetaResults([])
+    setMetaQuery('')
+    toast.success('تم استيراد البيانات')
+  }
+
+  // ==================== Image Upload ====================
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const compressed = await compressImage(file)
+      setFormData(prev => ({ ...prev, poster: compressed }))
+      toast.success('تم رفع الصورة')
+    } catch {
+      toast.error('خطأ في رفع الصورة')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  // ==================== Form Helpers ====================
+  const resetForm = () => {
+    setFormData({
+      title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
+      overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
+      author: '', pages: '', tags: '', notes: '', favorite: 'false', watched: 'false',
+      watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
+    })
+    setMetaResults([])
+    setMetaQuery('')
+  }
+
+  const openAddForm = (type?: string) => {
+    resetForm()
+    if (type) setFormData(prev => ({ ...prev, type }))
+    setShowAddForm(true)
+  }
+
+  const openEditForm = (item: MediaItem) => {
+    setFormData(itemToFormData(item))
+    setSelectedItem(item)
+    setShowEditForm(true)
+  }
+
+  const openDetails = (item: MediaItem) => {
+    setSelectedItem(item)
+    setShowDetails(true)
+  }
+
+  const openQuickRate = (item: MediaItem) => {
+    setSelectedItem(item)
+    setShowQuickRate(true)
+  }
+
+  // ==================== Sort & Filter ====================
+  const sortItems = useCallback((items: MediaItem[]): MediaItem[] => {
+    const sorted = [...items]
+    const [field, direction] = sortBy.split('_')
+    sorted.sort((a, b) => {
+      let aVal: string | number | boolean | null = ''
+      let bVal: string | number | boolean | null = ''
+      switch (field) {
+        case 'addedAt': aVal = a.addedAt; bVal = b.addedAt; break
+        case 'title': aVal = a.title; bVal = b.title; break
+        case 'year': aVal = a.year; bVal = b.year; break
+        case 'userRating': aVal = a.userRating ?? -1; bVal = b.userRating ?? -1; break
+        case 'rating': aVal = a.rating ? parseFloat(a.rating) : -1; bVal = b.rating ? parseFloat(b.rating) : -1; break
+        default: aVal = a.addedAt; bVal = b.addedAt
+      }
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
+      return direction === 'asc'
+        ? ((aVal as number) - (bVal as number))
+        : ((bVal as number) - (aVal as number))
+    })
+    return sorted
+  }, [sortBy])
+
+  const filterItems = useCallback((items: MediaItem[]): MediaItem[] => {
+    return items.filter(item => {
+      if (filterGenre && !(item.genres || []).some(g => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
+      if (filterYear && item.year !== filterYear) return false
+      if (filterRatingMin && (item.userRating == null || item.userRating < parseFloat(filterRatingMin))) return false
+      if (filterRatingMax && (item.userRating == null || item.userRating > parseFloat(filterRatingMax))) return false
+      return true
+    })
+  }, [filterGenre, filterYear, filterRatingMin, filterRatingMax])
+
+  const processedWlItems = useMemo(() => {
+    return filterItems(sortItems(wlItems))
+  }, [wlItems, sortItems, filterItems])
+
+  const processedRtItems = useMemo(() => {
+    return filterItems(sortItems(rtItems))
+  }, [rtItems, sortItems, filterItems])
+
+  // ==================== Export/Import ====================
+  const exportData = async () => {
+    try {
+      const params = new URLSearchParams()
+      params.set('limit', '1000')
+      const res = await fetch(`/api/watchlist?${params}`)
+      const data = await res.json()
+      const items = data.items || []
+      const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `hussamvision-backup-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('تم تصدير البيانات')
+    } catch {
+      toast.error('خطأ في التصدير')
+    }
+  }
+
+  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const items = JSON.parse(text)
+      if (!Array.isArray(items)) throw new Error('Invalid format')
+      let imported = 0
+      let duplicates = 0
+      for (const item of items) {
+        try {
+          const body = {
+            title: item.title,
+            originalTitle: item.originalTitle || null,
+            year: item.year || '',
+            type: item.type || 'movie',
+            poster: item.poster || null,
+            rating: item.rating || null,
+            overview: item.overview || null,
+            genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
+            episodes: item.episodes || null,
+            seasons: item.seasons || null,
+            duration: item.duration || null,
+            status: item.status || null,
+            author: item.author || null,
+            pages: item.pages || null,
+            tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
+            notes: item.notes || '',
+            favorite: item.favorite || false,
+            watched: item.watched || false,
+            watchedAt: item.watchedAt || null,
+            userRating: item.userRating != null ? item.userRating : null,
+            rewatch: item.rewatch || false,
+            runtime: item.runtime || null,
+            ratingStatus: item.ratingStatus || 'watched',
+          }
+          const res = await fetch('/api/watchlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          if (res.ok) imported++
+          else duplicates++
+        } catch {
+          duplicates++
+        }
+      }
+      toast.success(`تم استيراد ${imported} عنصر (${duplicates} مكرر)`)
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch {
+      toast.error('خطأ في استيراد الملف')
+    }
+  }
+
+  // ==================== Movie Night ====================
+  const pickRandomMovie = () => {
+    const pool = mainTab === 'watchlist' ? wlItems : rtItems
+    if (pool.length === 0) {
+      toast.error('لا توجد عناصر للاختيار منها')
+      return
+    }
+    const random = pool[Math.floor(Math.random() * pool.length)]
+    setMovieNightResult(random)
+    setShowMovieNight(true)
+  }
+
+  // ==================== Print Preview ====================
+  const openPrintPreview = async () => {
+    try {
+      const params = new URLSearchParams()
+      params.set('hasRating', 'true')
+      params.set('limit', '1000')
+      const res = await fetch(`/api/watchlist?${params}`)
+      const data = await res.json()
+      setAllRatedItems(data.items || [])
+      setShowPrintPreview(true)
+    } catch {
+      toast.error('خطأ في جلب البيانات')
+    }
+  }
+
+  const filteredPrintItems = useMemo(() => {
+    let items = [...allRatedItems]
+    if (printType !== 'all') items = items.filter(i => i.type === printType)
+    if (printGenreFilter) items = items.filter(i => (i.genres || []).some(g => g.toLowerCase().includes(printGenreFilter.toLowerCase())))
+    if (printYearFilter) items = items.filter(i => i.year === printYearFilter)
+    if (printRatingMin) items = items.filter(i => i.userRating != null && i.userRating >= parseFloat(printRatingMin))
+    if (printRatingMax) items = items.filter(i => i.userRating != null && i.userRating <= parseFloat(printRatingMax))
+
+    const [field, direction] = printSortBy.split('_')
+    items.sort((a, b) => {
+      let aVal: string | number = ''
+      let bVal: string | number = ''
+      switch (field) {
+        case 'title': aVal = a.title; bVal = b.title; break
+        case 'year': aVal = a.year; bVal = b.year; break
+        case 'userRating': aVal = a.userRating ?? -1; bVal = b.userRating ?? -1; break
+        default: aVal = a.userRating ?? -1; bVal = b.userRating ?? -1
+      }
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
+      return direction === 'asc' ? ((aVal as number) - (bVal as number)) : ((bVal as number) - (aVal as number))
+    })
+    return items
+  }, [allRatedItems, printType, printSortBy, printGenreFilter, printYearFilter, printRatingMin, printRatingMax])
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleShare = async () => {
+    const text = filteredPrintItems.map((item, i) =>
+      `${i + 1}. ${item.title} (${item.year}) - ${formatRating(item.userRating)}/100`
+    ).join('\n')
+    const shareText = `تقييماتي - HussamVision\n\n${text}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'تقييماتي - HussamVision', text: shareText })
+      } catch {
+        // user cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(shareText)
+      toast.success('تم النسخ إلى الحافظة')
+    }
+  }
+
+  // ==================== Unique genres/years for filters ====================
+  const allGenres = useMemo(() => {
+    const items = mainTab === 'watchlist' ? wlItems : rtItems
+    const genres = new Set<string>()
+    items.forEach(item => (item.genres || []).forEach(g => { if (g.trim()) genres.add(g.trim()) }))
+    return Array.from(genres).sort()
+  }, [mainTab, wlItems, rtItems])
+
+  const allYears = useMemo(() => {
+    const items = mainTab === 'watchlist' ? wlItems : rtItems
+    const years = new Set<string>()
+    items.forEach(item => { if (item.year) years.add(item.year) })
+    return Array.from(years).sort().reverse()
+  }, [mainTab, wlItems, rtItems])
+
+  // ==================== Login Screen ====================
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[100dvh] bg-[#0a0a0a] text-white flex items-center justify-center safe-top safe-bottom" dir="rtl">
+        <div className="w-full max-w-sm px-6">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto mb-4">
+              <Bookmark className="w-10 h-10 text-black" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">
+              <span className="bg-gradient-to-l from-[#d4af37] to-[#e6c65a] bg-clip-text text-transparent">Hussam</span>
+              <span className="bg-gradient-to-l from-[#c9a227] to-[#b8960f] bg-clip-text text-transparent">Vision</span>
+            </h1>
+            <p className="text-[#888]">أدخل كلمة المرور للدخول</p>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button onClick={movieNightPick} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="اختيار الليلة 🎲"><Dice5 className="w-5 h-5" /></Button>
-            {mainTab === 'ratings' && <Button onClick={openPrintDialog} variant="ghost" size="icon" className="text-neutral-400 hover:text-white" title="طباعة"><Printer className="w-5 h-5" /></Button>}
-            {mainTab === 'watchlist' && <Button onClick={() => setShowStats(!showStats)} variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><BarChart3 className="w-5 h-5" /></Button>}
-            <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-neutral-400 hover:text-white"><Settings className="w-5 h-5" /></Button></PopoverTrigger><PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]"><div className="space-y-2"><Button onClick={exportData} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><Download className="w-4 h-4" />تصدير</Button><Button onClick={() => importInputRef.current?.click()} variant="ghost" className="w-full justify-start gap-2 text-white hover:bg-[#2a2a2a]"><UploadIcon className="w-4 h-4" />استيراد</Button><input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} /></div></PopoverContent></Popover>
-            {mainTab === 'watchlist' && <Button onClick={() => { resetForm(); setShowAddDialog(true) }} className="bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة</span></Button>}
-            {mainTab === 'ratings' && <Button onClick={() => { resetForm(); setAddType('movie'); setShowAddRatedDialog(true) }} className="bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Plus className="w-4 h-4" /><span className="hidden sm:inline">إضافة تقييم</span></Button>}
+          <div className="space-y-4">
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              placeholder="كلمة المرور"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-14 text-center text-lg rounded-xl"
+            />
+            <Button
+              onClick={handleLogin}
+              className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-14 rounded-xl text-lg active:scale-[0.97] transition-transform"
+            >
+              دخول
+            </Button>
           </div>
-        </header>
+        </div>
+      </div>
+    )
+  }
 
-        {/* Main Tab Switch */}
-        <div className="flex gap-2 mb-4">
-          <button onClick={() => { setMainTab('watchlist'); setSearchQuery(''); clearFilters() }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'watchlist' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Eye className="w-5 h-5" /><span>أريد مشاهدته</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'watchlist' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{wlTotal}</span></div></button>
-          <button onClick={() => { setMainTab('ratings'); setSearchQuery(''); clearFilters(); setRatingSubTab('movie') }} className={`flex-1 rounded-xl p-3 transition-all text-center ${mainTab === 'ratings' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /><span>تقييماتي</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${mainTab === 'ratings' ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{rtTotal}</span></div></button>
+  // ==================== Detail Content (shared between Dialog and Drawer) ====================
+  const detailContent = selectedItem && (
+    <div className="space-y-4">
+      {/* Poster & Info */}
+      <div className="flex gap-4">
+        <div className="w-28 shrink-0">
+          <div className="aspect-[2/3] rounded-lg overflow-hidden bg-[#2a2a2a]">
+            {selectedItem.poster ? (
+              <img src={selectedItem.poster} alt={selectedItem.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                {(() => { const Ic = (TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).icon; return <Ic className="w-8 h-8 text-[#555]" /> })()}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl font-bold text-white">{selectedItem.title}</h2>
+          {selectedItem.originalTitle && selectedItem.originalTitle !== selectedItem.title && (
+            <p className="text-sm text-[#888] mt-1 truncate">{selectedItem.originalTitle}</p>
+          )}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <Badge variant="outline" className="border-[#2a2a2a] text-[#ccc]">{selectedItem.year}</Badge>
+            <Badge className={`bg-gradient-to-l ${(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).color} text-black text-xs`}>
+              {(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).label}
+            </Badge>
+            {selectedItem.favorite && <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><Heart className="w-3 h-3 ml-1 fill-red-400" />مفضل</Badge>}
+            {selectedItem.watched && <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><Eye className="w-3 h-3 ml-1" />تمت المشاهدة</Badge>}
+          </div>
+          {selectedItem.rating && (
+            <div className="mt-2 text-sm text-[#d4af37]">⭐ التقييم العام: {selectedItem.rating}</div>
+          )}
+          {selectedItem.userRating != null && (
+            <div className="mt-2">
+              <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border ${getRatingBg(selectedItem.userRating)}`}>
+                <Trophy className="w-4 h-4" />
+                <span className="font-bold text-lg">{formatRating(selectedItem.userRating)}</span>
+                <span className="text-xs">/100</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Overview */}
+      {selectedItem.overview && (
+        <div>
+          <h4 className="text-sm font-bold text-[#d4af37] mb-1">القصة</h4>
+          <p className="text-sm text-[#aaa] leading-relaxed">{selectedItem.overview}</p>
+        </div>
+      )}
+
+      {/* Details grid */}
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        {selectedItem.genres && selectedItem.genres.length > 0 && (
+          <div className="col-span-2">
+            <span className="text-[#888]">التصنيفات: </span>
+            <span className="text-[#ccc]">{selectedItem.genres.join(' • ')}</span>
+          </div>
+        )}
+        {selectedItem.episodes && (
+          <div><span className="text-[#888]">الحلقات: </span><span className="text-[#ccc]">{selectedItem.episodes}</span></div>
+        )}
+        {selectedItem.seasons && (
+          <div><span className="text-[#888]">المواسم: </span><span className="text-[#ccc]">{selectedItem.seasons}</span></div>
+        )}
+        {selectedItem.duration && (
+          <div><span className="text-[#888]">المدة: </span><span className="text-[#ccc]">{selectedItem.duration}</span></div>
+        )}
+        {selectedItem.runtime && (
+          <div><span className="text-[#888]">مدة الفيلم: </span><span className="text-[#ccc]">{selectedItem.runtime} دقيقة</span></div>
+        )}
+        {selectedItem.status && (
+          <div><span className="text-[#888]">الحالة: </span><span className="text-[#ccc]">{selectedItem.status}</span></div>
+        )}
+        {selectedItem.author && (
+          <div><span className="text-[#888]">المؤلف: </span><span className="text-[#ccc]">{selectedItem.author}</span></div>
+        )}
+        {selectedItem.pages && (
+          <div><span className="text-[#888]">الصفحات: </span><span className="text-[#ccc]">{selectedItem.pages}</span></div>
+        )}
+        {selectedItem.ratingStatus && (
+          <div><span className="text-[#888]">حالة التقييم: </span><span className="text-[#ccc]">{RATING_STATUSES.find(s => s.value === selectedItem.ratingStatus)?.label || selectedItem.ratingStatus}</span></div>
+        )}
+        {selectedItem.watchedAt && (
+          <div><span className="text-[#888]">تاريخ المشاهدة: </span><span className="text-[#ccc]">{selectedItem.watchedAt}</span></div>
+        )}
+        {selectedItem.tags && selectedItem.tags.length > 0 && (
+          <div className="col-span-2">
+            <span className="text-[#888]">الوسوم: </span>
+            <span className="text-[#ccc]">{selectedItem.tags.join(' • ')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Notes */}
+      {selectedItem.notes && (
+        <div>
+          <h4 className="text-sm font-bold text-[#d4af37] mb-1">ملاحظات</h4>
+          <p className="text-sm text-[#aaa] leading-relaxed whitespace-pre-wrap">{selectedItem.notes}</p>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-[#2a2a2a]">
+        <Button
+          size="sm"
+          onClick={() => openQuickRate(selectedItem)}
+          className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black"
+        >
+          <Star className="w-4 h-4 ml-1" />
+          {selectedItem.userRating != null ? 'تعديل التقييم' : 'تقييم'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => toggleFavorite(selectedItem)}
+          className={`border-[#2a2a2a] ${selectedItem.favorite ? 'text-red-400' : 'text-[#888]'}`}
+        >
+          <Heart className={`w-4 h-4 ml-1 ${selectedItem.favorite ? 'fill-red-400' : ''}`} />
+          {selectedItem.favorite ? 'إزالة من المفضلة' : 'مفضلة'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => toggleWatched(selectedItem)}
+          className="border-[#2a2a2a] text-[#888]"
+        >
+          {selectedItem.watched ? <EyeOff className="w-4 h-4 ml-1" /> : <Eye className="w-4 h-4 ml-1" />}
+          {selectedItem.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => { openEditForm(selectedItem); setShowDetails(false) }}
+          className="border-[#2a2a2a] text-[#888]"
+        >
+          <Edit3 className="w-4 h-4 ml-1" />
+          تعديل
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowDeleteConfirm(true)}
+          className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+        >
+          <Trash2 className="w-4 h-4 ml-1" />
+          حذف
+        </Button>
+      </div>
+    </div>
+  )
+
+  // ==================== Form Content (shared between Dialog and Drawer) ====================
+  const formContent = (isEdit: boolean) => (
+    <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1">
+      {/* Metadata Search */}
+      <div className="space-y-2">
+        <label className="text-sm font-bold text-[#d4af37]">بحث تلقائي</label>
+        <div className="flex gap-2">
+          <Input
+            value={metaQuery}
+            onChange={(e) => setMetaQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && searchMetadata()}
+            placeholder="ابحث عن العنوان..."
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm"
+          />
+          <Button
+            onClick={searchMetadata}
+            disabled={metaLoading}
+            size="sm"
+            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0"
+          >
+            {metaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          </Button>
+        </div>
+        {metaResults.length > 0 && (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {metaResults.map((result, idx) => (
+              <button
+                key={idx}
+                onClick={() => selectMetadata(result)}
+                className="w-full flex items-center gap-3 p-2 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#d4af37]/50 transition-colors text-right"
+              >
+                {result.poster && (
+                  <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-white truncate">{result.title}</div>
+                  <div className="text-xs text-[#888]">{result.year} {result.rating && `⭐ ${result.rating}`}</div>
+                </div>
+                <Check className="w-4 h-4 text-[#d4af37] shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Type */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">النوع *</label>
+        <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
+          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'all').map(([key, conf]) => (
+              <SelectItem key={key} value={key}>{conf.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Title */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">العنوان *</label>
+        <Input
+          value={formData.title}
+          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+          placeholder="عنوان العمل"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* Original Title */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">العنوان الأصلي</label>
+        <Input
+          value={formData.originalTitle}
+          onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
+          placeholder="Original Title"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+          dir="ltr"
+        />
+      </div>
+
+      {/* Year */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">السنة *</label>
+        <Input
+          value={formData.year}
+          onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
+          placeholder="2024"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* Poster */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">الصورة</label>
+        <div className="flex items-center gap-2">
+          <Input
+            value={formData.poster}
+            onChange={(e) => setFormData(prev => ({ ...prev, poster: e.target.value }))}
+            placeholder="رابط الصورة"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] flex-1"
+            dir="ltr"
+          />
+          <label className="cursor-pointer shrink-0">
+            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            <div className="px-3 py-2 rounded-lg bg-[#2a2a2a] text-[#888] text-sm hover:bg-[#333] transition-colors min-h-[44px] flex items-center">
+              {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+            </div>
+          </label>
+        </div>
+        {formData.poster && (
+          <div className="mt-2">
+            <img src={formData.poster} alt="preview" className="w-16 h-24 rounded-lg object-cover" />
+          </div>
+        )}
+      </div>
+
+      {/* Overview */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">القصة</label>
+        <Textarea
+          value={formData.overview}
+          onChange={(e) => setFormData(prev => ({ ...prev, overview: e.target.value }))}
+          placeholder="وصف العمل..."
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[80px]"
+        />
+      </div>
+
+      {/* Genres */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">التصنيفات (مفصولة بفاصلة)</label>
+        <Input
+          value={formData.genres}
+          onChange={(e) => setFormData(prev => ({ ...prev, genres: e.target.value }))}
+          placeholder="أكشن، دراما، خيال علمي"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* Type-specific fields */}
+      {(formData.type === 'series' || formData.type === 'anime') && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">المواسم</label>
+            <Input
+              value={formData.seasons}
+              onChange={(e) => setFormData(prev => ({ ...prev, seasons: e.target.value }))}
+              placeholder="3"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">الحلقات</label>
+            <Input
+              value={formData.episodes}
+              onChange={(e) => setFormData(prev => ({ ...prev, episodes: e.target.value }))}
+              placeholder="24"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+        </div>
+      )}
+
+      {formData.type === 'movie' && (
+        <div className="space-y-1">
+          <label className="text-sm font-bold text-[#d4af37]">مدة الفيلم (دقيقة)</label>
+          <Input
+            value={formData.runtime}
+            onChange={(e) => setFormData(prev => ({ ...prev, runtime: e.target.value }))}
+            placeholder="120"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+          />
+        </div>
+      )}
+
+      {formData.type === 'book' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">المؤلف</label>
+            <Input
+              value={formData.author}
+              onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
+              placeholder="اسم المؤلف"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">عدد الصفحات</label>
+            <Input
+              value={formData.pages}
+              onChange={(e) => setFormData(prev => ({ ...prev, pages: e.target.value }))}
+              placeholder="350"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">حالة المشاهدة</label>
+        <Select value={formData.ratingStatus} onValueChange={(v) => setFormData(prev => ({ ...prev, ratingStatus: v }))}>
+          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            {RATING_STATUSES.map(s => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Rating */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">التقييم العام</label>
+        <Input
+          value={formData.rating}
+          onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+          placeholder="7.5"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* User Rating */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">تقييمي (من 100)</label>
+        <Input
+          value={formData.userRating}
+          onChange={(e) => setFormData(prev => ({ ...prev, userRating: e.target.value }))}
+          placeholder="85"
+          type="number"
+          min="0"
+          max="100"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* Tags */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">الوسوم (مفصولة بفاصلة)</label>
+        <Input
+          value={formData.tags}
+          onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+          placeholder="وسم1، وسم2"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+        />
+      </div>
+
+      {/* Notes */}
+      <div className="space-y-1">
+        <label className="text-sm font-bold text-[#d4af37]">ملاحظات</label>
+        <Textarea
+          value={formData.notes}
+          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+          placeholder="ملاحظاتك الشخصية..."
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[60px]"
+        />
+      </div>
+
+      {/* Toggles */}
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={() => setFormData(prev => ({ ...prev, favorite: prev.favorite === 'true' ? 'false' : 'true' }))}
+          className="flex items-center gap-2 text-sm"
+        >
+          <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'text-red-400 fill-red-400' : 'text-[#666]'}`} />
+          <span className={formData.favorite === 'true' ? 'text-red-400' : 'text-[#666]'}>مفضل</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
+          className="flex items-center gap-2 text-sm"
+        >
+          <Eye className={`w-4 h-4 ${formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}`} />
+          <span className={formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}>تمت المشاهدة</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFormData(prev => ({ ...prev, rewatch: prev.rewatch === 'true' ? 'false' : 'true' }))}
+          className="flex items-center gap-2 text-sm"
+        >
+          <ArrowRight className={`w-4 h-4 ${formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}`} />
+          <span className={formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}>إعادة مشاهدة</span>
+        </button>
+      </div>
+
+      {/* Submit */}
+      <Button
+        onClick={isEdit ? updateItem : createItem}
+        disabled={formSubmitting}
+        className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base"
+      >
+        {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : isEdit ? 'حفظ التعديلات' : 'إضافة'}
+      </Button>
+    </div>
+  )
+
+  // ==================== Quick Rate Content ====================
+  const quickRateContent = selectedItem && (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="font-bold text-lg text-white">{selectedItem.title}</h3>
+        <p className="text-sm text-[#888]">{selectedItem.year} • {(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).label}</p>
+        {selectedItem.userRating != null && (
+          <p className="text-sm mt-1">التقييم الحالي: <span className={`font-bold ${getRatingColor(selectedItem.userRating)}`}>{formatRating(selectedItem.userRating)}</span></p>
+        )}
+      </div>
+
+      {/* Rating Scale */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-5 gap-1.5">
+          {Array.from({ length: 10 }).map((_, decade) => {
+            const base = decade * 10
+            return (
+              <div key={decade} className="text-center">
+                <div className="text-[10px] text-[#666] mb-1">{base}s</div>
+                <div className="space-y-1">
+                  {Array.from({ length: 10 }).map((__, unit) => {
+                    const val = base + unit
+                    return (
+                      <button
+                        key={val}
+                        onClick={() => quickRate(val)}
+                        className={`w-full py-1 rounded text-xs font-bold transition-all active:scale-95 ${
+                          selectedItem.userRating === val
+                            ? 'bg-[#d4af37] text-black'
+                            : val >= 70
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : val >= 40
+                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Quick presets */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        {[100, 90, 85, 80, 75, 70, 60, 50, 40, 30, 20, 10, 0].map(val => (
+          <button
+            key={val}
+            onClick={() => quickRate(val)}
+            className={`px-3 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 ${
+              selectedItem.userRating === val
+                ? 'bg-[#d4af37] text-black'
+                : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#ccc] hover:border-[#d4af37]/50'
+            }`}
+          >
+            {val}
+          </button>
+        ))}
+      </div>
+
+      {selectedItem.userRating != null && (
+        <Button
+          variant="outline"
+          onClick={async () => {
+            await quickRate(-1) // will set to null
+            // Actually, let's handle removing rating differently
+            try {
+              const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userRating: null }),
+              })
+              if (res.ok) {
+                toast.success('تم إزالة التقييم')
+                setShowQuickRate(false)
+                setSelectedItem(prev => prev ? { ...prev, userRating: null } : null)
+                fetchWatchlist(1, true)
+                fetchRatings(1, true)
+              }
+            } catch {
+              toast.error('خطأ')
+            }
+          }}
+          className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10"
+        >
+          <X className="w-4 h-4 ml-1" />
+          إزالة التقييم
+        </Button>
+      )}
+    </div>
+  )
+
+  // ==================== Delete Confirm ====================
+  const deleteConfirmContent = selectedItem && (
+    <div className="space-y-4 text-center">
+      <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+        <Trash2 className="w-8 h-8 text-red-400" />
+      </div>
+      <h3 className="text-lg font-bold text-white">تأكيد الحذف</h3>
+      <p className="text-[#888]">هل أنت متأكد من حذف &quot;{selectedItem.title}&quot;؟ لا يمكن التراجع عن هذا الإجراء.</p>
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          onClick={() => setShowDeleteConfirm(false)}
+          className="flex-1 border-[#2a2a2a] text-[#ccc]"
+        >
+          إلغاء
+        </Button>
+        <Button
+          onClick={deleteItem}
+          className="flex-1 bg-red-500 text-white hover:bg-red-600"
+        >
+          حذف
+        </Button>
+      </div>
+    </div>
+  )
+
+  // ==================== Movie Night Content ====================
+  const movieNightContent = movieNightResult && (
+    <div className="space-y-4 text-center">
+      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto">
+        <Dice5 className="w-8 h-8 text-black" />
+      </div>
+      <h3 className="text-lg font-bold text-[#d4af37]">🎬 ليلة الأفلام</h3>
+      <p className="text-[#888]">العمل المختار عشوائياً:</p>
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-4">
+        {movieNightResult.poster && (
+          <img src={movieNightResult.poster} alt="" className="w-16 h-24 rounded-lg object-cover shrink-0" />
+        )}
+        <div className="text-right">
+          <h4 className="font-bold text-white">{movieNightResult.title}</h4>
+          <p className="text-sm text-[#888]">{movieNightResult.year} • {(TYPE_CONFIG[movieNightResult.type] || TYPE_CONFIG.movie).label}</p>
+          {movieNightResult.rating && <p className="text-sm text-[#d4af37]">⭐ {movieNightResult.rating}</p>}
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          onClick={pickRandomMovie}
+          className="flex-1 border-[#2a2a2a] text-[#ccc]"
+        >
+          <Dice5 className="w-4 h-4 ml-1" />
+          اختر غيره
+        </Button>
+        <Button
+          onClick={() => { setShowMovieNight(false); openDetails(movieNightResult) }}
+          className="flex-1 bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black"
+        >
+          عرض التفاصيل
+        </Button>
+      </div>
+    </div>
+  )
+
+  // ==================== Stats Content ====================
+  const statsContent = stats && (
+    <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 text-center">
+          <Trophy className="w-6 h-6 text-[#d4af37] mx-auto mb-2" />
+          <div className="text-2xl font-bold text-white">{stats.totalRated}</div>
+          <div className="text-xs text-[#888]">عمل مقيّم</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 text-center">
+          <Star className="w-6 h-6 text-[#d4af37] mx-auto mb-2" />
+          <div className="text-2xl font-bold text-white">{formatRating(stats.avgRating)}</div>
+          <div className="text-xs text-[#888]">متوسط التقييم</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 text-center">
+          <CalendarDays className="w-6 h-6 text-[#d4af37] mx-auto mb-2" />
+          <div className="text-2xl font-bold text-white">{stats.thisMonth}</div>
+          <div className="text-xs text-[#888]">هذا الشهر</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 text-center">
+          <BarChart3 className="w-6 h-6 text-[#d4af37] mx-auto mb-2" />
+          <div className="text-2xl font-bold text-white">{stats.genreCount}</div>
+          <div className="text-xs text-[#888]">تصنيف مختلف</div>
+        </div>
+      </div>
+
+      {/* By Type */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 space-y-3">
+        <h3 className="font-bold text-[#d4af37]">حسب النوع</h3>
+        <div className="space-y-2">
+          {[
+            { label: 'أفلام', count: stats.movieCount, avg: stats.avgMovieRating, color: 'bg-[#d4af37]' },
+            { label: 'مسلسلات', count: stats.seriesCount, avg: stats.avgSeriesRating, color: 'bg-[#e6c65a]' },
+            { label: 'أنمي', count: stats.animeCount, avg: stats.avgAnimeRating, color: 'bg-[#c9a227]' },
+          ].map(t => (
+            <div key={t.label} className="flex items-center gap-3">
+              <span className="text-sm text-[#ccc] w-16 shrink-0">{t.label}</span>
+              <div className="flex-1 h-2 bg-[#2a2a2a] rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${t.color} rounded-full transition-all`}
+                  style={{ width: `${stats.totalRated > 0 ? (t.count / stats.totalRated) * 100 : 0}%` }}
+                />
+              </div>
+              <span className="text-xs text-[#888] w-8 text-left">{t.count}</span>
+              <span className="text-xs text-[#d4af37] w-12 text-left">{formatRating(t.avg)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h4 className="text-xs text-[#888] mb-1">أعلى تقييم</h4>
+          <div className="text-lg font-bold text-green-400">{formatRating(stats.maxRating)}</div>
+          <div className="text-xs text-[#ccc] truncate">{stats.maxRatingTitle}</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h4 className="text-xs text-[#888] mb-1">أفضل تصنيف</h4>
+          <div className="text-lg font-bold text-[#d4af37]">{stats.topGenre}</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h4 className="text-xs text-[#888] mb-1">أفضل سنة</h4>
+          <div className="text-lg font-bold text-[#d4af37]">{stats.topYear}</div>
+        </div>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h4 className="text-xs text-[#888] mb-1">أفضل عقد</h4>
+          <div className="text-lg font-bold text-[#d4af37]">{stats.topDecade}</div>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ==================== Print Preview Overlay ====================
+  const printPreviewOverlay = showPrintPreview && (
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] overflow-y-auto no-print" dir="rtl">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-[#2a2a2a] p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-[#d4af37]">
+            <Printer className="w-5 h-5 inline ml-2" />
+            معاينة الطباعة
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowPrintPreview(false)}
+            className="text-[#888]"
+          >
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
-        {/* Ratings Tab: Native React Implementation */}
-        {mainTab === 'ratings' && (
-        <>
-          {/* Stats Dashboard Card */}
-          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-4 sm:p-6 mb-6">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#d4af37]" />إحصائيات شاملة</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.totalRated ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأعمال الكلي</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.movieCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأفلام</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#e6c65a]">{ratingsStats?.seriesCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد المسلسلات</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#c9a227]">{ratingsStats?.animeCount ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد الأنمي</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.topGenre ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر Genre</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#f0d77a]">{ratingsStats?.avgRating ? Number(ratingsStats.avgRating).toFixed(1) : '0'}</p><p className="text-[10px] sm:text-sm text-neutral-400">متوسط التقييم</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-green-400">{ratingsStats?.maxRating ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أعلى تقييم</p>{ratingsStats?.maxRatingTitle && <p className="text-[10px] text-neutral-500 truncate mt-0.5">{ratingsStats.maxRatingTitle}</p>}</div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#e6c65a]">{ratingsStats?.topYear ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر سنة إنتاج</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#c9a227]">{ratingsStats?.topDecade ?? '-'}</p><p className="text-[10px] sm:text-sm text-neutral-400">أكثر عقد</p></div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3 sm:p-4 border border-[#2a2a2a]"><p className="text-lg sm:text-2xl font-bold text-[#d4af37]">{ratingsStats?.thisMonth ?? 0}</p><p className="text-[10px] sm:text-sm text-neutral-400">عدد هذا الشهر</p></div>
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2">
+          <Select value={printType} onValueChange={setPrintType}>
+            <SelectTrigger className="w-28 bg-[#1a1a1a] border-[#2a2a2a] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+              <SelectItem value="all">الكل</SelectItem>
+              <SelectItem value="movie">أفلام</SelectItem>
+              <SelectItem value="series">مسلسلات</SelectItem>
+              <SelectItem value="anime">أنمي</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={printSortBy} onValueChange={setPrintSortBy}>
+            <SelectTrigger className="w-36 bg-[#1a1a1a] border-[#2a2a2a] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+              {SORT_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            value={printGenreFilter}
+            onChange={(e) => setPrintGenreFilter(e.target.value)}
+            placeholder="التصنيف"
+            className="w-24 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+          />
+          <Input
+            value={printYearFilter}
+            onChange={(e) => setPrintYearFilter(e.target.value)}
+            placeholder="السنة"
+            className="w-20 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+          />
+          <Input
+            value={printRatingMin}
+            onChange={(e) => setPrintRatingMin(e.target.value)}
+            placeholder="من"
+            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            type="number"
+          />
+          <Input
+            value={printRatingMax}
+            onChange={(e) => setPrintRatingMax(e.target.value)}
+            placeholder="إلى"
+            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            type="number"
+          />
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-3 p-4 border-b border-[#2a2a2a]">
+        <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black">
+          <Printer className="w-4 h-4 ml-1" />
+          طباعة
+        </Button>
+        <Button onClick={handleShare} variant="outline" className="border-[#2a2a2a] text-[#ccc]">
+          <Share2 className="w-4 h-4 ml-1" />
+          مشاركة
+        </Button>
+        <div className="text-sm text-[#888]">
+          {filteredPrintItems.length} عمل
+        </div>
+      </div>
+
+      {/* Print Table */}
+      <div id="print-container" className="p-4">
+        <div className="print-only text-center mb-6">
+          <h1 className="text-2xl font-bold">تقييماتي - HussamVision</h1>
+          <p className="text-sm text-gray-500">{new Date().toLocaleDateString('ar-SA')}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#2a2a2a]">
+                <th className="text-right py-2 px-2 text-[#888] font-normal">#</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">العنوان</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">النوع</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">السنة</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">التصنيفات</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">التقييم</th>
+                <th className="text-right py-2 px-2 text-[#888] font-normal">الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPrintItems.map((item, idx) => (
+                <tr key={item.id} className="border-b border-[#1a1a1a]">
+                  <td className="py-2 px-2 text-[#666]">{idx + 1}</td>
+                  <td className="py-2 px-2 font-bold text-white">{item.title}</td>
+                  <td className="py-2 px-2 text-[#888]">{(TYPE_CONFIG[item.type] || TYPE_CONFIG.movie).label}</td>
+                  <td className="py-2 px-2 text-[#888]">{item.year}</td>
+                  <td className="py-2 px-2 text-[#888]">{(item.genres || []).slice(0, 3).join(' • ')}</td>
+                  <td className="py-2 px-2">
+                    {item.userRating != null ? (
+                      <span className={`font-bold ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
+                    ) : '-'}
+                  </td>
+                  <td className="py-2 px-2 text-[#888]">{RATING_STATUSES.find(s => s.value === item.ratingStatus)?.label || item.ratingStatus}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ==================== Responsive Modal Wrapper ====================
+  const ResponsiveModal = ({
+    open,
+    onOpenChange,
+    title,
+    children,
+    footerContent,
+  }: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    title: string
+    children: React.ReactNode
+    footerContent?: React.ReactNode
+  }) => {
+    if (isMobile) {
+      return (
+        <Drawer open={open} onOpenChange={onOpenChange}>
+          <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh]">
+            <DrawerHeader className="border-b border-[#2a2a2a]">
+              <DrawerTitle className="text-[#d4af37] font-bold">{title}</DrawerTitle>
+            </DrawerHeader>
+            <div className="overflow-y-auto p-4" style={{ maxHeight: 'calc(85vh - 120px)' }}>
+              {children}
+            </div>
+            {footerContent && (
+              <DrawerFooter className="border-t border-[#2a2a2a]">
+                {footerContent}
+              </DrawerFooter>
+            )}
+          </DrawerContent>
+        </Drawer>
+      )
+    }
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-[#0f0f0f] border-[#2a2a2a] max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[#d4af37] font-bold">{title}</DialogTitle>
+          </DialogHeader>
+          {children}
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // ==================== Main Render ====================
+  return (
+    <div className="min-h-[100dvh] bg-[#0a0a0a] text-white" dir="rtl">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#2a2a2a] safe-top">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+          {/* Top row: Logo + Actions */}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center">
+                <Bookmark className="w-4 h-4 text-black" />
+              </div>
+              <h1 className="text-lg font-bold">
+                <span className="bg-gradient-to-l from-[#d4af37] to-[#e6c65a] bg-clip-text text-transparent">Hussam</span>
+                <span className="bg-gradient-to-l from-[#c9a227] to-[#b8960f] bg-clip-text text-transparent">Vision</span>
+              </h1>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={pickRandomMovie}
+                className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                title="ليلة الأفلام"
+              >
+                <Dice5 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={exportData}
+                className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                title="تصدير"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              <label className="cursor-pointer">
+                <input type="file" accept=".json" onChange={importData} className="hidden" />
+                <div className="flex items-center justify-center h-9 w-9 rounded-md text-[#888] hover:text-[#d4af37] hover:bg-[#1a1a1a] transition-colors" title="استيراد">
+                  <UploadIcon className="w-4 h-4" />
+                </div>
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-[#888] hover:text-red-400 h-9 px-2 text-xs"
+              >
+                خروج
+              </Button>
             </div>
           </div>
 
-          {/* Ratings Sub-tabs: أفلام / مسلسلات / أنمي */}
-          <div className="flex gap-2 mb-4">
-            {([
-              { key: 'movie' as const, label: 'أفلام', Icon: Film, color: 'from-[#d4af37] to-[#b8960f]', count: ratingsStats?.movieCount ?? 0 },
-              { key: 'series' as const, label: 'مسلسلات', Icon: Tv, color: 'from-[#e6c65a] to-[#c9a227]', count: ratingsStats?.seriesCount ?? 0 },
-              { key: 'anime' as const, label: 'أنمي', Icon: Sparkles, color: 'from-[#c9a227] to-[#a07d00]', count: ratingsStats?.animeCount ?? 0 },
-            ]).map((tab) => { const active = ratingSubTab === tab.key; return <button key={tab.key} onClick={() => setRatingSubTab(tab.key)} className={`flex-1 rounded-xl p-3 transition-all text-center ${active ? 'bg-gradient-to-br ' + tab.color + ' text-[#0a0a0a] shadow-lg font-bold' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center justify-center gap-2"><tab.Icon className="w-5 h-5" /><span>{tab.label}</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-black/20' : 'bg-[#2a2a2a]'}`}>{tab.count}</span></div></button> })}
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666]" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ابحث عن عمل..."
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-10 h-10 text-sm rounded-xl"
+            />
           </div>
 
-          {/* Search & Filters */}
-          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
-            <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0">
-              <div className="flex-1 min-w-0 relative">{isSearchingRatings ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#d4af37] animate-spin" /> : <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />}<Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث في كل التقييمات..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-9 h-10" /></div>
-              <div className="hidden sm:flex"><Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="addedAt">تاريخ الإضافة</SelectItem><SelectItem value="title">العنوان</SelectItem><SelectItem value="year">السنة</SelectItem><SelectItem value="userRating">تقييمي</SelectItem><SelectItem value="rating">التقييم العام</SelectItem></SelectContent></Select></div>
-              <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
-              <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#2a2a2a] text-neutral-400'}`}><Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span></Button>
-            </div>
-            {showFilters && <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-[#2a2a2a]">
-              <Select value={filterYear} onValueChange={setFilterYear}><SelectTrigger className="w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل السنوات</SelectItem>{YEARS_RANGE.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select>
-              <Input type="number" min="0" max="100" value={filterMinUserRating} onChange={(e) => setFilterMinUserRating(e.target.value)} placeholder="تقييم أعلى من" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-[130px]" />
-              <Select value={filterGenre} onValueChange={setFilterGenre}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل التصنيفات</SelectItem>{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-neutral-400"><X className="w-4 h-4 ml-1" />مسح</Button>
-            </div>}
+          {/* Main Tabs */}
+          <div className="flex items-center gap-1 mobile-tabs-scroll">
+            {[
+              { key: 'watchlist', label: 'أريد مشاهدته', icon: Bookmark },
+              { key: 'ratings', label: 'تقييماتي', icon: Trophy },
+              { key: 'stats', label: 'إحصائيات', icon: BarChart3 },
+            ].map(tab => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setMainTab(tab.key as 'watchlist' | 'ratings' | 'stats')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${
+                    mainTab === tab.key
+                      ? 'bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black'
+                      : 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              )
+            })}
           </div>
+        </div>
+      </header>
 
-          <div className="flex items-center justify-between mb-4"><p className="text-sm text-neutral-400">{filteredRatedItems.length} نتيجة</p></div>
-
-          {/* Ratings Items List */}
-          {filteredRatedItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20"><div className="w-24 h-24 rounded-full bg-[#d4af37]/10 flex items-center justify-center mb-6"><Star className="w-12 h-12 text-neutral-500" /></div><h3 className="text-xl font-bold mb-2">{ratedList.length === 0 ? 'لا توجد تقييمات' : 'لا توجد نتائج'}</h3><p className="text-neutral-500 mb-8">{ratedList.length === 0 ? 'أضف تقييمك الأول' : 'جرب تغيير الفلاتر'}</p></div>
-          ) : (
-            <div className="space-y-2">
-              {filteredRatedItems.map((item) => {
-                const rating = item.userRating ?? 0
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-24">
+        {/* Watchlist Tab */}
+        {mainTab === 'watchlist' && (
+          <div className="space-y-4">
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-2 mobile-tabs-scroll">
+              {['all', 'movie', 'series', 'anime'].map(type => {
+                const conf = TYPE_CONFIG[type]
+                const Icon = conf.icon
                 return (
-                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 border border-[#2a2a2a]/50 transition-all cursor-pointer" onClick={() => { setSelectedItem(item); setShowDetails(true) }}>
-                    <div className={`w-[46px] h-[46px] rounded-lg flex items-center justify-center font-bold text-sm border flex-shrink-0 ${getRatingBg(rating)}`}>{formatRating(item.userRating)}</div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold line-clamp-1 english-title">{getDisplayTitle(item)}</h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-neutral-400">
-                        <span>{item.year}</span>
-                        {item.genres?.[0] && <Badge className="bg-[#2a2a2a] text-neutral-300 text-[10px] px-1.5 py-0">{item.genres[0]}</Badge>}
-                        {item.seasons && <span>• {item.seasons} موسم</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditRatedDialog(item) }} className="w-8 h-8 text-neutral-400 hover:text-[#d4af37]"><Edit3 className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeFromList(item.id) }} className="w-8 h-8 text-neutral-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></Button>
-                    </div>
-                  </div>
+                  <button
+                    key={type}
+                    onClick={() => setWlType(type)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                      wlType === type
+                        ? `bg-gradient-to-l ${conf.color} text-black`
+                        : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {conf.label}
+                  </button>
                 )
               })}
             </div>
-          )}
 
-          {/* Infinite scroll loader for ratings */}
-          {rtHasMore && <div ref={loaderRef} className="flex justify-center py-8">{isLoadingMore && <Loader2 className="w-8 h-8 animate-spin text-[#d4af37]" />}</div>}
-        </>
-        )}
+            {/* Controls row */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 text-sm text-[#888]">
+                {wlTotal} عمل
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0">
+                      <ArrowUpDown className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
+                    <div className="space-y-1">
+                      {SORT_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setSortBy(opt.value); }}
+                          className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
+                            sortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                >
+                  {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
 
-        {/* Watchlist Tab Content */}
-        {mainTab === 'watchlist' && (
-        <>
-        {/* Watchlist Stats */}
-        {showStats && (
-          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-6 mb-6"><h3 className="font-bold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#d4af37]" />إحصائيات {TYPE_CONFIG[activeTab].plural}</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#d4af37]">{stats.total}</p><p className="text-sm text-neutral-400">إجمالي</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#f0d77a]">{stats.watched}</p><p className="text-sm text-neutral-400">تمت المشاهدة</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#e6c65a]">{stats.favorite}</p><p className="text-sm text-neutral-400">مفضلة</p></div><div className="bg-[#1a1a1a] rounded-lg p-4 border border-[#2a2a2a]"><p className="text-2xl font-bold text-[#c9a227]">{stats.avgRating.toFixed(1)}</p><p className="text-sm text-neutral-400">متوسط التقييم</p></div></div></div>
-        )}
+            {/* Filters */}
+            {showFilters && (
+              <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
+                <Select value={filterGenre} onValueChange={setFilterGenre}>
+                  <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
+                    <SelectValue placeholder="التصنيف" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="all">الكل</SelectItem>
+                    {allGenres.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
+                    <SelectValue placeholder="السنة" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="all">الكل</SelectItem>
+                    {allYears.map(y => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={filterRatingMin}
+                  onChange={(e) => setFilterRatingMin(e.target.value)}
+                  placeholder="تقييم من"
+                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
+                  type="number"
+                />
+                <Input
+                  value={filterRatingMax}
+                  onChange={(e) => setFilterRatingMax(e.target.value)}
+                  placeholder="تقييم إلى"
+                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
+                  type="number"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterRatingMin(''); setFilterRatingMax('') }}
+                  className="text-[#888] text-xs"
+                >
+                  مسح الفلاتر
+                </Button>
+              </div>
+            )}
 
-        {/* Sub-tabs */}
-        <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto mobile-tabs-scroll pb-1 sm:pb-0">
-          {(['all', 'movie', 'series', 'anime'] as TabType[]).map((type) => { const c = TYPE_CONFIG[type]; const I = c.icon; const active = activeTab === type; return <button key={type} onClick={() => setActiveTab(type)} className={`flex-shrink-0 min-w-[90px] sm:min-w-0 rounded-xl p-2.5 transition-all ${active ? 'bg-gradient-to-br ' + c.color + ' text-[#0a0a0a] shadow-lg' : 'bg-[#1a1a1a] text-neutral-400 hover:bg-[#2a2a2a] border border-[#2a2a2a]/50'}`}><div className="flex items-center gap-2"><I className="w-4 h-4" /><div className="text-right"><p className="font-bold text-xs sm:text-sm">{c.plural}</p><p className={`text-[10px] ${active ? 'opacity-80' : 'text-neutral-500'}`}>{tabStats[type].total}</p></div></div></button> })}
-        </div>
-
-        {/* Search & Filter */}
-        <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3 sm:p-4 mb-4">
-          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto mobile-toolbar pb-1 sm:pb-0">
-            <div className="flex-1 min-w-0 relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] pr-9 h-10" /></div>
-            <div className="hidden sm:flex"><Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-10"><ArrowUpDown className="w-4 h-4 ml-2" /><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="addedAt">تاريخ الإضافة</SelectItem><SelectItem value="title">العنوان</SelectItem><SelectItem value="year">السنة</SelectItem>{mainTab === 'ratings' && <><SelectItem value="userRating">تقييمي</SelectItem><SelectItem value="rating">التقييم العام</SelectItem></>}</SelectContent></Select></div>
-            <Button variant="ghost" size="icon" onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="h-10 w-10 text-neutral-400">{sortOrder === 'asc' ? '↑' : '↓'}</Button>
-            <div className="flex bg-[#1a1a1a] rounded-lg p-1"><Button variant="ghost" size="icon" onClick={() => setViewMode('grid')} className={`h-8 w-8 ${viewMode === 'grid' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a]' : 'text-neutral-400'}`}><Grid3X3 className="w-4 h-4" /></Button><Button variant="ghost" size="icon" onClick={() => setViewMode('list')} className={`h-8 w-8 ${viewMode === 'list' ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a]' : 'text-neutral-400'}`}><List className="w-4 h-4" /></Button></div>
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={`gap-2 h-10 ${showFilters ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#2a2a2a] text-neutral-400'}`}><Filter className="w-4 h-4" /><span className="hidden sm:inline">فلاتر</span></Button>
-          </div>
-          {showFilters && <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-[#2a2a2a]">
-            {activeTab === 'all' && <Select value={filterType} onValueChange={setFilterType}><SelectTrigger className="w-[100px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="النوع" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="all">الكل</SelectItem><SelectItem value="movie">أفلام</SelectItem><SelectItem value="series">مسلسلات</SelectItem><SelectItem value="anime">أنمي</SelectItem></SelectContent></Select>}
-            <Select value={filterYear} onValueChange={setFilterYear}><SelectTrigger className="w-[120px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><CalendarDays className="w-4 h-4 ml-2" /><SelectValue placeholder="السنة" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل السنوات</SelectItem>{YEARS_RANGE.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select>
-            {mainTab === 'ratings' && <Input type="number" min="0" max="100" value={filterMinUserRating} onChange={(e) => setFilterMinUserRating(e.target.value)} placeholder="تقييم أعلى من" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-[130px]" />}
-            <Select value={filterGenre} onValueChange={setFilterGenre}><SelectTrigger className="w-[140px] bg-[#1a1a1a] border-[#2a2a2a] h-9"><SelectValue placeholder="التصنيف" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]"><SelectItem value="all">كل التصنيفات</SelectItem>{allGenres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-neutral-400"><X className="w-4 h-4 ml-1" />مسح</Button>
-          </div>}
-        </div>
-
-        <div className="flex items-center justify-between mb-4"><p className="text-sm text-neutral-400">{filteredItems.length} نتيجة</p></div>
-
-        {/* Items Grid/List */}
-        {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20"><div className={`w-24 h-24 rounded-full ${TYPE_CONFIG[activeTab].bgColor} flex items-center justify-center mb-6`}><TypeIcon className="w-12 h-12 text-neutral-500" /></div><h3 className="text-xl font-bold mb-2">{currentList.length === 0 ? (mainTab === 'watchlist' ? 'القائمة فارغة' : 'لا توجد تقييمات') : 'لا توجد نتائج'}</h3><p className="text-neutral-500 mb-8">{currentList.length === 0 ? (mainTab === 'watchlist' ? 'أضف أول عمل إلى قائمتك' : 'أضف تقييمك الأول') : 'جرب تغيير الفلاتر'}</p></div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {filteredItems.map((item) => (
-              <div key={item.id} className={`group relative rounded-xl overflow-hidden transition-all hover:scale-[1.02] cursor-pointer`} onClick={() => { setSelectedItem(item); setShowDetails(true) }}>
-                <div className="aspect-[2/3] bg-[#1a1a1a]">
-                  {item.poster ? <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" /> : <div className={`w-full h-full flex items-center justify-center ${TYPE_CONFIG[item.type as TabType]?.bgColor || 'bg-[#1a1a1a]'}`}>{(() => { const I = TYPE_CONFIG[item.type as TabType]?.icon || Film; return <I className="w-16 h-16 text-neutral-500" /> })()}</div>}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                  <div className="absolute top-2 right-2 flex flex-col gap-1">{activeTab === 'all' && <Badge className={`bg-gradient-to-r ${TYPE_CONFIG[item.type as TabType]?.color || 'from-[#d4af37] to-[#b8960f]'} text-white text-[10px]`}>{TYPE_CONFIG[item.type as TabType]?.label || item.type}</Badge>}{item.favorite && <Badge className="bg-red-500 text-white p-1"><Heart className="w-3 h-3 fill-white" /></Badge>}</div>
-                  {mainTab === 'ratings' && item.userRating != null && <div className="absolute top-2 left-2"><Badge className={`bg-black/60 ${getRatingClass(item.userRating)} font-bold`}>{formatRating(item.userRating)}</Badge></div>}
-                  {mainTab === 'watchlist' && item.rating && <div className="absolute top-2 left-2"><Badge className="bg-black/60 text-[#e6c65a]"><Star className="w-3 h-3 ml-1 fill-[#e6c65a]" />{item.rating}</Badge></div>}
-                  <div className="absolute bottom-0 right-0 left-0 p-3"><h3 className="font-bold text-sm line-clamp-1 english-title">{getDisplayTitle(item)}</h3><div className="flex items-center gap-2 text-xs text-neutral-400"><span>{item.year}</span>{item.seasons && <span>• {item.seasons} موسم</span>}</div></div>
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex items-center justify-center gap-2">
-                    {mainTab === 'watchlist' && <Button size="icon" onClick={(e) => { e.stopPropagation(); openQuickRate(item) }} className="w-9 h-9 rounded-full bg-[#d4af37]/80 text-[#0a0a0a]" title="شاهدت + قيّم"><Eye className="w-4 h-4" /></Button>}
-                    {mainTab === 'watchlist' && <Button size="icon" onClick={(e) => { e.stopPropagation(); removeFromList(item.id) }} className="w-9 h-9 rounded-full bg-red-500 text-white" title="حذف"><Trash2 className="w-4 h-4" /></Button>}
-                    {mainTab === 'ratings' && <Button size="icon" onClick={(e) => { e.stopPropagation(); openEditRatedDialog(item) }} className="w-9 h-9 rounded-full bg-[#d4af37]/80 text-[#0a0a0a]" title="تعديل"><Edit3 className="w-4 h-4" /></Button>}
+            {/* Items */}
+            {wlLoading && wlItems.length === 0 ? (
+              <SkeletonGrid count={6} />
+            ) : processedWlItems.length === 0 ? (
+              <div className="text-center py-16">
+                <Bookmark className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                <p className="text-[#888] text-lg mb-2">لا توجد أعمال</p>
+                <p className="text-[#666] text-sm">أضف أعمالاً جديدة لمتابعتها</p>
+              </div>
+            ) : (
+              <>
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    {processedWlItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onToggleFavorite={() => toggleFavorite(item)}
+                        onToggleWatched={() => toggleWatched(item)}
+                        viewMode="grid"
+                      />
+                    ))}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredItems.map((item) => (
-              <div key={item.id} className="flex gap-4 p-3 rounded-xl bg-[#1a1a1a]/50 hover:bg-[#2a2a2a]/50 cursor-pointer border border-[#2a2a2a]/50" onClick={() => { setSelectedItem(item); setShowDetails(true) }}>
-                <div className="w-16 h-24 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{item.poster ? <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" /> : <div className={`w-full h-full flex items-center justify-center ${TYPE_CONFIG[item.type as TabType]?.bgColor || 'bg-[#1a1a1a]'}`}>{(() => { const I = TYPE_CONFIG[item.type as TabType]?.icon || Film; return <I className="w-8 h-8 text-neutral-500" /> })()}</div>}</div>
-                <div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div className="flex items-center gap-2">{activeTab === 'all' && <Badge className={`bg-gradient-to-r ${TYPE_CONFIG[item.type as TabType]?.color || ''} text-white text-[10px]`}>{TYPE_CONFIG[item.type as TabType]?.label}</Badge>}<h3 className="font-bold line-clamp-1 english-title">{getDisplayTitle(item)}</h3></div><div className="flex items-center gap-1">{item.favorite && <Heart className="w-4 h-4 text-red-500 fill-red-500" />}{mainTab === 'ratings' && item.userRating != null && <Badge className={`bg-[#d4af37]/20 ${getRatingClass(item.userRating)} font-bold`}>{formatRating(item.userRating)}</Badge>}</div></div><div className="flex items-center gap-3 mt-1 text-xs text-neutral-400"><span>{item.year}</span>{item.seasons && <span>• {item.seasons} موسم</span>}{item.genres?.[0] && <span>• {item.genres[0]}</span>}</div></div>
-              </div>
-            ))}
+                ) : (
+                  <div className="space-y-2">
+                    {processedWlItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onToggleFavorite={() => toggleFavorite(item)}
+                        onToggleWatched={() => toggleWatched(item)}
+                        viewMode="list"
+                      />
+                    ))}
+                  </div>
+                )}
+                <div ref={loadMoreRef} className="h-4" />
+                {wlLoading && wlItems.length > 0 && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
-        {/* Infinite scroll loader */}
-        {(wlHasMore) && <div ref={loaderRef} className="flex justify-center py-8">{isLoadingMore && <Loader2 className="w-8 h-8 animate-spin text-[#d4af37]" />}</div>}
-        </>
+        {/* Ratings Tab */}
+        {mainTab === 'ratings' && (
+          <div className="space-y-4">
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-2 mobile-tabs-scroll">
+              {['movie', 'series', 'anime'].map(type => {
+                const conf = TYPE_CONFIG[type]
+                const Icon = conf.icon
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setRtType(type)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                      rtType === type
+                        ? `bg-gradient-to-l ${conf.color} text-black`
+                        : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {conf.plural}
+                  </button>
+                )
+              })}
+              <div className="flex-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openPrintPreview}
+                className="border-[#2a2a2a] text-[#d4af37] hover:bg-[#d4af37]/10 text-xs"
+              >
+                <Printer className="w-3.5 h-3.5 ml-1" />
+                طباعة
+              </Button>
+            </div>
+
+            {/* Controls row */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 text-sm text-[#888]">
+                {rtTotal} عمل مقيّم
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0">
+                      <ArrowUpDown className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
+                    <div className="space-y-1">
+                      {SORT_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setSortBy(opt.value) }}
+                          className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
+                            sortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                >
+                  {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            {showFilters && (
+              <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
+                <Select value={filterGenre} onValueChange={setFilterGenre}>
+                  <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
+                    <SelectValue placeholder="التصنيف" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="all">الكل</SelectItem>
+                    {allGenres.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
+                    <SelectValue placeholder="السنة" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                    <SelectItem value="all">الكل</SelectItem>
+                    {allYears.map(y => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={filterRatingMin}
+                  onChange={(e) => setFilterRatingMin(e.target.value)}
+                  placeholder="تقييم من"
+                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
+                  type="number"
+                />
+                <Input
+                  value={filterRatingMax}
+                  onChange={(e) => setFilterRatingMax(e.target.value)}
+                  placeholder="تقييم إلى"
+                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
+                  type="number"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterRatingMin(''); setFilterRatingMax('') }}
+                  className="text-[#888] text-xs"
+                >
+                  مسح الفلاتر
+                </Button>
+              </div>
+            )}
+
+            {/* Items */}
+            {rtLoading && rtItems.length === 0 ? (
+              <SkeletonGrid count={6} />
+            ) : processedRtItems.length === 0 ? (
+              <div className="text-center py-16">
+                <Trophy className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                <p className="text-[#888] text-lg mb-2">لا توجد تقييمات</p>
+                <p className="text-[#666] text-sm">قيّم أعمالاً لتظهر هنا</p>
+              </div>
+            ) : (
+              <>
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    {processedRtItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onToggleFavorite={() => toggleFavorite(item)}
+                        onToggleWatched={() => toggleWatched(item)}
+                        viewMode="grid"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {processedRtItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onToggleFavorite={() => toggleFavorite(item)}
+                        onToggleWatched={() => toggleWatched(item)}
+                        viewMode="list"
+                      />
+                    ))}
+                  </div>
+                )}
+                <div ref={loadMoreRef} className="h-4" />
+                {rtLoading && rtItems.length > 0 && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
 
-        {/* Detail Dialog */}
-        <Dialog open={showDetails} onOpenChange={setShowDetails}><DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto">{selectedItem && <><DialogHeader><DialogTitle className="text-xl english-title">{getDisplayTitle(selectedItem)}</DialogTitle></DialogHeader><div className="mt-4 space-y-4"><div className="flex gap-4"><div className="w-32 h-48 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{selectedItem.poster ? <img src={selectedItem.poster} alt="" className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center ${TYPE_CONFIG[selectedItem.type as TabType]?.bgColor || 'bg-[#1a1a1a]'}`}>{(() => { const I = TYPE_CONFIG[selectedItem.type as TabType]?.icon || Film; return <I className="w-12 h-12 text-neutral-500" /> })()}</div>}</div><div className="flex-1"><div className="flex items-center gap-2 mb-2 flex-wrap"><Badge className={`bg-gradient-to-r ${TYPE_CONFIG[selectedItem.type as TabType]?.color || 'from-[#d4af37] to-[#b8960f]'} text-white`}>{TYPE_CONFIG[selectedItem.type as TabType]?.label || selectedItem.type}</Badge><span className="text-[#d4af37]">{selectedItem.year}</span>{mainTab === 'ratings' && selectedItem.userRating != null && <Badge className={`bg-[#d4af37]/20 ${getRatingClass(selectedItem.userRating)} font-bold`}>تقييمي: {formatRating(selectedItem.userRating)}/100</Badge>}</div>{selectedItem.seasons && <p className="text-sm text-neutral-400">{selectedItem.seasons} مواسم</p>}{selectedItem.genres?.length > 0 && <div className="flex flex-wrap gap-1 mt-2">{selectedItem.genres.map(g => <Badge key={g} className="bg-[#2a2a2a] text-neutral-300 text-[10px]">{g}</Badge>)}</div>}</div></div>{selectedItem.overview && <div><h4 className="font-medium mb-1 text-[#e6c65a]">الملخص</h4><p className="text-sm text-neutral-300">{selectedItem.overview}</p></div>}{selectedItem.notes && <div><h4 className="font-medium mb-1 text-[#e6c65a]">ملاحظاتي</h4><p className="text-sm text-neutral-300">{selectedItem.notes}</p></div>}
-
-          {/* Rating Section — watchlist only */}
-          {mainTab === 'watchlist' && <div><h4 className="font-medium mb-2 text-[#e6c65a]">قيّم هذا العمل (0-100)</h4><p className="text-xs text-neutral-500 mb-2">تقييم العمل ينقله تلقائياً إلى التقييمات</p><div className="flex items-center gap-2 flex-wrap">{[10,20,30,40,50,60,70,80,90,100].map(r => <button key={r} onClick={() => rateItem(selectedItem.id, r)} className="w-12 h-10 rounded-lg text-sm font-bold bg-[#1a1a1a] text-neutral-400 hover:bg-[#d4af37] hover:text-[#0a0a0a] transition-all">{r}</button>)}</div><div className="flex items-center gap-1 mt-2"><Input type="number" min="0" max="100" step="0.01" placeholder="مثال: 88.33" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-32" onKeyDown={(e) => { if (e.key === 'Enter') { const v = parseFloat((e.target as HTMLInputElement).value); if (v >= 0 && v <= 100) rateItem(selectedItem.id, v) } }} /><span className="text-neutral-500 text-sm">/ 100</span></div></div>}
-
-          <div className="flex gap-2 pt-4">
-            {mainTab === 'ratings' && <Button onClick={() => openEditRatedDialog(selectedItem)} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a]"><Edit3 className="w-4 h-4 ml-2" />تعديل</Button>}
-            <Button onClick={() => removeFromList(selectedItem.id)} variant="destructive" className="flex-1"><Trash2 className="w-4 h-4 ml-2" />حذف</Button>
-          </div>
-        </div></>}</DialogContent></Dialog>
-
-        {/* Watchlist Edit Dialog - notes + poster only */}
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Edit3 className="w-5 h-5 text-[#d4af37]" />تعديل الملاحظات فقط</DialogTitle></DialogHeader><div className="space-y-4 mt-4">
-          {editingItem && <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><div className="flex items-center gap-3"><div className="w-12 h-18 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{editingItem.poster ? <img src={editingItem.poster} alt="" className="w-full h-full object-cover" /> : <Film className="w-6 h-6 text-neutral-500" />}</div><div><p className="font-bold">{getDisplayTitle(editingItem)}</p><p className="text-xs text-neutral-400">{editingItem.year} • {TYPE_CONFIG[editingItem.type as TabType]?.label}</p></div></div></div>}
-          <div><label className="text-sm text-neutral-400 mb-1 block">ملاحظاتي</label><Textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} placeholder="أضف ملاحظاتك..." className="bg-[#1a1a1a] border-[#2a2a2a] min-h-[80px]" /></div>
-          <div><label className="text-sm text-neutral-400 mb-1 block">صورة الملصق</label><div className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-colors ${isDragOver ? 'border-[#d4af37] bg-[#d4af37]/5' : 'border-[#2a2a2a]'}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handlePosterUpload(e.target.files[0])} />{formData.poster ? <div className="relative inline-block"><img src={formData.poster} alt="poster" className="h-24 rounded-lg mx-auto" /><Button variant="ghost" size="icon" onClick={() => setFormData(p => ({ ...p, poster: '' }))} className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white rounded-full"><X className="w-3 h-3" /></Button></div> : <div className="py-2 cursor-pointer" onClick={() => fileInputRef.current?.click()}><ImageIcon className="w-6 h-6 text-neutral-500 mx-auto mb-1" /><p className="text-xs text-neutral-400">اسحب صورة أو اضغط</p></div>}</div></div>
-          <div className="flex gap-2"><Button onClick={handleSaveEdit} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">حفظ</Button><Button onClick={() => { setShowEditDialog(false); setEditingItem(null); resetForm() }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
-        </div></DialogContent></Dialog>
-
-        {/* Ratings Edit Dialog - FULL edit (title, year, genre, rating, seasons) */}
-        <Dialog open={showEditRatedDialog} onOpenChange={setShowEditRatedDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Edit3 className="w-5 h-5 text-[#d4af37]" />تعديل التقييم</DialogTitle></DialogHeader><div className="space-y-4 mt-4">
-          {editingItem && <Badge className={`bg-gradient-to-r ${TYPE_CONFIG[editingItem.type as TabType]?.color || ''} text-white`}>{TYPE_CONFIG[editingItem.type as TabType]?.label}</Badge>}
-          <div><label className="text-sm text-neutral-400 mb-1 block">اسم العمل</label><Input value={formData.title} onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))} className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm text-neutral-400 mb-1 block">سنة الإنتاج</label><Input type="number" value={formData.year} onChange={(e) => setFormData(p => ({ ...p, year: e.target.value }))} className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-            <div><label className="text-sm text-neutral-400 mb-1 block">التصنيف</label><Select value={formData.genres || 'Other'} onValueChange={(v) => setFormData(p => ({ ...p, genres: v }))}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          {(editingItem?.type === 'series' || editingItem?.type === 'anime') && <div><label className="text-sm text-neutral-400 mb-1 block">عدد المواسم</label><Input type="number" value={formData.seasons} onChange={(e) => setFormData(p => ({ ...p, seasons: e.target.value }))} className="bg-[#1a1a1a] border-[#2a2a2a] h-10 w-32" /></div>}
-          <div><label className="text-sm text-neutral-400 mb-1 block">التقييم (0-100)</label><div className="flex items-center gap-2"><Input type="number" min="0" max="100" step="any" value={formData.userRating} onChange={(e) => setFormData(p => ({ ...p, userRating: e.target.value }))} className="bg-[#1a1a1a] border-[#2a2a2a] h-10 w-32" /><span className="text-neutral-500">/ 100</span></div></div>
-          <div><label className="text-sm text-neutral-400 mb-1 block">ملاحظات</label><Textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} className="bg-[#1a1a1a] border-[#2a2a2a] min-h-[60px]" /></div>
-          <div className="flex gap-2"><Button onClick={handleSaveRatedEdit} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">حفظ التعديل</Button><Button onClick={() => { setShowEditRatedDialog(false); setEditingItem(null); resetForm() }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
-        </div></DialogContent></Dialog>
-
-        {/* Add Rated Item Dialog - like old تقييماتي */}
-        <Dialog open={showAddRatedDialog} onOpenChange={setShowAddRatedDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Plus className="w-5 h-5 text-[#d4af37]" />إضافة تقييم جديد</DialogTitle></DialogHeader><div className="space-y-4 mt-4">
-          <div><label className="text-sm text-neutral-400 mb-2 block">نوع العمل</label><div className="grid grid-cols-3 gap-2">{(['movie', 'series', 'anime'] as const).map((type) => { const c = TYPE_CONFIG[type]; const I = c.icon; return <button key={type} onClick={() => setAddType(type)} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 ${addType === type ? 'bg-gradient-to-br ' + c.color + ' text-[#0a0a0a]' : 'bg-[#2a2a2a]/50 text-neutral-400'}`}><I className="w-5 h-5" /><span className="text-xs">{c.label}</span></button> })}</div></div>
-          <div><label className="text-sm text-neutral-400 mb-1 block">اسم العمل</label><Input value={formData.title} onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))} placeholder="مثال: Interstellar" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm text-neutral-400 mb-1 block">سنة الإنتاج</label><Input type="number" value={formData.year} onChange={(e) => setFormData(p => ({ ...p, year: e.target.value }))} placeholder="2024" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-            <div><label className="text-sm text-neutral-400 mb-1 block">التصنيف</label><Select value={formData.genres || ''} onValueChange={(v) => setFormData(p => ({ ...p, genres: v }))}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue placeholder="اختر النوع" /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          {(addType === 'series' || addType === 'anime') && <div><label className="text-sm text-neutral-400 mb-1 block">عدد المواسم</label><Input type="number" value={formData.seasons} onChange={(e) => setFormData(p => ({ ...p, seasons: e.target.value }))} placeholder="3" className="bg-[#1a1a1a] border-[#2a2a2a] h-10 w-32" /></div>}
-          <div><label className="text-sm text-neutral-400 mb-1 block">التقييم (0-100)</label><div className="flex items-center gap-2"><Input type="number" min="0" max="100" step="any" value={formData.userRating} onChange={(e) => setFormData(p => ({ ...p, userRating: e.target.value }))} placeholder="85.5" className="bg-[#1a1a1a] border-[#2a2a2a] h-10 w-32" /><span className="text-neutral-500">/ 100</span></div></div>
-          <div className="flex gap-2"><Button onClick={handleAddRatedItem} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">إضافة التقييم</Button><Button onClick={() => { setShowAddRatedDialog(false); resetForm() }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
-        </div></DialogContent></Dialog>
-
-        {/* Quick Rate Dialog — eye button from watchlist */}
-        <Dialog open={showQuickRate} onOpenChange={setShowQuickRate}><DialogContent className="max-w-sm bg-[#0f0f0f] border-[#2a2a2a]"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Eye className="w-5 h-5 text-[#d4af37]" />ما هو تقييمك؟</DialogTitle></DialogHeader>
-          {quickRateItem && <div className="space-y-4 mt-4">
-            <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a] flex items-center gap-3">
-              <div className="w-12 h-18 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">{quickRateItem.poster ? <img src={quickRateItem.poster} alt="" className="w-full h-full object-cover" /> : <Film className="w-6 h-6 text-neutral-500" />}</div>
-              <div><p className="font-bold line-clamp-1">{getDisplayTitle(quickRateItem)}</p><p className="text-xs text-neutral-400">{quickRateItem.year} • {TYPE_CONFIG[quickRateItem.type as TabType]?.label}</p></div>
-            </div>
-            {/* Genre Selection */}
-            <div><label className="text-sm text-neutral-400 mb-2 block">التصنيف</label><Select value={quickRateGenre || 'Other'} onValueChange={setQuickRateGenre}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">{GENRE_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
-            <div><p className="text-sm text-neutral-400 mb-2">اختر تقييمك (0-100):</p><div className="flex items-center gap-2 flex-wrap">{[10,20,30,40,50,60,70,80,90,100].map(r => <button key={r} onClick={() => { rateItem(quickRateItem.id, r, quickRateGenre); setShowQuickRate(false); setQuickRateItem(null); setQuickRateGenre('') }} className="w-12 h-10 rounded-lg text-sm font-bold bg-[#1a1a1a] text-neutral-400 hover:bg-[#d4af37] hover:text-[#0a0a0a] transition-all">{r}</button>)}</div>
-            <div className="flex items-center gap-1 mt-2"><Input type="number" min="0" max="100" step="0.01" value={quickRateValue} onChange={(e) => setQuickRateValue(e.target.value)} placeholder="مثال: 88.33" className="bg-[#1a1a1a] border-[#2a2a2a] h-9 w-32" onKeyDown={(e) => { if (e.key === 'Enter') handleQuickRate() }} /><span className="text-neutral-500 text-sm">/ 100</span></div></div>
-            <div className="flex gap-2"><Button onClick={handleQuickRate} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">قيّم وانقل للتقييمات</Button><Button onClick={() => { setShowQuickRate(false); setQuickRateItem(null); setQuickRateGenre('') }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div>
-          </div>}
-        </DialogContent></Dialog>
-
-        {/* Add to Watchlist Dialog */}
-        {/* Print Customization Dialog */}
-        <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Printer className="w-5 h-5 text-[#d4af37]" />تخصيص الطباعة</DialogTitle></DialogHeader>
-          <div className="space-y-5 mt-4">
-            {isPrintLoading && <div className="flex items-center justify-center py-8 gap-3"><Loader2 className="w-6 h-6 animate-spin text-[#d4af37]" /><span className="text-neutral-400">جاري تحميل كل البيانات للطباعة...</span></div>}
-            {!isPrintLoading && <>
-            {/* Quick Selections */}
-            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Trophy className="w-4 h-4" />اختيار سريع</label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {([
-                  { key: 'all' as const, label: 'الكل' },
-                  { key: 'top10' as const, label: 'أفضل 10' },
-                  { key: 'top25' as const, label: 'أفضل 25' },
-                  { key: 'top50' as const, label: 'أفضل 50' },
-                ]).map((opt) => (
-                  <button key={opt.key} onClick={() => setPrintFilter(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all ${printFilter === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}>{opt.label}</button>
+        {/* Stats Tab */}
+        {mainTab === 'stats' && (
+          <div className="space-y-4">
+            {statsLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-28 rounded-xl" />
                 ))}
               </div>
-            </div>
-
-            {/* Type Filter */}
-            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><SlidersHorizontal className="w-4 h-4" />حسب النوع</label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {([
-                  { key: 'all' as const, label: 'الكل', Icon: Star },
-                  { key: 'movie' as const, label: 'أفلام', Icon: Film },
-                  { key: 'series' as const, label: 'مسلسلات', Icon: Tv },
-                  { key: 'anime' as const, label: 'أنمي', Icon: Sparkles },
-                ]).map((opt) => (
-                  <button key={opt.key} onClick={() => setPrintType(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all flex flex-col items-center gap-1 ${printType === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}><opt.Icon className="w-4 h-4" /><span>{opt.label}</span></button>
-                ))}
+            ) : stats ? (
+              statsContent
+            ) : (
+              <div className="text-center py-16">
+                <BarChart3 className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                <p className="text-[#888]">لا توجد إحصائيات</p>
               </div>
-            </div>
-
-            {/* Year & Genre & Rating */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-                <label className="text-sm text-neutral-400 mb-2 block">حسب السنة</label>
-                <Select value={printYear} onValueChange={setPrintYear}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="all">كل السنوات</SelectItem>{printYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select>
-              </div>
-              <div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-                <label className="text-sm text-neutral-400 mb-2 block">حسب التصنيف</label>
-                <Select value={printGenre} onValueChange={setPrintGenre}><SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-10"><SelectValue /></SelectTrigger><SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]"><SelectItem value="all">كل التصنيفات</SelectItem>{printGenres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select>
-              </div>
-            </div>
-
-            {/* Sort Order */}
-            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><ArrowUpDown className="w-4 h-4" />ترتيب القائمة حسب</label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {([
-                  { key: 'title' as const, label: 'الأحرف' },
-                  { key: 'rating' as const, label: 'التقييم' },
-                  { key: 'year' as const, label: 'السنة' },
-                  { key: 'type' as const, label: 'النوع' },
-                ]).map((opt) => (
-                  <button key={opt.key} onClick={() => setPrintSortBy(opt.key)} className={`py-2.5 px-2 rounded-lg text-sm font-bold transition-all ${printSortBy === opt.key ? 'bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] shadow-lg' : 'bg-[#2a2a2a]/50 text-neutral-400 hover:bg-[#2a2a2a]'}`}>{opt.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Rating Range */}
-            <div className="p-4 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]">
-              <label className="text-sm text-[#d4af37] font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4" />نطاق التقييم</label>
-              <div className="flex items-center gap-3 mt-2">
-                <div className="flex-1"><Input type="number" min="0" max="100" step="0.01" value={printMinRating} onChange={(e) => setPrintMinRating(e.target.value)} placeholder="من (مثال: 70)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-                <span className="text-neutral-500">—</span>
-                <div className="flex-1"><Input type="number" min="0" max="100" step="0.01" value={printMaxRating} onChange={(e) => setPrintMaxRating(e.target.value)} placeholder="إلى (مثال: 100)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>
-              </div>
-            </div>
-
-            {/* Preview Summary */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-[#d4af37]/10 to-[#b8960f]/5 border border-[#d4af37]/20">
-              <div className="flex items-center justify-between">
-                <div><p className="text-sm text-neutral-300">عدد الأعمال المطلوب طباعتها</p><p className="text-xs text-neutral-500 mt-0.5">مرتبة حسب: {printSortBy === 'title' ? 'الأحرف' : printSortBy === 'rating' ? 'التقييم' : printSortBy === 'year' ? 'السنة' : 'النوع'}</p></div>
-                <div className="text-3xl font-bold text-[#d4af37]">{printPreviewItems.length}</div>
-              </div>
-              {printPreviewItems.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-[#2a2a2a] max-h-32 overflow-y-auto">
-                  <p className="text-xs text-neutral-500 mb-1">معاينة الأسماء:</p>
-                  <p className="text-xs text-neutral-300 leading-relaxed">{printPreviewItems.slice(0, 15).map(i => i.originalTitle || i.title).join(' • ')}{printPreviewItems.length > 15 ? ` ... +${printPreviewItems.length - 15} آخر` : ''}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              <Button onClick={executePrint} disabled={printPreviewItems.length === 0} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold gap-2"><Printer className="w-4 h-4" />طباعة ({printPreviewItems.length})</Button>
-              <Button onClick={resetPrintFilters} variant="ghost" className="text-neutral-400 gap-1"><X className="w-4 h-4" />إعادة تعيين</Button>
-              <Button onClick={() => setShowPrintDialog(false)} variant="ghost" className="text-neutral-400">إلغاء</Button>
-            </div>
-            </>}
+            )}
           </div>
-        </DialogContent></Dialog>
+        )}
+      </main>
 
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}><DialogContent className="max-w-lg bg-[#0f0f0f] border-[#2a2a2a] sm:max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><Plus className="w-5 h-5 text-[#d4af37]" />إضافة {TYPE_CONFIG[addType].label} جديد</DialogTitle></DialogHeader><div className="space-y-4 mt-4"><div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">نوع العمل</label><div className="grid grid-cols-3 gap-2">{(['movie', 'series', 'anime'] as const).map((type) => { const c = TYPE_CONFIG[type]; const I = c.icon; return <button key={type} onClick={() => { setAddType(type); setShowResults(false) }} className={`p-2 rounded-lg transition-all flex flex-col items-center gap-1 ${addType === type ? 'bg-gradient-to-br ' + c.color + ' text-[#0a0a0a]' : 'bg-[#2a2a2a]/50 text-neutral-400'}`}><I className="w-5 h-5" /><span className="text-xs">{c.label}</span></button> })}</div></div><div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">ابحث لجلب المعلومات تلقائياً</label><div className="flex gap-2"><Input value={metaSearchQuery} onChange={(e) => setMetaSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchMetadata()} placeholder="ابحث بالإنجليزي أو العربي..." className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-10" /><Button onClick={fetchMetadata} disabled={isFetching || !metaSearchQuery.trim()} className="bg-[#d4af37] text-[#0a0a0a] font-bold px-4">{isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}</Button></div>{searchError && <p className="text-red-400 text-sm mt-2">{searchError}</p>}</div>{showResults && searchResults.length > 0 && <div className="max-h-60 overflow-y-auto space-y-2 bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a]">{searchResults.map((r, idx) => <button key={idx} onClick={() => selectAndAdd(r)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[#2a2a2a] text-right transition-colors">{r.poster && <img src={r.poster} alt="" className="w-10 h-14 rounded object-cover flex-shrink-0" />}<div className="flex-1 min-w-0"><p className="font-bold text-sm line-clamp-1">{r.originalTitle || r.title}</p><p className="text-xs text-neutral-400">{r.year} {r.rating && `• ⭐ ${r.rating}`}</p></div><Plus className="w-4 h-4 text-[#d4af37] flex-shrink-0" /></button>)}</div>}<div className="p-3 rounded-xl bg-[#1a1a1a]/50 border border-[#2a2a2a]"><label className="text-sm text-neutral-400 mb-2 block">أو أدخل البيانات يدوياً</label><div className="space-y-3"><Input value={formData.originalTitle} onChange={(e) => setFormData(p => ({ ...p, originalTitle: e.target.value, title: e.target.value }))} placeholder="اسم العمل (إنجليزي)" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><div className="grid grid-cols-2 gap-3"><Input value={formData.year} onChange={(e) => setFormData(p => ({ ...p, year: e.target.value }))} placeholder="السنة" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><Input value={formData.genres} onChange={(e) => setFormData(p => ({ ...p, genres: e.target.value }))} placeholder="التصنيف" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>{(addType === 'series' || addType === 'anime') && <div className="grid grid-cols-2 gap-3"><Input value={formData.seasons} onChange={(e) => setFormData(p => ({ ...p, seasons: e.target.value }))} placeholder="عدد المواسم" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /><Input value={formData.episodes} onChange={(e) => setFormData(p => ({ ...p, episodes: e.target.value }))} placeholder="عدد الحلقات" className="bg-[#1a1a1a] border-[#2a2a2a] h-10" /></div>}<Textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات (اختياري)" className="bg-[#1a1a1a] border-[#2a2a2a] min-h-[60px]" /></div></div><div className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-colors ${isDragOver ? 'border-[#d4af37] bg-[#d4af37]/5' : 'border-[#2a2a2a]'}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handlePosterUpload(e.target.files[0])} />{formData.poster ? <div className="relative inline-block"><img src={formData.poster} alt="poster" className="h-24 rounded-lg mx-auto" /><Button variant="ghost" size="icon" onClick={() => setFormData(p => ({ ...p, poster: '' }))} className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white rounded-full"><X className="w-3 h-3" /></Button></div> : <div className="py-2 cursor-pointer" onClick={() => fileInputRef.current?.click()}><ImageIcon className="w-6 h-6 text-neutral-500 mx-auto mb-1" /><p className="text-xs text-neutral-400">اسحب صورة أو اضغط</p></div>}</div><div className="flex gap-2"><Button onClick={handleAddItem} className="flex-1 bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-[#0a0a0a] font-bold">إضافة</Button><Button onClick={() => { setShowAddDialog(false); resetForm() }} variant="ghost" className="flex-1 text-neutral-400">إلغاء</Button></div></div></DialogContent></Dialog>
-
+      {/* FAB - Add button */}
+      <div className="fixed bottom-6 left-6 z-30 safe-bottom">
+        <Button
+          onClick={() => openAddForm(wlType !== 'all' ? wlType : rtType !== 'all' ? rtType : 'movie')}
+          className="w-14 h-14 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-black shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-transform"
+          size="icon"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
       </div>
+
+      {/* Modals */}
+
+      {/* Details Modal */}
+      <ResponsiveModal
+        open={showDetails}
+        onOpenChange={setShowDetails}
+        title="تفاصيل العمل"
+      >
+        {detailContent}
+      </ResponsiveModal>
+
+      {/* Add Form Modal */}
+      <ResponsiveModal
+        open={showAddForm}
+        onOpenChange={setShowAddForm}
+        title="إضافة عمل جديد"
+      >
+        {formContent(false)}
+      </ResponsiveModal>
+
+      {/* Edit Form Modal */}
+      <ResponsiveModal
+        open={showEditForm}
+        onOpenChange={setShowEditForm}
+        title="تعديل العمل"
+      >
+        {formContent(true)}
+      </ResponsiveModal>
+
+      {/* Quick Rate Modal */}
+      <ResponsiveModal
+        open={showQuickRate}
+        onOpenChange={setShowQuickRate}
+        title="تقييم العمل"
+      >
+        {quickRateContent}
+      </ResponsiveModal>
+
+      {/* Delete Confirm Modal */}
+      <ResponsiveModal
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="تأكيد الحذف"
+      >
+        {deleteConfirmContent}
+      </ResponsiveModal>
+
+      {/* Movie Night Modal */}
+      <ResponsiveModal
+        open={showMovieNight}
+        onOpenChange={setShowMovieNight}
+        title="ليلة الأفلام"
+      >
+        {movieNightContent}
+      </ResponsiveModal>
+
+      {/* Print Preview Overlay */}
+      {printPreviewOverlay}
     </div>
   )
 }

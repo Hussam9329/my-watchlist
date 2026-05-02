@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+function formatItem(item: any) {
+  return {
+    ...item,
+    genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
+    tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -8,15 +16,8 @@ export async function GET(
   try {
     const { id } = await params
     const item = await prisma.mediaItem.findUnique({ where: { id } })
-    if (!item) {
-      return NextResponse.json({ error: 'العنصر غير موجود' }, { status: 404 })
-    }
-    const formattedItem = {
-      ...item,
-      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
-      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
-    }
-    return NextResponse.json(formattedItem)
+    if (!item) return NextResponse.json({ error: 'العنصر غير موجود' }, { status: 404 })
+    return NextResponse.json(formatItem(item))
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 })
   }
@@ -29,7 +30,7 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    
+
     const item = await prisma.mediaItem.update({
       where: { id },
       data: {
@@ -58,14 +59,8 @@ export async function PUT(
         ratingStatus: body.ratingStatus || 'watched',
       }
     })
-    
-    const formattedItem = {
-      ...item,
-      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
-      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
-    }
-    
-    return NextResponse.json(formattedItem)
+
+    return NextResponse.json(formatItem(item))
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }
@@ -91,30 +86,22 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    
-    const updateData = { ...body }
-    if (body.watchedAt) {
-      updateData.watchedAt = String(body.watchedAt)
-    }
+
+    const updateData: any = { ...body }
+    if (body.watchedAt) updateData.watchedAt = String(body.watchedAt)
     if (body.genres !== undefined) {
       updateData.genres = Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || '')
     }
     if (body.userRating !== undefined) {
       updateData.userRating = body.userRating != null ? parseFloat(String(body.userRating)) : null
     }
-    
+
     const item = await prisma.mediaItem.update({
       where: { id },
       data: updateData
     })
-    
-    const formattedItem = {
-      ...item,
-      genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
-      tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
-    }
-    
-    return NextResponse.json(formattedItem)
+
+    return NextResponse.json(formatItem(item))
   } catch (error) {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }

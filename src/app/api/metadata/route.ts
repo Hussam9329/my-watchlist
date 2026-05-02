@@ -10,14 +10,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'العنوان مطلوب' }, { status: 400 })
     }
 
-    // الكتب - استخدام Google Books API
     if (type === 'book') {
       const apiKey = process.env.GOOGLE_BOOKS_API_KEY || 'AIzaSyB7JLp8QJzHch9I1qeCc4PQ2rzZ7qfQyl8'
       const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=10&orderBy=relevance&printType=books&key=${apiKey}`
-      
+
       const response = await fetch(url, { cache: 'no-store' })
       const data = await response.json()
-      
+
       if (data.items && data.items.length > 0) {
         const results = data.items.map((item: any) => {
           const info = item.volumeInfo || {}
@@ -36,18 +35,13 @@ export async function POST(request: NextRequest) {
         })
         return NextResponse.json({ results })
       }
-      
       return NextResponse.json({ results: [] })
     }
 
-    // الألعاب - استخدام Steam Store API (مثل TMDB للأفلام)
     if (type === 'game') {
       const steamResponse = await fetch(
         `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(title)}&cc=us&l=english&count=10`,
-        { 
-          cache: 'no-store',
-          headers: { 'Accept-Language': 'en-US,en;q=0.9' }
-        }
+        { cache: 'no-store', headers: { 'Accept-Language': 'en-US,en;q=0.9' } }
       )
       const steamData = await steamResponse.json()
 
@@ -60,21 +54,15 @@ export async function POST(request: NextRequest) {
             if (item.platforms.mac) platformList.push('Mac')
             if (item.platforms.linux) platformList.push('Linux')
           }
-          // بوستر رسمي من Steam (صورة عمودية 600x900 - نفس نسبة TMDB)
-          const posterUrl = appId 
+          const posterUrl = appId
             ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`
             : null
-          // صورة صغيرة للعرض في نتائج البحث
-          const smallPoster = item.tiny_image 
-            ? item.tiny_image.replace('capsule_231x87', 'capsule_616x353')
-            : posterUrl
 
           return {
             title: item.name,
             originalTitle: item.name,
             year: '',
             poster: posterUrl,
-            smallPoster: smallPoster,
             overview: '',
             rating: item.metascore ? (parseInt(item.metascore) / 10).toFixed(1) : null,
             genres: [],
@@ -83,18 +71,14 @@ export async function POST(request: NextRequest) {
         })
         return NextResponse.json({ results })
       }
-
       return NextResponse.json({ results: [] })
     }
 
-    // الأفلام والمسلسلات والأنمي - استخدام TMDB API
     const tmdbType = type === 'movie' ? 'movie' : 'tv'
-    
     const response = await fetch(
       `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=2dca580c2a14b55200e784d157207b4d`,
       { cache: 'no-store' }
     )
-    
     const data = await response.json()
 
     if (data.results && data.results.length > 0) {
@@ -108,12 +92,10 @@ export async function POST(request: NextRequest) {
         type: type,
         genres: []
       }))
-      
       return NextResponse.json({ results })
     }
 
     return NextResponse.json({ results: [] })
-
   } catch (error) {
     console.error('[API] Error:', error)
     return NextResponse.json({ error: 'حدث خطأ أثناء البحث' }, { status: 500 })

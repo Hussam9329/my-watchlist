@@ -37,7 +37,7 @@ export default function HussamVisionHome() {
 
   if (showLogin && !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#030712] text-white flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#030712] text-white flex items-center justify-center safe-top safe-bottom">
         <div className="w-full max-w-sm px-6">
           <div className="text-center mb-8">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
@@ -56,11 +56,11 @@ export default function HussamVisionHome() {
               onChange={(e) => setPasswordInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               placeholder="كلمة المرور"
-              className="bg-[#1a1a2a] border-[#2a2a3a] focus:border-indigo-500 h-12 text-center text-lg"
+              className="bg-[#1a1a2a] border-[#2a2a3a] focus:border-indigo-500 h-14 text-center text-lg rounded-xl"
             />
             <Button
               onClick={handleLogin}
-              className="w-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold h-12"
+              className="w-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold h-14 rounded-xl text-lg active:scale-[0.97] transition-transform"
             >
               دخول
             </Button>
@@ -77,8 +77,8 @@ export default function HussamVisionHome() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#030712] text-white" dir="rtl">
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-6 sm:py-12">
+    <div className="min-h-[100dvh] bg-[#030712] text-white" dir="rtl">
+      <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center px-4 py-6 sm:py-12 safe-top safe-bottom">
         {/* الشعار */}
         <div className="text-center mb-6 sm:mb-16">
           <div className="flex justify-center mb-4 sm:mb-6">
@@ -102,22 +102,22 @@ export default function HussamVisionHome() {
               <a
                 key={card.href}
                 href={card.href}
-                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-3 sm:p-6 text-center transition-colors duration-150 touch-active"
+                className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-4 sm:p-6 text-center transition-all duration-150 touch-active active:scale-[0.97]"
                 style={{ borderColor: `var(--card-border, rgba(99,102,241,0.2))` }}
               >
                 <div className="relative z-10">
-                  <div className={`w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br ${card.gradient} border ${card.iconBorder} shadow-lg ${card.iconShadow}`}>
-                    <Icon className={`w-6 h-6 sm:w-11 sm:h-11 text-${card.color}-400`} />
+                  <div className={`w-14 h-14 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br ${card.gradient} border ${card.iconBorder} shadow-lg ${card.iconShadow}`}>
+                    <Icon className={`w-7 h-7 sm:w-11 sm:h-11 text-${card.color}-400`} />
                   </div>
-                  <h3 className={`text-sm sm:text-2xl font-bold mb-0.5 sm:mb-2 bg-gradient-to-l ${card.textGradient} bg-clip-text text-transparent`}>
+                  <h3 className={`text-base sm:text-2xl font-bold mb-1 sm:mb-2 bg-gradient-to-l ${card.textGradient} bg-clip-text text-transparent`}>
                     {card.title}
                   </h3>
-                  <p className="text-[11px] sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
+                  <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed hidden sm:block">
                     {card.desc}
                   </p>
-                  <div className={`mt-2 sm:mt-4 flex items-center justify-center gap-1 ${card.textColor} text-xs sm:text-sm`}>
+                  <div className={`mt-3 sm:mt-4 flex items-center justify-center gap-1 ${card.textColor} text-sm sm:text-sm`}>
                     <span>ادخل الآن</span>
-                    <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <ArrowLeft className="w-4 h-4 sm:w-4 sm:h-4" />
                   </div>
                 </div>
               </a>
@@ -126,9 +126,9 @@ export default function HussamVisionHome() {
         </div>
 
         {/* تذييل */}
-        <div className="mt-8 sm:mt-16 text-center">
+        <div className="mt-8 sm:mt-16 text-center safe-bottom">
           <div className="flex items-center justify-center gap-4 text-neutral-600 text-xs">
-            <div className="flex items-center gap-2 text-neutral-500 cursor-pointer hover:text-neutral-300" onClick={handleLogout}>
+            <div className="flex items-center gap-2 text-neutral-500 cursor-pointer hover:text-neutral-300 active:text-neutral-200" onClick={handleLogout}>
               خروج
             </div>
             <div className="w-8 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />

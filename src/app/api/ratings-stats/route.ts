@@ -3,7 +3,6 @@ import { prisma } from '@/lib/db'
 
 export async function GET() {
   try {
-    // Get all rated items (movie, series, or anime with userRating)
     const ratedItems = await prisma.mediaItem.findMany({
       where: {
         type: { in: ['movie', 'series', 'anime'] },
@@ -21,10 +20,8 @@ export async function GET() {
       }
     })
 
-    // Total rated items
     const totalRated = ratedItems.length
 
-    // Top genre - parse comma-separated genres
     const genreMap: Record<string, number> = {}
     ratedItems.forEach(item => {
       if (item.genres) {
@@ -35,42 +32,25 @@ export async function GET() {
     })
     const topGenre = Object.keys(genreMap).sort((a, b) => genreMap[b] - genreMap[a])[0] || '-'
 
-    // Average rating
     const ratings = ratedItems.map(x => x.userRating!).filter(x => x !== null && x !== undefined)
     const avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
 
-    // Top production year
     const yearMap: Record<string, number> = {}
     ratedItems.forEach(item => {
-      if (item.year) {
-        yearMap[item.year] = (yearMap[item.year] || 0) + 1
-      }
+      if (item.year) yearMap[item.year] = (yearMap[item.year] || 0) + 1
     })
     const topYear = Object.keys(yearMap).sort((a, b) => yearMap[b] - yearMap[a])[0] || '-'
 
-    // Items added this month
     const now = new Date()
     const thisMonth = ratedItems.filter(item => {
       const d = new Date(item.addedAt)
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
     }).length
 
-    // Type-specific stats
     const movies = ratedItems.filter(i => i.type === 'movie')
     const series = ratedItems.filter(i => i.type === 'series')
     const anime = ratedItems.filter(i => i.type === 'anime')
 
-    const movieCount = movies.length
-    const seriesCount = series.length
-    const animeCount = anime.length
-    const avgMovieRating = movies.length ? movies.reduce((a, m) => a + (m.userRating || 0), 0) / movies.length : 0
-    const avgSeriesRating = series.length ? series.reduce((a, s) => a + (s.userRating || 0), 0) / series.length : 0
-    const avgAnimeRating = anime.length ? anime.reduce((a, s) => a + (s.userRating || 0), 0) / anime.length : 0
-
-    // Plan-to-watch movies for movie night picker
-    const planMovies = movies.filter(m => m.ratingStatus === 'plan')
-
-    // Top decade
     const decadeMap: Record<string, number> = {}
     ratedItems.forEach(item => {
       const y = Number(item.year)
@@ -81,10 +61,9 @@ export async function GET() {
     })
     const topDecade = Object.keys(decadeMap).sort((a, b) => decadeMap[b] - decadeMap[a])[0] || '-'
 
-    // Max rating
     const maxRating = ratings.length ? Math.max(...ratings) : 0
     const topRatedItem = ratedItems.find(x => x.userRating === maxRating)
-    const maxRatingTitle = topRatedItem ? (ratedItems.find(i => i.userRating === maxRating) as any)?.title || '-' : '-'
+    const maxRatingTitle = topRatedItem?.title || '-'
 
     return NextResponse.json({
       totalRated,
@@ -93,13 +72,12 @@ export async function GET() {
       topYear,
       topDecade,
       thisMonth,
-      movieCount,
-      seriesCount,
-      animeCount,
-      avgMovieRating: Math.round(avgMovieRating * 100) / 100,
-      avgSeriesRating: Math.round(avgSeriesRating * 100) / 100,
-      avgAnimeRating: Math.round(avgAnimeRating * 100) / 100,
-      planMovieCount: planMovies.length,
+      movieCount: movies.length,
+      seriesCount: series.length,
+      animeCount: anime.length,
+      avgMovieRating: Math.round((movies.length ? movies.reduce((a, m) => a + (m.userRating || 0), 0) / movies.length : 0) * 100) / 100,
+      avgSeriesRating: Math.round((series.length ? series.reduce((a, s) => a + (s.userRating || 0), 0) / series.length : 0) * 100) / 100,
+      avgAnimeRating: Math.round((anime.length ? anime.reduce((a, s) => a + (s.userRating || 0), 0) / anime.length : 0) * 100) / 100,
       genreCount: Object.keys(genreMap).length,
       maxRating: Math.round(maxRating * 100) / 100,
       maxRatingTitle,
