@@ -2428,6 +2428,19 @@ export default function ArchivePage() {
         )}
       </main>
 
+      {/* FAB - Print button (ratings tab only, on mobile) */}
+      {mainTab === 'ratings' && isMobile && (
+        <div className="fixed bottom-6 right-6 z-30 safe-bottom">
+          <Button
+            onClick={openPrintPreview}
+            className="w-14 h-14 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-black shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-transform"
+            size="icon"
+          >
+            <Printer className="w-6 h-6" />
+          </Button>
+        </div>
+      )}
+
       {/* FAB - Add button */}
       <div className="fixed bottom-6 left-6 z-30 safe-bottom">
         <Button
