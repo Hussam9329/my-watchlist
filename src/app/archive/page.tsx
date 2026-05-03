@@ -1782,11 +1782,11 @@ export default function ArchivePage() {
 
   // ==================== Print Preview Overlay ====================
   const printPreviewOverlay = showPrintPreview && (
-    <div className="fixed inset-0 z-50 bg-[#0a0a0a] overflow-y-auto no-print" dir="rtl">
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col no-print" dir="rtl">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-[#2a2a2a] p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[#d4af37]">
+      <div className="shrink-0 bg-[#0a0a0a] border-b border-[#2a2a2a] p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg sm:text-xl font-bold text-[#d4af37]">
             <Printer className="w-5 h-5 inline ml-2" />
             معاينة الطباعة
           </h2>
@@ -1798,6 +1798,21 @@ export default function ArchivePage() {
           >
             <X className="w-5 h-5" />
           </Button>
+        </div>
+
+        {/* Action Buttons - always visible on mobile */}
+        <div className="flex items-center gap-2 mb-3">
+          <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9">
+            <Printer className="w-4 h-4 ml-1" />
+            طباعة
+          </Button>
+          <Button onClick={handleShare} variant="outline" className="border-[#2a2a2a] text-[#ccc] h-9">
+            <Share2 className="w-4 h-4 ml-1" />
+            مشاركة
+          </Button>
+          <div className="text-sm text-[#888]">
+            {filteredPrintItems.length} عمل
+          </div>
         </div>
 
         {/* Filters */}
@@ -1852,20 +1867,8 @@ export default function ArchivePage() {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-3 p-4 border-b border-[#2a2a2a]">
-        <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black">
-          <Printer className="w-4 h-4 ml-1" />
-          طباعة
-        </Button>
-        <Button onClick={handleShare} variant="outline" className="border-[#2a2a2a] text-[#ccc]">
-          <Share2 className="w-4 h-4 ml-1" />
-          مشاركة
-        </Button>
-        <div className="text-sm text-[#888]">
-          {filteredPrintItems.length} عمل
-        </div>
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
 
       {/* Print Table */}
       <div id="print-container" className="p-4">
@@ -1905,6 +1908,7 @@ export default function ArchivePage() {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -2224,7 +2228,7 @@ export default function ArchivePage() {
         {mainTab === 'ratings' && (
           <div className="space-y-4">
             {/* Sub-tabs */}
-            <div className="flex items-center gap-2 mobile-tabs-scroll">
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto mobile-tabs-scroll">
               {['movie', 'series', 'anime'].map(type => {
                 const conf = TYPE_CONFIG[type]
                 const Icon = conf.icon
@@ -2232,7 +2236,7 @@ export default function ArchivePage() {
                   <button
                     key={type}
                     onClick={() => setRtType(type)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                       rtType === type
                         ? `bg-gradient-to-l ${conf.color} text-black`
                         : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
@@ -2243,12 +2247,12 @@ export default function ArchivePage() {
                   </button>
                 )
               })}
-              <div className="flex-1" />
+              <div className="flex-1 min-w-2" />
               <Button
                 variant="outline"
                 size="sm"
                 onClick={openPrintPreview}
-                className="border-[#2a2a2a] text-[#d4af37] hover:bg-[#d4af37]/10 text-xs"
+                className="border-[#2a2a2a] text-[#d4af37] hover:bg-[#d4af37]/10 text-xs shrink-0"
               >
                 <Printer className="w-3.5 h-3.5 ml-1" />
                 طباعة
