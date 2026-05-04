@@ -198,7 +198,7 @@ function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
 // ==================== Skeleton Grid ====================
 function SkeletonGrid({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="aspect-[2/3] rounded-xl skeleton-shimmer" />
       ))}
@@ -1963,7 +1963,7 @@ export default function ArchivePage() {
     <div className="min-h-[100dvh] bg-[#0a0a0a] text-white" dir="rtl">
       {/* Sticky Header */}
       <header className="sticky top-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#2a2a2a] safe-top">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           {/* Top row: Logo + Actions */}
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
@@ -2050,7 +2050,7 @@ export default function ArchivePage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-24">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-24">
         {/* Watchlist Tab */}
         {mainTab === 'watchlist' && (
           <div className="space-y-4">
@@ -2185,7 +2185,7 @@ export default function ArchivePage() {
             ) : (
               <>
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
                     {processedWlItems.map(item => (
                       <MediaCard
                         key={item.id}
@@ -2368,7 +2368,7 @@ export default function ArchivePage() {
             ) : (
               <>
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
                     {processedRtItems.map(item => (
                       <MediaCard
                         key={item.id}

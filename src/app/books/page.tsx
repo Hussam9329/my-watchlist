@@ -125,7 +125,7 @@ function getRatingBg(rating: number) {
 // ==================== Skeleton Grid ====================
 function SkeletonGrid({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="aspect-[2/3] rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] animate-pulse" />
       ))}
@@ -1249,7 +1249,7 @@ export default function BooksPage() {
     <div className="min-h-screen bg-[#0a0a0a] text-white" dir="rtl">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#2a2a2a]">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center gap-3">
             {/* Back Button */}
             <Button
@@ -1419,7 +1419,7 @@ export default function BooksPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
           <SkeletonGrid count={12} />
         ) : processedItems.length === 0 ? (
@@ -1444,7 +1444,7 @@ export default function BooksPage() {
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
             {processedItems.map(item => (
               <BookCard
                 key={item.id}

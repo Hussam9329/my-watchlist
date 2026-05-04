@@ -174,7 +174,7 @@ function itemMatchesTab(item: MediaItem, tabKey: string): boolean {
 // ==================== Skeleton Grid ====================
 function SkeletonGrid({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="aspect-[3/4] rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] animate-pulse" />
       ))}
@@ -1443,7 +1443,7 @@ export default function GamesPage() {
     <div className="min-h-screen bg-[#0a0a0a] text-white" dir="rtl">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a]">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-3">
             {/* Back + Title */}
             <div className="flex items-center gap-3 min-w-0">
@@ -1623,7 +1623,7 @@ export default function GamesPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-4">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {loading ? (
           <SkeletonGrid count={8} />
         ) : processedItems.length === 0 ? (
@@ -1645,7 +1645,7 @@ export default function GamesPage() {
           </div>
         ) : (
           <div className={viewMode === 'grid'
-            ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4'
+            ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5'
             : 'space-y-2'
           }>
             {processedItems.map(item => (
