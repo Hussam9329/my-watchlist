@@ -60,20 +60,29 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
+    // Check duplicates: same type + same year + (same title OR same originalTitle)
+    const orConditions: any[] = [{ title: body.title }]
+    if (body.originalTitle) {
+      orConditions.push({ originalTitle: body.originalTitle })
+      // Also check if title matches originalTitle or vice versa
+      orConditions.push({ title: body.originalTitle })
+    }
+
     const existing = await prisma.mediaItem.findFirst({
       where: {
         type: body.type,
         year: body.year,
-        OR: [
-          { title: body.title },
-          ...(body.originalTitle ? [{ originalTitle: body.originalTitle }] : [])
-        ]
+        OR: orConditions
       }
     })
 
     if (existing) {
       return NextResponse.json(
-        { error: 'هذا العمل موجود مسبقاً في الأرشيف!', duplicate: true, existingItem: existing },
+        {
+          error: 'هذا العمل موجود مسبقاً في الأرشيف!',
+          duplicate: true,
+          existingItem: formatItem(existing)
+        },
         { status: 409 }
       )
     }

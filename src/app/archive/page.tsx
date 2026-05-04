@@ -612,19 +612,47 @@ export default function ArchivePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      const resData = await res.json()
       if (!res.ok) {
-        const errData = await res.json()
-        if (errData.duplicate) {
-          toast.error('هذا العمل موجود مسبقاً!')
+        if (resData.duplicate && resData.existingItem) {
+          // Show the existing item to the user and let them navigate to it
+          const existing = resData.existingItem as MediaItem
+          const tabLabel = existing.userRating != null ? 'تقييماتي' : 'أريد مشاهدته'
+          toast.error(`هذا العمل موجود مسبقاً في "${tabLabel}"!`, {
+            duration: 5000,
+            action: {
+              label: 'عرض',
+              onClick: () => {
+                setShowAddForm(false)
+                resetForm()
+                // Navigate to the correct tab and open the item
+                if (existing.userRating != null) {
+                  setMainTab('ratings')
+                } else {
+                  setMainTab('watchlist')
+                }
+                setSelectedItem(existing)
+                setShowDetails(true)
+              }
+            }
+          })
           return
         }
-        throw new Error(errData.error)
+        throw new Error(resData.error)
       }
       toast.success('تمت الإضافة بنجاح')
       setShowAddForm(false)
       resetForm()
-      fetchWatchlist(1, true)
+      // Refresh both lists and switch to the correct tab to show the new item
+      if (resData.userRating != null) {
+        setMainTab('ratings')
+        fetchRatings(1, true)
+      } else {
+        setMainTab('watchlist')
+        fetchWatchlist(1, true)
+      }
       fetchRatings(1, true)
+      fetchWatchlist(1, true)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة')
     } finally {
