@@ -373,6 +373,9 @@ export default function ArchivePage() {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
 
+  // All years from database
+  const [dbYears, setDbYears] = useState<string[]>([])
+
   // UI state
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -544,6 +547,15 @@ export default function ArchivePage() {
     setWlPage(1)
     fetchWatchlist(1, true)
   }, [isAuthenticated, wlType, debouncedSearch, fetchWatchlist])
+
+  // Fetch all available years from database
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetch('/api/years')
+      .then(r => r.json())
+      .then(data => { if (data.years) setDbYears(data.years) })
+      .catch(() => {})
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (!isAuthenticated || mainTab !== 'ratings') return
@@ -1051,11 +1063,12 @@ export default function ArchivePage() {
   }, [mainTab, wlItems, rtItems])
 
   const allYears = useMemo(() => {
-    const items = mainTab === 'watchlist' ? wlItems : rtItems
+    if (dbYears.length > 0) return dbYears
     const years = new Set<string>()
-    items.forEach(item => { if (item.year) years.add(item.year) })
+    wlItems.forEach(item => { if (item.year) years.add(item.year) })
+    rtItems.forEach(item => { if (item.year) years.add(item.year) })
     return Array.from(years).sort().reverse()
-  }, [mainTab, wlItems, rtItems])
+  }, [dbYears, wlItems, rtItems])
 
   // ==================== Login Screen ====================
   if (!isAuthenticated) {
