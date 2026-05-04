@@ -214,9 +214,10 @@ interface MediaCardProps {
   onToggleFavorite: () => void
   onToggleWatched: () => void
   viewMode: 'grid' | 'list'
+  hidePoster?: boolean
 }
 
-const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode }: MediaCardProps) {
+const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode, hidePoster }: MediaCardProps) {
   const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
   const TypeIcon = typeConf.icon
 
@@ -227,7 +228,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         onClick={onClick}
       >
         <div className="w-12 h-16 rounded-lg overflow-hidden bg-[#2a2a2a] shrink-0">
-          {item.poster ? (
+          {item.poster && !hidePoster ? (
             <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -257,6 +258,83 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
     )
   }
 
+  // Grid view with hidePoster (ratings tab)
+  if (hidePoster) {
+    return (
+      <div
+        className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden active:scale-[0.97] transition-transform cursor-pointer hover:border-[#3a3a3a]"
+        onClick={onClick}
+      >
+        <div className="aspect-[2/3] relative flex flex-col items-center justify-center bg-gradient-to-b from-[#1a1a1a] to-[#111]">
+          {/* Type icon */}
+          <div className={`w-14 h-14 rounded-2xl ${typeConf.bgColor} flex items-center justify-center mb-3`}>
+            <TypeIcon className="w-7 h-7 text-[#d4af37]" />
+          </div>
+          {/* Rating prominently displayed */}
+          {item.userRating != null ? (
+            <div className={`text-4xl font-black ${getRatingColor(item.userRating)} mb-1`}>
+              {formatRating(item.userRating)}
+            </div>
+          ) : item.rating ? (
+            <div className="text-2xl font-bold text-[#d4af37] mb-1">⭐ {item.rating}</div>
+          ) : null}
+          {/* Type badge */}
+          <div className={`px-3 py-1 rounded-md text-xs font-bold bg-gradient-to-l ${typeConf.color} text-black mt-1`}>
+            {typeConf.label}
+          </div>
+          {/* Badges */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1">
+            {item.favorite && (
+              <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+              </div>
+            )}
+            {item.watched && (
+              <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                <Eye className="w-3.5 h-3.5 text-green-400" />
+              </div>
+            )}
+          </div>
+          {/* Quick actions on hover (desktop) */}
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={onQuickRate}
+              className="w-10 h-10 rounded-full bg-[#d4af37] text-black flex items-center justify-center hover:scale-110 transition-transform"
+              title="تقييم"
+            >
+              <Star className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onToggleFavorite}
+              className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
+              title={item.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+            >
+              <Heart className={`w-5 h-5 ${item.favorite ? 'text-red-400 fill-red-400' : ''}`} />
+            </button>
+            <button
+              onClick={onToggleWatched}
+              className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
+              title={item.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
+            >
+              {item.watched ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+        {/* Info */}
+        <div className="p-2.5">
+          <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-[#888]">{item.year}</span>
+            {item.genres && item.genres.length > 0 && (
+              <span className="text-[10px] text-[#666] truncate max-w-[80px]">{item.genres[0]}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Standard grid view (with poster)
   return (
     <div
       className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden active:scale-[0.97] transition-transform cursor-pointer hover:border-[#3a3a3a]"
@@ -1330,17 +1408,19 @@ export default function ArchivePage() {
         />
       </div>
 
-      {/* Original Title */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">العنوان الأصلي</label>
-        <Input
-          value={formData.originalTitle}
-          onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
-          placeholder="Original Title"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-          dir="ltr"
-        />
-      </div>
+      {/* Original Title - only in edit */}
+      {isEdit && (
+        <div className="space-y-1">
+          <label className="text-sm font-bold text-[#d4af37]">العنوان الأصلي</label>
+          <Input
+            value={formData.originalTitle}
+            onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
+            placeholder="Original Title"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            dir="ltr"
+          />
+        </div>
+      )}
 
       {/* Year */}
       <div className="space-y-1">
@@ -1378,176 +1458,182 @@ export default function ArchivePage() {
         )}
       </div>
 
-      {/* Overview */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">القصة</label>
-        <Textarea
-          value={formData.overview}
-          onChange={(e) => setFormData(prev => ({ ...prev, overview: e.target.value }))}
-          placeholder="وصف العمل..."
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[80px]"
-        />
-      </div>
-
-      {/* Genres */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">التصنيفات (مفصولة بفاصلة)</label>
-        <Input
-          value={formData.genres}
-          onChange={(e) => setFormData(prev => ({ ...prev, genres: e.target.value }))}
-          placeholder="أكشن، دراما، خيال علمي"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-        />
-      </div>
-
-      {/* Type-specific fields */}
-      {(formData.type === 'series' || formData.type === 'anime') && (
-        <div className="grid grid-cols-2 gap-3">
+      {/* === Fields only shown in EDIT mode === */}
+      {isEdit && (
+        <>
+          {/* Overview */}
           <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">المواسم</label>
+            <label className="text-sm font-bold text-[#d4af37]">القصة</label>
+            <Textarea
+              value={formData.overview}
+              onChange={(e) => setFormData(prev => ({ ...prev, overview: e.target.value }))}
+              placeholder="وصف العمل..."
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[80px]"
+            />
+          </div>
+
+          {/* Genres */}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">التصنيفات (مفصولة بفاصلة)</label>
             <Input
-              value={formData.seasons}
-              onChange={(e) => setFormData(prev => ({ ...prev, seasons: e.target.value }))}
-              placeholder="3"
+              value={formData.genres}
+              onChange={(e) => setFormData(prev => ({ ...prev, genres: e.target.value }))}
+              placeholder="أكشن، دراما، خيال علمي"
               className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
             />
           </div>
+
+          {/* Type-specific fields */}
+          {(formData.type === 'series' || formData.type === 'anime') && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-[#d4af37]">المواسم</label>
+                <Input
+                  value={formData.seasons}
+                  onChange={(e) => setFormData(prev => ({ ...prev, seasons: e.target.value }))}
+                  placeholder="3"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-[#d4af37]">الحلقات</label>
+                <Input
+                  value={formData.episodes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, episodes: e.target.value }))}
+                  placeholder="24"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.type === 'movie' && (
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-[#d4af37]">مدة الفيلم (دقيقة)</label>
+              <Input
+                value={formData.runtime}
+                onChange={(e) => setFormData(prev => ({ ...prev, runtime: e.target.value }))}
+                placeholder="120"
+                className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+              />
+            </div>
+          )}
+
+          {formData.type === 'book' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-[#d4af37]">المؤلف</label>
+                <Input
+                  value={formData.author}
+                  onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
+                  placeholder="اسم المؤلف"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-[#d4af37]">عدد الصفحات</label>
+                <Input
+                  value={formData.pages}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pages: e.target.value }))}
+                  placeholder="350"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Status */}
           <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">الحلقات</label>
+            <label className="text-sm font-bold text-[#d4af37]">حالة المشاهدة</label>
+            <Select value={formData.ratingStatus} onValueChange={(v) => setFormData(prev => ({ ...prev, ratingStatus: v }))}>
+              <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                {RATING_STATUSES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Rating */}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">التقييم العام</label>
             <Input
-              value={formData.episodes}
-              onChange={(e) => setFormData(prev => ({ ...prev, episodes: e.target.value }))}
-              placeholder="24"
+              value={formData.rating}
+              onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+              placeholder="7.5"
               className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
             />
           </div>
-        </div>
+
+          {/* User Rating */}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">تقييمي (من 100)</label>
+            <Input
+              value={formData.userRating}
+              onChange={(e) => setFormData(prev => ({ ...prev, userRating: e.target.value }))}
+              placeholder="85"
+              type="number"
+              min="0"
+              max="100"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">الوسوم (مفصولة بفاصلة)</label>
+            <Input
+              value={formData.tags}
+              onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+              placeholder="وسم1، وسم2"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <label className="text-sm font-bold text-[#d4af37]">ملاحظات</label>
+            <Textarea
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="ملاحظاتك الشخصية..."
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[60px]"
+            />
+          </div>
+
+          {/* Toggles */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, favorite: prev.favorite === 'true' ? 'false' : 'true' }))}
+              className="flex items-center gap-2 text-sm"
+            >
+              <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'text-red-400 fill-red-400' : 'text-[#666]'}`} />
+              <span className={formData.favorite === 'true' ? 'text-red-400' : 'text-[#666]'}>مفضل</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
+              className="flex items-center gap-2 text-sm"
+            >
+              <Eye className={`w-4 h-4 ${formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}`} />
+              <span className={formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}>تمت المشاهدة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, rewatch: prev.rewatch === 'true' ? 'false' : 'true' }))}
+              className="flex items-center gap-2 text-sm"
+            >
+              <ArrowRight className={`w-4 h-4 ${formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}`} />
+              <span className={formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}>إعادة مشاهدة</span>
+            </button>
+          </div>
+        </>
       )}
-
-      {formData.type === 'movie' && (
-        <div className="space-y-1">
-          <label className="text-sm font-bold text-[#d4af37]">مدة الفيلم (دقيقة)</label>
-          <Input
-            value={formData.runtime}
-            onChange={(e) => setFormData(prev => ({ ...prev, runtime: e.target.value }))}
-            placeholder="120"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-          />
-        </div>
-      )}
-
-      {formData.type === 'book' && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">المؤلف</label>
-            <Input
-              value={formData.author}
-              onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
-              placeholder="اسم المؤلف"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">عدد الصفحات</label>
-            <Input
-              value={formData.pages}
-              onChange={(e) => setFormData(prev => ({ ...prev, pages: e.target.value }))}
-              placeholder="350"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Status */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">حالة المشاهدة</label>
-        <Select value={formData.ratingStatus} onValueChange={(v) => setFormData(prev => ({ ...prev, ratingStatus: v }))}>
-          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-            {RATING_STATUSES.map(s => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Rating */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">التقييم العام</label>
-        <Input
-          value={formData.rating}
-          onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
-          placeholder="7.5"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-        />
-      </div>
-
-      {/* User Rating */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">تقييمي (من 100)</label>
-        <Input
-          value={formData.userRating}
-          onChange={(e) => setFormData(prev => ({ ...prev, userRating: e.target.value }))}
-          placeholder="85"
-          type="number"
-          min="0"
-          max="100"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-        />
-      </div>
-
-      {/* Tags */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">الوسوم (مفصولة بفاصلة)</label>
-        <Input
-          value={formData.tags}
-          onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-          placeholder="وسم1، وسم2"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-        />
-      </div>
-
-      {/* Notes */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">ملاحظات</label>
-        <Textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-          placeholder="ملاحظاتك الشخصية..."
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] min-h-[60px]"
-        />
-      </div>
-
-      {/* Toggles */}
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => setFormData(prev => ({ ...prev, favorite: prev.favorite === 'true' ? 'false' : 'true' }))}
-          className="flex items-center gap-2 text-sm"
-        >
-          <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'text-red-400 fill-red-400' : 'text-[#666]'}`} />
-          <span className={formData.favorite === 'true' ? 'text-red-400' : 'text-[#666]'}>مفضل</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
-          className="flex items-center gap-2 text-sm"
-        >
-          <Eye className={`w-4 h-4 ${formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}`} />
-          <span className={formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}>تمت المشاهدة</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFormData(prev => ({ ...prev, rewatch: prev.rewatch === 'true' ? 'false' : 'true' }))}
-          className="flex items-center gap-2 text-sm"
-        >
-          <ArrowRight className={`w-4 h-4 ${formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}`} />
-          <span className={formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}>إعادة مشاهدة</span>
-        </button>
-      </div>
+      {/* === End of edit-only fields === */}
 
       {/* Submit */}
       <Button
@@ -1622,6 +1708,48 @@ export default function ArchivePage() {
             {val}
           </button>
         ))}
+      </div>
+
+      {/* Manual decimal input */}
+      <div className="space-y-2">
+        <label className="text-sm font-bold text-[#d4af37] text-center block">تقييم يدوي (رقم عشري)</label>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="88.33"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] flex-1"
+            dir="ltr"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = parseFloat((e.target as HTMLInputElement).value)
+                if (!isNaN(val) && val >= 0 && val <= 100) {
+                  quickRate(val)
+                } else {
+                  toast.error('أدخل قيمة بين 0 و 100')
+                }
+              }
+            }}
+            id="manual-rating-input"
+          />
+          <Button
+            onClick={() => {
+              const input = document.getElementById('manual-rating-input') as HTMLInputElement
+              const val = parseFloat(input?.value || '')
+              if (!isNaN(val) && val >= 0 && val <= 100) {
+                quickRate(val)
+              } else {
+                toast.error('أدخل قيمة بين 0 و 100')
+              }
+            }}
+            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0"
+          >
+            <Star className="w-4 h-4 ml-1" />
+            تقييم
+          </Button>
+        </div>
       </div>
 
       {selectedItem.userRating != null && (
@@ -2391,6 +2519,7 @@ export default function ArchivePage() {
                         onToggleFavorite={() => toggleFavorite(item)}
                         onToggleWatched={() => toggleWatched(item)}
                         viewMode="grid"
+                        hidePoster={true}
                       />
                     ))}
                   </div>
@@ -2405,6 +2534,7 @@ export default function ArchivePage() {
                         onToggleFavorite={() => toggleFavorite(item)}
                         onToggleWatched={() => toggleWatched(item)}
                         viewMode="list"
+                        hidePoster={true}
                       />
                     ))}
                   </div>
