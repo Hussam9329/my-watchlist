@@ -2053,7 +2053,7 @@ export default function ArchivePage() {
             <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
               <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4 py-3" style={{ maxHeight: 'calc(92vh - 100px)' }}>
+            <div className="px-4 py-3">
               {children}
             </div>
             {footerContent && (
@@ -2067,7 +2067,7 @@ export default function ArchivePage() {
     }
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-y-auto ${wide ? 'max-w-2xl' : 'max-w-lg'}`}>
+        <DialogContent className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'sm:max-w-2xl max-w-2xl' : 'sm:max-w-lg max-w-lg'}`}>
           <DialogHeader>
             <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
           </DialogHeader>
@@ -2172,7 +2172,7 @@ export default function ArchivePage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-24">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-6">
         {/* Watchlist Tab */}
         {mainTab === 'watchlist' && (
           <div className="space-y-4">
@@ -2204,6 +2204,13 @@ export default function ArchivePage() {
                 {wlTotal} عمل
               </div>
               <div className="flex items-center gap-1.5">
+                <Button
+                  onClick={() => openAddForm(wlType !== 'all' ? wlType : 'movie')}
+                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">إضافة</span>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2387,6 +2394,13 @@ export default function ArchivePage() {
                 {rtTotal} عمل مقيّم
               </div>
               <div className="flex items-center gap-1.5">
+                <Button
+                  onClick={() => openAddForm(rtType !== 'all' ? rtType : 'movie')}
+                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">إضافة</span>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2577,17 +2591,6 @@ export default function ArchivePage() {
           </Button>
         </div>
       )}
-
-      {/* FAB - Add button */}
-      <div className="fixed bottom-6 left-6 z-30 safe-bottom">
-        <Button
-          onClick={() => openAddForm(wlType !== 'all' ? wlType : rtType !== 'all' ? rtType : 'movie')}
-          className="w-14 h-14 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-black shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-transform"
-          size="icon"
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
-      </div>
 
       {/* Modals */}
 
