@@ -1243,131 +1243,147 @@ export default function ArchivePage() {
 
   // ==================== Form Content (shared between Dialog and Drawer) ====================
   const formContent = (isEdit: boolean) => (
-    <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1">
+    <div className="space-y-5 overflow-y-auto p-1" style={{ maxHeight: isMobile ? 'calc(80vh - 120px)' : 'calc(80vh - 80px)' }}>
       {/* Metadata Search */}
       <div className="space-y-2">
-        <label className="text-sm font-bold text-[#d4af37]">بحث تلقائي</label>
+        <label className="text-xs font-bold text-[#d4af37] flex items-center gap-1.5">
+          <Search className="w-3.5 h-3.5" />
+          بحث تلقائي
+        </label>
         <div className="flex gap-2">
           <Input
             value={metaQuery}
             onChange={(e) => setMetaQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && searchMetadata()}
             placeholder="ابحث عن العنوان..."
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm h-11"
           />
           <Button
             onClick={searchMetadata}
             disabled={metaLoading}
-            size="sm"
-            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0"
+            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0 h-11 px-4"
           >
-            {metaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            {metaLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
           </Button>
         </div>
         {metaResults.length > 0 && (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
             {metaResults.map((result, idx) => (
               <button
                 key={idx}
                 onClick={() => selectMetadata(result)}
-                className="w-full flex items-center gap-3 p-2 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#d4af37]/50 transition-colors text-right"
+                className="flex items-center gap-3 p-2.5 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#d4af37]/50 hover:bg-[#1a1a1a]/80 transition-all text-right active:scale-[0.98]"
               >
-                {result.poster && (
-                  <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
+                {result.poster ? (
+                  <img src={result.poster} alt="" className="w-11 h-16 rounded-lg object-cover shrink-0 shadow-md" />
+                ) : (
+                  <div className="w-11 h-16 rounded-lg bg-[#2a2a2a] flex items-center justify-center shrink-0">
+                    <Film className="w-4 h-4 text-[#555]" />
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-white truncate">{result.title}</div>
-                  <div className="text-xs text-[#888]">{result.year} {result.rating && `⭐ ${result.rating}`}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-[#888]">{result.year}</span>
+                    {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
+                  </div>
                 </div>
-                <Check className="w-4 h-4 text-[#d4af37] shrink-0" />
+                <div className="w-7 h-7 rounded-full bg-[#d4af37]/10 flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5 text-[#d4af37]" />
+                </div>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Type */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">النوع *</label>
-        <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
-          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-            {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'all').map(([key, conf]) => (
-              <SelectItem key={key} value={key}>{conf.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Type + Year row */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-[#d4af37]">النوع *</label>
+          <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
+            <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-11">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+              {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'all').map(([key, conf]) => (
+                <SelectItem key={key} value={key}>{conf.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-[#d4af37]">السنة *</label>
+          <Input
+            value={formData.year}
+            onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
+            placeholder="2024"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
+          />
+        </div>
       </div>
 
       {/* Title */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">العنوان *</label>
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-[#d4af37]">العنوان *</label>
         <Input
           value={formData.title}
           onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
           placeholder="عنوان العمل"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
         />
       </div>
 
       {/* Original Title - only in edit */}
       {isEdit && (
-        <div className="space-y-1">
-          <label className="text-sm font-bold text-[#d4af37]">العنوان الأصلي</label>
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-[#d4af37]">العنوان الأصلي</label>
           <Input
             value={formData.originalTitle}
             onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
             placeholder="Original Title"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
             dir="ltr"
           />
         </div>
       )}
 
-      {/* Year */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">السنة *</label>
-        <Input
-          value={formData.year}
-          onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
-          placeholder="2024"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-        />
-      </div>
-
       {/* Poster */}
-      <div className="space-y-1">
-        <label className="text-sm font-bold text-[#d4af37]">الصورة</label>
-        <div className="flex items-center gap-2">
-          <Input
-            value={formData.poster}
-            onChange={(e) => setFormData(prev => ({ ...prev, poster: e.target.value }))}
-            placeholder="رابط الصورة"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] flex-1"
-            dir="ltr"
-          />
-          <label className="cursor-pointer shrink-0">
-            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            <div className="px-3 py-2 rounded-lg bg-[#2a2a2a] text-[#888] text-sm hover:bg-[#333] transition-colors min-h-[44px] flex items-center">
-              {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
-            </div>
-          </label>
-        </div>
-        {formData.poster && (
-          <div className="mt-2">
-            <img src={formData.poster} alt="preview" className="w-16 h-24 rounded-lg object-cover" />
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-[#d4af37]">الصورة</label>
+        <div className="flex items-start gap-3">
+          <div className="flex-1 space-y-2">
+            <Input
+              value={formData.poster}
+              onChange={(e) => setFormData(prev => ({ ...prev, poster: e.target.value }))}
+              placeholder="رابط الصورة"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
+              dir="ltr"
+            />
+            <label className="cursor-pointer block">
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#2a2a2a] text-[#aaa] text-sm hover:bg-[#333] hover:text-white transition-colors min-h-[44px] border border-dashed border-[#3a3a3a]">
+                {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+                <span>رفع صورة</span>
+              </div>
+            </label>
           </div>
-        )}
+          {formData.poster && (
+            <div className="shrink-0">
+              <div className="w-16 h-24 sm:w-20 sm:h-30 rounded-xl overflow-hidden bg-[#2a2a2a] border border-[#3a3a3a] shadow-lg">
+                <img src={formData.poster} alt="preview" className="w-full h-full object-cover" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* === Fields only shown in EDIT mode === */}
       {isEdit && (
         <>
           {/* Overview */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">القصة</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#d4af37]">القصة</label>
             <Textarea
               value={formData.overview}
               onChange={(e) => setFormData(prev => ({ ...prev, overview: e.target.value }))}
@@ -1377,104 +1393,104 @@ export default function ArchivePage() {
           </div>
 
           {/* Genres */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">التصنيفات (مفصولة بفاصلة)</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#d4af37]">التصنيفات (مفصولة بفاصلة)</label>
             <Input
               value={formData.genres}
               onChange={(e) => setFormData(prev => ({ ...prev, genres: e.target.value }))}
               placeholder="أكشن، دراما، خيال علمي"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
             />
           </div>
 
           {/* Type-specific fields */}
           {(formData.type === 'series' || formData.type === 'anime') && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-[#d4af37]">المواسم</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#d4af37]">المواسم</label>
                 <Input
                   value={formData.seasons}
                   onChange={(e) => setFormData(prev => ({ ...prev, seasons: e.target.value }))}
                   placeholder="3"
-                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-[#d4af37]">الحلقات</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#d4af37]">الحلقات</label>
                 <Input
                   value={formData.episodes}
                   onChange={(e) => setFormData(prev => ({ ...prev, episodes: e.target.value }))}
                   placeholder="24"
-                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
                 />
               </div>
             </div>
           )}
 
           {formData.type === 'movie' && (
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-[#d4af37]">مدة الفيلم (دقيقة)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#d4af37]">مدة الفيلم (دقيقة)</label>
               <Input
                 value={formData.runtime}
                 onChange={(e) => setFormData(prev => ({ ...prev, runtime: e.target.value }))}
                 placeholder="120"
-                className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
               />
             </div>
           )}
 
           {formData.type === 'book' && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-[#d4af37]">المؤلف</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#d4af37]">المؤلف</label>
                 <Input
                   value={formData.author}
                   onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
                   placeholder="اسم المؤلف"
-                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-[#d4af37]">عدد الصفحات</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#d4af37]">عدد الصفحات</label>
                 <Input
                   value={formData.pages}
                   onChange={(e) => setFormData(prev => ({ ...prev, pages: e.target.value }))}
                   placeholder="350"
-                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
                 />
               </div>
             </div>
           )}
 
-          {/* Status */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">حالة المشاهدة</label>
-            <Select value={formData.ratingStatus} onValueChange={(v) => setFormData(prev => ({ ...prev, ratingStatus: v }))}>
-              <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                {RATING_STATUSES.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Rating */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">التقييم العام</label>
-            <Input
-              value={formData.rating}
-              onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
-              placeholder="7.5"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
-            />
+          {/* Status + Rating row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#d4af37]">حالة المشاهدة</label>
+              <Select value={formData.ratingStatus} onValueChange={(v) => setFormData(prev => ({ ...prev, ratingStatus: v }))}>
+                <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                  {RATING_STATUSES.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#d4af37]">التقييم العام</label>
+              <Input
+                value={formData.rating}
+                onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+                placeholder="7.5"
+                className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
+              />
+            </div>
           </div>
 
           {/* User Rating */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">تقييمي (من 100)</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#d4af37]">تقييمي (من 100)</label>
             <Input
               value={formData.userRating}
               onChange={(e) => setFormData(prev => ({ ...prev, userRating: e.target.value }))}
@@ -1482,24 +1498,24 @@ export default function ArchivePage() {
               type="number"
               min="0"
               max="100"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
             />
           </div>
 
           {/* Tags */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">الوسوم (مفصولة بفاصلة)</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#d4af37]">الوسوم (مفصولة بفاصلة)</label>
             <Input
               value={formData.tags}
               onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
               placeholder="وسم1، وسم2"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37]"
+              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
             />
           </div>
 
           {/* Notes */}
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-[#d4af37]">ملاحظات</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#d4af37]">ملاحظات</label>
             <Textarea
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
@@ -1509,30 +1525,30 @@ export default function ArchivePage() {
           </div>
 
           {/* Toggles */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, favorite: prev.favorite === 'true' ? 'false' : 'true' }))}
-              className="flex items-center gap-2 text-sm"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.favorite === 'true' ? 'bg-red-500/10 text-red-400' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
             >
-              <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'text-red-400 fill-red-400' : 'text-[#666]'}`} />
-              <span className={formData.favorite === 'true' ? 'text-red-400' : 'text-[#666]'}>مفضل</span>
+              <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'fill-red-400' : ''}`} />
+              <span>مفضل</span>
             </button>
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
-              className="flex items-center gap-2 text-sm"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.watched === 'true' ? 'bg-green-500/10 text-green-400' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
             >
-              <Eye className={`w-4 h-4 ${formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}`} />
-              <span className={formData.watched === 'true' ? 'text-green-400' : 'text-[#666]'}>تمت المشاهدة</span>
+              <Eye className="w-4 h-4" />
+              <span>تمت المشاهدة</span>
             </button>
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, rewatch: prev.rewatch === 'true' ? 'false' : 'true' }))}
-              className="flex items-center gap-2 text-sm"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.rewatch === 'true' ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
             >
-              <ArrowRight className={`w-4 h-4 ${formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}`} />
-              <span className={formData.rewatch === 'true' ? 'text-[#d4af37]' : 'text-[#666]'}>إعادة مشاهدة</span>
+              <ArrowRight className="w-4 h-4" />
+              <span>إعادة مشاهدة</span>
             </button>
           </div>
         </>
@@ -1543,7 +1559,7 @@ export default function ArchivePage() {
       <Button
         onClick={isEdit ? updateItem : createItem}
         disabled={formSubmitting}
-        className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base"
+        className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base rounded-xl"
       >
         {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : isEdit ? 'حفظ التعديلات' : 'إضافة'}
       </Button>
@@ -2021,21 +2037,23 @@ export default function ArchivePage() {
     title,
     children,
     footerContent,
+    wide = false,
   }: {
     open: boolean
     onOpenChange: (open: boolean) => void
     title: string
     children: React.ReactNode
     footerContent?: React.ReactNode
+    wide?: boolean
   }) => {
     if (isMobile) {
       return (
         <Drawer open={open} onOpenChange={onOpenChange}>
-          <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh]">
-            <DrawerHeader className="border-b border-[#2a2a2a]">
-              <DrawerTitle className="text-[#d4af37] font-bold">{title}</DrawerTitle>
+          <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92vh]">
+            <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
+              <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
             </DrawerHeader>
-            <div className="overflow-y-auto p-4" style={{ maxHeight: 'calc(85vh - 120px)' }}>
+            <div className="overflow-y-auto px-4 py-3" style={{ maxHeight: 'calc(92vh - 100px)' }}>
               {children}
             </div>
             {footerContent && (
@@ -2049,9 +2067,9 @@ export default function ArchivePage() {
     }
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-[#0f0f0f] border-[#2a2a2a] max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-y-auto ${wide ? 'max-w-2xl' : 'max-w-lg'}`}>
           <DialogHeader>
-            <DialogTitle className="text-[#d4af37] font-bold">{title}</DialogTitle>
+            <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
           </DialogHeader>
           {children}
         </DialogContent>
@@ -2587,6 +2605,7 @@ export default function ArchivePage() {
         open={showAddForm}
         onOpenChange={setShowAddForm}
         title="إضافة عمل جديد"
+        wide
       >
         {formContent(false)}
       </ResponsiveModal>
@@ -2596,6 +2615,7 @@ export default function ArchivePage() {
         open={showEditForm}
         onOpenChange={setShowEditForm}
         title="تعديل العمل"
+        wide
       >
         {formContent(true)}
       </ResponsiveModal>
