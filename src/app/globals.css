@@ -195,6 +195,8 @@ html {
     background: white !important;
     color: black !important;
     font-family: Tahoma, Arial, sans-serif !important;
+    font-size: 11pt !important;
+    direction: rtl !important;
   }
 
   .no-print {
@@ -213,6 +215,59 @@ html {
   #print-container {
     display: block !important;
     position: static !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Table styling for print */
+  #print-container table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #print-container thead tr {
+    border-bottom: 2px solid #d4af37 !important;
+  }
+
+  #print-container th {
+    color: #333 !important;
+    font-weight: bold !important;
+    padding: 6pt 4pt !important;
+    text-align: right !important;
+    font-size: 9pt !important;
+  }
+
+  #print-container td {
+    color: #222 !important;
+    padding: 4pt 4pt !important;
+    border-bottom: 1px solid #ddd !important;
+    font-size: 9pt !important;
+  }
+
+  #print-container tr:nth-child(even) td {
+    background: #f9f9f9 !important;
+  }
+
+  /* Rating bar for print */
+  #print-container .h-1\\.5 {
+    height: 4pt !important;
+  }
+
+  /* Hide dark backgrounds in print */
+  #print-container .bg-\\[\\#111\\],
+  #print-container .bg-\\[\\#1a1a1a\\],
+  #print-container .bg-\\[\\#2a2a2a\\] {
+    background: transparent !important;
+  }
+
+  /* Print header */
+  .print-only h1 {
+    color: #d4af37 !important;
+    font-size: 18pt !important;
+  }
+
+  .print-only p {
+    color: #666 !important;
   }
 }
 

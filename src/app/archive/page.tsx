@@ -86,8 +86,6 @@ interface StatsData {
 }
 
 // ==================== Constants ====================
-const APP_PASSWORD = '204871'
-
 const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
@@ -214,10 +212,9 @@ interface MediaCardProps {
   onToggleFavorite: () => void
   onToggleWatched: () => void
   viewMode: 'grid' | 'list'
-  hidePoster?: boolean
 }
 
-const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode, hidePoster }: MediaCardProps) {
+const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode }: MediaCardProps) {
   const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
   const TypeIcon = typeConf.icon
 
@@ -228,7 +225,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         onClick={onClick}
       >
         <div className="w-12 h-16 rounded-lg overflow-hidden bg-[#2a2a2a] shrink-0">
-          {item.poster && !hidePoster ? (
+          {item.poster ? (
             <img src={item.poster} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -253,82 +250,6 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
           {item.favorite && <Heart className="w-4 h-4 text-red-400 fill-red-400" />}
           {item.watched && <Eye className="w-4 h-4 text-green-400" />}
-        </div>
-      </div>
-    )
-  }
-
-  // Grid view with hidePoster (ratings tab)
-  if (hidePoster) {
-    return (
-      <div
-        className="group relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden active:scale-[0.97] transition-transform cursor-pointer hover:border-[#3a3a3a]"
-        onClick={onClick}
-      >
-        <div className="aspect-[2/3] relative flex flex-col items-center justify-center bg-gradient-to-b from-[#1a1a1a] to-[#111]">
-          {/* Type icon */}
-          <div className={`w-14 h-14 rounded-2xl ${typeConf.bgColor} flex items-center justify-center mb-3`}>
-            <TypeIcon className="w-7 h-7 text-[#d4af37]" />
-          </div>
-          {/* Rating prominently displayed */}
-          {item.userRating != null ? (
-            <div className={`text-4xl font-black ${getRatingColor(item.userRating)} mb-1`}>
-              {formatRating(item.userRating)}
-            </div>
-          ) : item.rating ? (
-            <div className="text-2xl font-bold text-[#d4af37] mb-1">⭐ {item.rating}</div>
-          ) : null}
-          {/* Type badge */}
-          <div className={`px-3 py-1 rounded-md text-xs font-bold bg-gradient-to-l ${typeConf.color} text-black mt-1`}>
-            {typeConf.label}
-          </div>
-          {/* Badges */}
-          <div className="absolute top-2 right-2 flex flex-col gap-1">
-            {item.favorite && (
-              <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-              </div>
-            )}
-            {item.watched && (
-              <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                <Eye className="w-3.5 h-3.5 text-green-400" />
-              </div>
-            )}
-          </div>
-          {/* Quick actions on hover (desktop) */}
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={onQuickRate}
-              className="w-10 h-10 rounded-full bg-[#d4af37] text-black flex items-center justify-center hover:scale-110 transition-transform"
-              title="تقييم"
-            >
-              <Star className="w-5 h-5" />
-            </button>
-            <button
-              onClick={onToggleFavorite}
-              className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-              title={item.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
-            >
-              <Heart className={`w-5 h-5 ${item.favorite ? 'text-red-400 fill-red-400' : ''}`} />
-            </button>
-            <button
-              onClick={onToggleWatched}
-              className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-              title={item.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
-            >
-              {item.watched ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-        {/* Info */}
-        <div className="p-2.5">
-          <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-[#888]">{item.year}</span>
-            {item.genres && item.genres.length > 0 && (
-              <span className="text-[10px] text-[#666] truncate max-w-[80px]">{item.genres[0]}</span>
-            )}
-          </div>
         </div>
       </div>
     )
@@ -425,8 +346,7 @@ export default function ArchivePage() {
   const isMobile = useIsMobile()
 
   // Auth
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
+  const [isAuthChecked, setIsAuthChecked] = useState(false)
 
   // Main tabs
   const [mainTab, setMainTab] = useState<'watchlist' | 'ratings' | 'stats'>('watchlist')
@@ -510,31 +430,14 @@ export default function ArchivePage() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   // ==================== Auth ====================
-  const [isAuthChecked, setIsAuthChecked] = useState(false)
   useEffect(() => {
     const auth = localStorage.getItem('hussamvision_auth')
-    if (auth === 'true') {
-      // Use callback form to avoid cascading render warning
-      setIsAuthenticated(() => true)
+    if (auth !== 'true') {
+      window.location.href = '/'
+      return
     }
     setIsAuthChecked(true)
   }, [])
-
-  const handleLogin = () => {
-    if (passwordInput === APP_PASSWORD) {
-      setIsAuthenticated(true)
-      localStorage.setItem('hussamvision_auth', 'true')
-      toast.success('مرحباً بك!')
-    } else {
-      toast.error('كلمة المرور غير صحيحة')
-    }
-  }
-
-  const handleLogout = () => {
-    setIsAuthenticated(false)
-    localStorage.removeItem('hussamvision_auth')
-    setPasswordInput('')
-  }
 
   // ==================== Debounced Search ====================
   useEffect(() => {
@@ -621,30 +524,30 @@ export default function ArchivePage() {
 
   // ==================== Effects ====================
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthChecked) return
     setWlPage(1)
     fetchWatchlist(1, true)
-  }, [isAuthenticated, wlType, debouncedSearch, fetchWatchlist])
+  }, [isAuthChecked, wlType, debouncedSearch, fetchWatchlist])
 
   // Fetch all available years from database
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthChecked) return
     fetch('/api/years')
       .then(r => r.json())
       .then(data => { if (data.years) setDbYears(data.years) })
       .catch(() => {})
-  }, [isAuthenticated])
+  }, [isAuthChecked])
 
   useEffect(() => {
-    if (!isAuthenticated || mainTab !== 'ratings') return
+    if (!isAuthChecked || mainTab !== 'ratings') return
     setRtPage(1)
     fetchRatings(1, true)
-  }, [isAuthenticated, mainTab, rtType, debouncedSearch, fetchRatings])
+  }, [isAuthChecked, mainTab, rtType, debouncedSearch, fetchRatings])
 
   useEffect(() => {
-    if (!isAuthenticated || mainTab !== 'stats') return
+    if (!isAuthChecked || mainTab !== 'stats') return
     fetchStats()
-  }, [isAuthenticated, mainTab, fetchStats])
+  }, [isAuthChecked, mainTab, fetchStats])
 
   // ==================== Infinite Scroll ====================
   useEffect(() => {
@@ -1148,38 +1051,11 @@ export default function ArchivePage() {
     return Array.from(years).sort().reverse()
   }, [dbYears, wlItems, rtItems])
 
-  // ==================== Login Screen ====================
-  if (!isAuthenticated) {
+  // ==================== Auth Loading ====================
+  if (!isAuthChecked) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0a0a] text-white flex items-center justify-center safe-top safe-bottom" dir="rtl">
-        <div className="w-full max-w-sm px-6">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto mb-4">
-              <Bookmark className="w-10 h-10 text-black" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">
-              <span className="bg-gradient-to-l from-[#d4af37] to-[#e6c65a] bg-clip-text text-transparent">Hussam</span>
-              <span className="bg-gradient-to-l from-[#c9a227] to-[#b8960f] bg-clip-text text-transparent">Vision</span>
-            </h1>
-            <p className="text-[#888]">أدخل كلمة المرور للدخول</p>
-          </div>
-          <div className="space-y-4">
-            <Input
-              type="password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              placeholder="كلمة المرور"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-14 text-center text-lg rounded-xl"
-            />
-            <Button
-              onClick={handleLogin}
-              className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-14 rounded-xl text-lg active:scale-[0.97] transition-transform"
-            >
-              دخول
-            </Button>
-          </div>
-        </div>
+      <div className="min-h-[100dvh] bg-[#0a0a0a] flex items-center justify-center" dir="rtl">
+        <Loader2 className="w-8 h-8 text-[#d4af37] animate-spin" />
       </div>
     )
   }
@@ -1923,43 +1799,43 @@ export default function ArchivePage() {
 
   // ==================== Print Preview Overlay ====================
   const printPreviewOverlay = showPrintPreview && (
-    <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col no-print" dir="rtl">
-      {/* Header */}
-      <div className="shrink-0 bg-[#0a0a0a] border-b border-[#2a2a2a] p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg sm:text-xl font-bold text-[#d4af37]">
-            <Printer className="w-5 h-5 inline ml-2" />
-            معاينة الطباعة
-          </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowPrintPreview(false)}
-            className="text-[#888]"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-
-        {/* Action Buttons - always visible on mobile */}
-        <div className="flex items-center gap-2 mb-3">
-          <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9">
-            <Printer className="w-4 h-4 ml-1" />
-            طباعة
-          </Button>
-          <Button onClick={handleShare} variant="outline" className="border-[#2a2a2a] text-[#ccc] h-9">
-            <Share2 className="w-4 h-4 ml-1" />
-            مشاركة
-          </Button>
-          <div className="text-sm text-[#888]">
-            {filteredPrintItems.length} عمل
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a]/98 backdrop-blur-sm flex flex-col no-print" dir="rtl">
+      {/* Compact Header */}
+      <div className="shrink-0 bg-[#0a0a0a] border-b border-[#2a2a2a] px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center">
+              <Printer className="w-4 h-4 text-black" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">معاينة الطباعة</h2>
+              <p className="text-xs text-[#666]">{filteredPrintItems.length} عمل</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-4 text-sm font-bold">
+              <Printer className="w-3.5 h-3.5 ml-1.5" />
+              طباعة
+            </Button>
+            <Button onClick={handleShare} variant="outline" size="sm" className="border-[#2a2a2a] text-[#ccc] h-9 px-3 text-sm">
+              <Share2 className="w-3.5 h-3.5 ml-1" />
+              مشاركة
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowPrintPreview(false)}
+              className="text-[#888] h-9 w-9 p-0"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2">
+        {/* Filters Row */}
+        <div className="flex flex-wrap gap-2 mt-3">
           <Select value={printType} onValueChange={setPrintType}>
-            <SelectTrigger className="w-28 bg-[#1a1a1a] border-[#2a2a2a] text-sm">
+            <SelectTrigger className="w-24 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
@@ -1970,7 +1846,7 @@ export default function ArchivePage() {
             </SelectContent>
           </Select>
           <Select value={printSortBy} onValueChange={setPrintSortBy}>
-            <SelectTrigger className="w-36 bg-[#1a1a1a] border-[#2a2a2a] text-sm">
+            <SelectTrigger className="w-32 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
@@ -1983,73 +1859,129 @@ export default function ArchivePage() {
             value={printGenreFilter}
             onChange={(e) => setPrintGenreFilter(e.target.value)}
             placeholder="التصنيف"
-            className="w-24 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            className="w-20 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
           />
           <Input
             value={printYearFilter}
             onChange={(e) => setPrintYearFilter(e.target.value)}
             placeholder="السنة"
-            className="w-20 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
           />
           <Input
             value={printRatingMin}
             onChange={(e) => setPrintRatingMin(e.target.value)}
             placeholder="من"
-            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            className="w-14 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
             type="number"
           />
           <Input
             value={printRatingMax}
             onChange={(e) => setPrintRatingMax(e.target.value)}
             placeholder="إلى"
-            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-sm"
+            className="w-14 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
             type="number"
           />
+          {(printType !== 'all' || printGenreFilter || printYearFilter || printRatingMin || printRatingMax) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setPrintType('all'); setPrintGenreFilter(''); setPrintYearFilter(''); setPrintRatingMin(''); setPrintRatingMax('') }}
+              className="text-red-400 text-xs h-8 px-2"
+            >
+              <X className="w-3 h-3 ml-1" />
+              مسح
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Scrollable content */}
+      {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
+        <div id="print-container" className="p-4 sm:p-6 max-w-4xl mx-auto">
+          {/* Print Header - only visible when printing */}
+          <div className="print-only text-center mb-8">
+            <h1 className="text-3xl font-black mb-1">
+              <span className="text-[#d4af37]">Hussam</span><span className="text-[#b8960f]">Vision</span>
+            </h1>
+            <p className="text-sm text-gray-500 mb-4">تقييماتي - {new Date().toLocaleDateString('ar-SA')}</p>
+            <div className="w-24 h-0.5 bg-[#d4af37] mx-auto" />
+          </div>
 
-      {/* Print Table */}
-      <div id="print-container" className="p-4">
-        <div className="print-only text-center mb-6">
-          <h1 className="text-2xl font-bold">تقييماتي - HussamVision</h1>
-          <p className="text-sm text-gray-500">{new Date().toLocaleDateString('ar-SA')}</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#2a2a2a]">
-                <th className="text-right py-2 px-2 text-[#888] font-normal">#</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">العنوان</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">النوع</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">السنة</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">التصنيفات</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">التقييم</th>
-                <th className="text-right py-2 px-2 text-[#888] font-normal">الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPrintItems.map((item, idx) => (
-                <tr key={item.id} className="border-b border-[#1a1a1a]">
-                  <td className="py-2 px-2 text-[#666]">{idx + 1}</td>
-                  <td className="py-2 px-2 font-bold text-white">{item.title}</td>
-                  <td className="py-2 px-2 text-[#888]">{(TYPE_CONFIG[item.type] || TYPE_CONFIG.movie).label}</td>
-                  <td className="py-2 px-2 text-[#888]">{item.year}</td>
-                  <td className="py-2 px-2 text-[#888]">{(item.genres || []).slice(0, 3).join(' • ')}</td>
-                  <td className="py-2 px-2">
-                    {item.userRating != null ? (
-                      <span className={`font-bold ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
-                    ) : '-'}
-                  </td>
-                  <td className="py-2 px-2 text-[#888]">{RATING_STATUSES.find(s => s.value === item.ratingStatus)?.label || item.ratingStatus}</td>
+          {/* Screen-only summary bar */}
+          <div className="no-print flex items-center gap-3 mb-4">
+            {/* Stats pills */}
+            {(() => {
+              const movies = filteredPrintItems.filter(i => i.type === 'movie').length
+              const series = filteredPrintItems.filter(i => i.type === 'series').length
+              const anime = filteredPrintItems.filter(i => i.type === 'anime').length
+              const avgRating = filteredPrintItems.length > 0
+                ? (filteredPrintItems.reduce((sum, i) => sum + (i.userRating ?? 0), 0) / filteredPrintItems.filter(i => i.userRating != null).length).toFixed(1)
+                : '0'
+              return (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-1 rounded-lg bg-[#d4af37]/10 text-[#d4af37] text-xs font-bold">{movies} فيلم</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-[#e6c65a]/10 text-[#e6c65a] text-xs font-bold">{series} مسلسل</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-[#c9a227]/10 text-[#c9a227] text-xs font-bold">{anime} أنمي</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-green-500/10 text-green-400 text-xs font-bold">متوسط {avgRating}</span>
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* Print Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b-2 border-[#d4af37]/30">
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-8">#</th>
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs">العنوان</th>
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-16">النوع</th>
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-12">السنة</th>
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-20">التصنيفات</th>
+                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-16">التقييم</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredPrintItems.map((item, idx) => {
+                  const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
+                  return (
+                    <tr key={item.id} className={`border-b border-[#1a1a1a] ${idx % 2 === 0 ? 'bg-[#111]' : 'bg-transparent'}`}>
+                      <td className="py-2 px-2 text-[#555] text-xs font-mono">{idx + 1}</td>
+                      <td className="py-2 px-2 font-bold text-white text-sm">{item.title}</td>
+                      <td className="py-2 px-2">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-l ${typeConf.color} text-black`}>
+                          {typeConf.label}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-[#888] text-xs">{item.year}</td>
+                      <td className="py-2 px-2 text-[#666] text-xs">{(item.genres || []).slice(0, 2).join(' • ')}</td>
+                      <td className="py-2 px-2">
+                        {item.userRating != null ? (
+                          <div className="flex items-center gap-1">
+                            <div className="w-12 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${getRatingBarColor(item.userRating)}`}
+                                style={{ width: `${item.userRating}%` }}
+                              />
+                            </div>
+                            <span className={`text-xs font-bold ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[#444]">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Print Footer */}
+          <div className="print-only text-center mt-8 pt-4 border-t border-gray-300">
+            <p className="text-xs text-gray-400">HussamVision - {new Date().toLocaleDateString('ar-SA')}</p>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   )
@@ -2144,7 +2076,10 @@ export default function ArchivePage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleLogout}
+                onClick={() => {
+                  localStorage.removeItem('hussamvision_auth')
+                  window.location.href = '/'
+                }}
                 className="text-[#888] hover:text-red-400 h-9 px-2 text-xs"
               >
                 خروج
@@ -2436,14 +2371,6 @@ export default function ArchivePage() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
-                >
-                  {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-                </Button>
               </div>
             </div>
 
@@ -2497,9 +2424,13 @@ export default function ArchivePage() {
               </div>
             )}
 
-            {/* Items */}
+            {/* Items - Always list view for ratings, no posters */}
             {rtLoading && rtItems.length === 0 ? (
-              <SkeletonGrid count={6} />
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-xl skeleton-shimmer" />
+                ))}
+              </div>
             ) : processedRtItems.length === 0 ? (
               <div className="text-center py-16">
                 <Trophy className="w-12 h-12 text-[#333] mx-auto mb-4" />
@@ -2508,37 +2439,54 @@ export default function ArchivePage() {
               </div>
             ) : (
               <>
-                {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
-                    {processedRtItems.map(item => (
-                      <MediaCard
+                <div className="space-y-1.5">
+                  {processedRtItems.map((item, idx) => {
+                    const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
+                    const TypeIcon = typeConf.icon
+                    return (
+                      <div
                         key={item.id}
-                        item={item}
+                        className="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 active:scale-[0.98] transition-transform cursor-pointer hover:border-[#3a3a3a]"
                         onClick={() => openDetails(item)}
-                        onQuickRate={() => openQuickRate(item)}
-                        onToggleFavorite={() => toggleFavorite(item)}
-                        onToggleWatched={() => toggleWatched(item)}
-                        viewMode="grid"
-                        hidePoster={true}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {processedRtItems.map(item => (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
-                        onClick={() => openDetails(item)}
-                        onQuickRate={() => openQuickRate(item)}
-                        onToggleFavorite={() => toggleFavorite(item)}
-                        onToggleWatched={() => toggleWatched(item)}
-                        viewMode="list"
-                        hidePoster={true}
-                      />
-                    ))}
-                  </div>
-                )}
+                      >
+                        {/* Rank number */}
+                        <span className="text-xs text-[#555] font-mono w-6 text-center shrink-0">{idx + 1}</span>
+
+                        {/* Type icon */}
+                        <div className={`w-9 h-9 rounded-lg ${typeConf.bgColor} flex items-center justify-center shrink-0`}>
+                          <TypeIcon className="w-4 h-4 text-[#d4af37]" />
+                        </div>
+
+                        {/* Title & info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-[#666]">{item.year}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-l ${typeConf.color} text-black`}>{typeConf.label}</span>
+                            {item.genres && item.genres.length > 0 && (
+                              <span className="text-[10px] text-[#555] truncate max-w-[100px]">{item.genres[0]}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rating */}
+                        {item.userRating != null ? (
+                          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border shrink-0 ${getRatingBg(item.userRating)}`}>
+                            <span className={`font-black text-base ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[#555] shrink-0">-</span>
+                        )}
+
+                        {/* Badges */}
+                        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                          {item.favorite && <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />}
+                          {item.watched && <Eye className="w-3.5 h-3.5 text-green-400" />}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
                 <div ref={loadMoreRef} className="h-4" />
                 {rtLoading && rtItems.length > 0 && (
                   <div className="flex justify-center py-4">
