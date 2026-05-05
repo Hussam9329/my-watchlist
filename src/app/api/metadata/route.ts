@@ -75,23 +75,61 @@ export async function POST(request: NextRequest) {
     }
 
     const tmdbType = type === 'movie' ? 'movie' : 'tv'
-    const response = await fetch(
-      `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=2dca580c2a14b55200e784d157207b4d`,
-      { cache: 'no-store' }
-    )
-    const data = await response.json()
+    const TMDB_API_KEY = '2dca580c2a14b55200e784d157207b4d'
 
-    if (data.results && data.results.length > 0) {
-      const results = data.results.slice(0, 5).map((result: any) => ({
-        title: result.title || result.name,
-        originalTitle: result.original_title || result.original_name,
-        year: (result.release_date || result.first_air_date || '').split('-')[0],
-        poster: result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null,
-        overview: result.overview || 'لا يوجد وصف',
-        rating: result.vote_average ? result.vote_average.toFixed(1) : null,
-        type: type,
-        genres: []
-      }))
+    // Search in both English and Arabic in parallel
+    const [enResponse, arResponse] = await Promise.all([
+      fetch(
+        `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
+        { cache: 'no-store' }
+      ),
+      fetch(
+        `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
+        { cache: 'no-store' }
+      )
+    ])
+
+    const enData = await enResponse.json()
+    const arData = await arResponse.json()
+
+    // Create a map of Arabic results by TMDB ID for poster/title lookup
+    const arResultsMap = new Map<number, any>(
+      (arData.results || []).map((r: any) => [r.id, r])
+    )
+
+    if (enData.results && enData.results.length > 0) {
+      const results = enData.results.slice(0, 5).map((result: any) => {
+        const arResult = arResultsMap.get(result.id)
+        const isArabic = result.original_language === 'ar'
+
+        // For Arabic original films: use Arabic title + Arabic poster
+        // For non-Arabic films: use English title + English poster
+        // Overview: always Arabic for UI consistency (from Arabic search results)
+        const displayTitle = isArabic
+          ? (result.original_title || result.original_name)
+          : (result.title || result.name)
+
+        const displayOriginalTitle = isArabic
+          ? (result.title || result.name) // English transliteration for Arabic films
+          : (result.original_title || result.original_name) // Original language title
+
+        const displayPoster = (isArabic && arResult?.poster_path)
+          ? `https://image.tmdb.org/t/p/w500${arResult.poster_path}`
+          : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
+
+        const displayOverview = arResult?.overview || result.overview || 'لا يوجد وصف'
+
+        return {
+          title: displayTitle,
+          originalTitle: displayOriginalTitle,
+          year: (result.release_date || result.first_air_date || '').split('-')[0],
+          poster: displayPoster,
+          overview: displayOverview,
+          rating: result.vote_average ? result.vote_average.toFixed(1) : null,
+          type: type,
+          genres: []
+        }
+      })
       return NextResponse.json({ results })
     }
 
