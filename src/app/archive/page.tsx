@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Search, Loader2,
   Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
-  BarChart3, CalendarDays, Bookmark, Heart, Settings, Trash2, Cloud, CloudOff,
+  BarChart3, CalendarDays, Bookmark, Settings, Trash2, Cloud, CloudOff,
   ArrowRight, Dice5, Printer, Trophy, SlidersHorizontal, Share2, FileText
 } from 'lucide-react'
 
@@ -38,7 +38,6 @@ interface MediaItem {
   pages?: number | null
   tags: string[]
   notes: string
-  favorite: boolean
   watched: boolean
   watchedAt?: string | null
   userRating?: number | null
@@ -183,7 +182,6 @@ function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
     pages: item.pages != null ? String(item.pages) : '',
     tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
     notes: item.notes || '',
-    favorite: item.favorite ? 'true' : 'false',
     watched: item.watched ? 'true' : 'false',
     watchedAt: item.watchedAt || '',
     userRating: item.userRating != null ? String(item.userRating) : '',
@@ -261,12 +259,12 @@ interface MediaCardProps {
   item: MediaItem
   onClick: () => void
   onQuickRate: () => void
-  onToggleFavorite: () => void
+  onDelete: () => void
   onToggleWatched: () => void
   viewMode: 'grid' | 'list'
 }
 
-const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onToggleFavorite, onToggleWatched, viewMode }: MediaCardProps) {
+const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onDelete, onToggleWatched, viewMode }: MediaCardProps) {
   const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
   const TypeIcon = typeConf.icon
 
@@ -300,7 +298,6 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-          {item.favorite && <Heart className="w-4 h-4 text-red-400 fill-red-400" />}
           {item.watched && <Eye className="w-4 h-4 text-green-400" />}
         </div>
       </div>
@@ -324,11 +321,6 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         )}
         {/* Badges overlay */}
         <div className="absolute top-2 right-2 flex flex-col gap-1">
-          {item.favorite && (
-            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-              <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-            </div>
-          )}
           {item.watched && (
             <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
               <Eye className="w-3.5 h-3.5 text-green-400" />
@@ -364,11 +356,11 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
             <Star className="w-5 h-5" />
           </button>
           <button
-            onClick={onToggleFavorite}
-            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-            title={item.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            title="حذف"
           >
-            <Heart className={`w-5 h-5 ${item.favorite ? 'text-red-400 fill-red-400' : ''}`} />
+            <Trash2 className="w-5 h-5" />
           </button>
           <button
             onClick={onToggleWatched}
@@ -459,7 +451,7 @@ export default function ArchivePage() {
   const [formData, setFormData] = useState<Record<string, string>>({
     title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
     overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
-    author: '', pages: '', tags: '', notes: '', favorite: 'false', watched: 'false',
+    author: '', pages: '', tags: '', notes: '', watched: 'false',
     watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
   })
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -652,7 +644,6 @@ export default function ArchivePage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        favorite: formData.favorite === 'true',
         watched: formData.watched === 'true',
         watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
@@ -734,7 +725,6 @@ export default function ArchivePage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        favorite: formData.favorite === 'true',
         watched: formData.watched === 'true',
         watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
@@ -794,23 +784,6 @@ export default function ArchivePage() {
       fetchRatings(1, true)
     } catch {
       toast.error('خطأ في التقييم')
-    }
-  }
-
-  const toggleFavorite = async (item: MediaItem) => {
-    try {
-      const res = await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ favorite: !item.favorite }),
-      })
-      if (!res.ok) throw new Error('خطأ')
-      const updated = await res.json()
-      setWlItems(prev => prev.map(i => i.id === item.id ? { ...i, favorite: !i.favorite } : i))
-      setRtItems(prev => prev.map(i => i.id === item.id ? { ...i, favorite: !i.favorite } : i))
-      if (selectedItem?.id === item.id) setSelectedItem(updated)
-    } catch {
-      toast.error('خطأ في التحديث')
     }
   }
 
@@ -911,7 +884,7 @@ export default function ArchivePage() {
     setFormData({
       title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
       overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
-      author: '', pages: '', tags: '', notes: '', favorite: 'false', watched: 'false',
+      author: '', pages: '', tags: '', notes: '', watched: 'false',
       watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
     })
     setMetaResults([])
@@ -1032,7 +1005,6 @@ export default function ArchivePage() {
             pages: item.pages || null,
             tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
             notes: item.notes || '',
-            favorite: item.favorite || false,
             watched: item.watched || false,
             watchedAt: item.watchedAt || null,
             userRating: item.userRating != null ? item.userRating : null,
@@ -1184,7 +1156,6 @@ export default function ArchivePage() {
             <Badge className={`bg-gradient-to-l ${(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).color} text-black text-xs`}>
               {(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).label}
             </Badge>
-            {selectedItem.favorite && <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><Heart className="w-3 h-3 ml-1 fill-red-400" />مفضل</Badge>}
             {selectedItem.watched && <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><Eye className="w-3 h-3 ml-1" />تمت المشاهدة</Badge>}
           </div>
           {selectedItem.rating && (
@@ -1270,15 +1241,6 @@ export default function ArchivePage() {
         >
           <Star className="w-4 h-4 ml-1" />
           {selectedItem.userRating != null ? 'تعديل التقييم' : 'تقييم'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => toggleFavorite(selectedItem)}
-          className={`border-[#2a2a2a] ${selectedItem.favorite ? 'text-red-400' : 'text-[#888]'}`}
-        >
-          <Heart className={`w-4 h-4 ml-1 ${selectedItem.favorite ? 'fill-red-400' : ''}`} />
-          {selectedItem.favorite ? 'إزالة من المفضلة' : 'مفضلة'}
         </Button>
         <Button
           size="sm"
@@ -1608,14 +1570,6 @@ export default function ArchivePage() {
 
           {/* Toggles */}
           <div className="flex flex-wrap items-center gap-3 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, favorite: prev.favorite === 'true' ? 'false' : 'true' }))}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.favorite === 'true' ? 'bg-red-500/10 text-red-400' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
-            >
-              <Heart className={`w-4 h-4 ${formData.favorite === 'true' ? 'fill-red-400' : ''}`} />
-              <span>مفضل</span>
-            </button>
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
@@ -2356,7 +2310,7 @@ export default function ArchivePage() {
                         item={item}
                         onClick={() => openDetails(item)}
                         onQuickRate={() => openQuickRate(item)}
-                        onToggleFavorite={() => toggleFavorite(item)}
+                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
                         onToggleWatched={() => toggleWatched(item)}
                         viewMode="grid"
                       />
@@ -2370,7 +2324,7 @@ export default function ArchivePage() {
                         item={item}
                         onClick={() => openDetails(item)}
                         onQuickRate={() => openQuickRate(item)}
-                        onToggleFavorite={() => toggleFavorite(item)}
+                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
                         onToggleWatched={() => toggleWatched(item)}
                         viewMode="list"
                       />
@@ -2575,7 +2529,6 @@ export default function ArchivePage() {
 
                         {/* Badges */}
                         <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                          {item.favorite && <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />}
                           {item.watched && <Eye className="w-3.5 h-3.5 text-green-400" />}
                         </div>
                       </div>

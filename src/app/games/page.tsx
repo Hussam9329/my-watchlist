@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import {
   Plus, Star, Check, X, Eye, EyeOff, Search, Loader2, Edit3, Grid3X3, List,
   Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark,
-  Heart, Settings, Trash2, Cloud, CloudOff, ArrowRight, Gamepad2, Monitor, Smartphone
+  Settings, Trash2, Cloud, CloudOff, ArrowRight, Gamepad2, Monitor, Smartphone
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -37,7 +37,6 @@ interface MediaItem {
   pages?: number | null
   tags: string[] | string
   notes: string
-  favorite: boolean
   watched: boolean
   watchedAt?: string | null
   userRating?: number | null
@@ -86,7 +85,6 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'الكل' },
   { value: 'unplayed', label: 'لم ألعبها' },
   { value: 'played', label: 'لعبتها' },
-  { value: 'favorite', label: 'المفضلة' },
 ]
 
 const PLATFORM_OPTIONS = [
@@ -226,13 +224,13 @@ function RatingStars({ rating, onChange, size = 'sm' }: { rating: number | null;
 interface GameCardProps {
   item: MediaItem
   onClick: () => void
-  onToggleFavorite: () => void
+  onDelete: () => void
   onTogglePlayed: () => void
   onQuickRate: () => void
   viewMode: 'grid' | 'list'
 }
 
-const GameCard = React.memo(function GameCard({ item, onClick, onToggleFavorite, onTogglePlayed, onQuickRate, viewMode }: GameCardProps) {
+const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onTogglePlayed, onQuickRate, viewMode }: GameCardProps) {
   const platformBadge = getPlatformBadge(item)
   const genres = normalizeGenres(item.genres)
 
@@ -264,7 +262,6 @@ const GameCard = React.memo(function GameCard({ item, onClick, onToggleFavorite,
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-          {item.favorite && <Heart className="w-4 h-4 text-red-400 fill-red-400" />}
           {item.watched && <Check className="w-4 h-4 text-teal-400" />}
         </div>
       </div>
@@ -287,11 +284,6 @@ const GameCard = React.memo(function GameCard({ item, onClick, onToggleFavorite,
         )}
         {/* Badges overlay */}
         <div className="absolute top-2 right-2 flex flex-col gap-1">
-          {item.favorite && (
-            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-              <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-            </div>
-          )}
           {item.watched && (
             <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
               <Check className="w-3.5 h-3.5 text-teal-400" />
@@ -335,11 +327,11 @@ const GameCard = React.memo(function GameCard({ item, onClick, onToggleFavorite,
             <Star className="w-5 h-5" />
           </button>
           <button
-            onClick={onToggleFavorite}
-            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-            title={item.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            title="حذف"
           >
-            <Heart className={`w-5 h-5 ${item.favorite ? 'text-red-400 fill-red-400' : ''}`} />
+            <Trash2 className="w-5 h-5" />
           </button>
           <button
             onClick={onTogglePlayed}
@@ -398,7 +390,7 @@ export default function GamesPage() {
   const [formData, setFormData] = useState<Record<string, string>>({
     title: '', originalTitle: '', year: '', type: 'game', poster: '', rating: '',
     overview: '', genres: '', author: '', tags: '', notes: '',
-    favorite: 'false', watched: 'false', watchedAt: '', userRating: '',
+    watched: 'false', watchedAt: '', userRating: '',
     rewatch: 'false', ratingStatus: 'watched',
   })
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -478,7 +470,6 @@ export default function GamesPage() {
         author: formData.author || null,
         tags: formData.tags,
         notes: formData.notes,
-        favorite: formData.favorite === 'true',
         watched: formData.watched === 'true',
         watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
@@ -525,7 +516,6 @@ export default function GamesPage() {
         author: formData.author || null,
         tags: formData.tags,
         notes: formData.notes,
-        favorite: formData.favorite === 'true',
         watched: formData.watched === 'true',
         watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
@@ -562,23 +552,6 @@ export default function GamesPage() {
       fetchGames()
     } catch {
       toast.error('خطأ في الحذف')
-    }
-  }
-
-  const toggleFavorite = async (item: MediaItem) => {
-    try {
-      const res = await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ favorite: !item.favorite }),
-      })
-      if (!res.ok) throw new Error('خطأ')
-      const updated = await res.json()
-      setGames(prev => prev.map(i => i.id === item.id ? { ...i, favorite: !i.favorite } : i))
-      if (selectedItem?.id === item.id) setSelectedItem(updated)
-      toast.success(!item.favorite ? 'تمت الإضافة للمفضلة' : 'تمت الإزالة من المفضلة')
-    } catch {
-      toast.error('خطأ في التحديث')
     }
   }
 
@@ -673,7 +646,7 @@ export default function GamesPage() {
     setFormData({
       title: '', originalTitle: '', year: '', type: 'game', poster: '', rating: '',
       overview: '', genres: '', author: '', tags: '', notes: '',
-      favorite: 'false', watched: 'false', watchedAt: '', userRating: '',
+      watched: 'false', watchedAt: '', userRating: '',
       rewatch: 'false', ratingStatus: 'watched',
     })
     setMetaResults([])
@@ -700,7 +673,6 @@ export default function GamesPage() {
       author: item.author || '',
       tags: itemTags.join(', '),
       notes: item.notes || '',
-      favorite: item.favorite ? 'true' : 'false',
       watched: item.watched ? 'true' : 'false',
       watchedAt: item.watchedAt || '',
       userRating: item.userRating != null ? String(item.userRating) : '',
@@ -757,7 +729,6 @@ export default function GamesPage() {
       // Status filter
       if (filterStatus === 'played' && !item.watched) return false
       if (filterStatus === 'unplayed' && item.watched) return false
-      if (filterStatus === 'favorite' && !item.favorite) return false
       return true
     })
   }, [activeTab, filterGenre, filterYear, filterStatus])
@@ -796,7 +767,6 @@ export default function GamesPage() {
     const total = games.length
     const played = games.filter(g => g.watched).length
     const unplayed = total - played
-    const favorites = games.filter(g => g.favorite).length
     const rated = games.filter(g => g.userRating != null)
     const avgRating = rated.length > 0 ? (rated.reduce((sum, g) => sum + (g.userRating ?? 0), 0) / rated.length) : 0
     const topGenre = allGenres.length > 0 ? allGenres[0] : '-'
@@ -807,7 +777,7 @@ export default function GamesPage() {
       const p = g.author || 'غير محدد'
       platformCounts[p] = (platformCounts[p] || 0) + 1
     })
-    return { total, played, unplayed, favorites, avgRating, topGenre, topRated, platformCounts }
+    return { total, played, unplayed, avgRating, topGenre, topRated, platformCounts }
   }, [games, allGenres])
 
   // ==================== Export/Import ====================
@@ -855,7 +825,6 @@ export default function GamesPage() {
             author: item.author || null,
             tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
             notes: item.notes || '',
-            favorite: item.favorite || false,
             watched: item.watched || false,
             watchedAt: item.watchedAt || null,
             userRating: item.userRating != null ? item.userRating : null,
@@ -1119,15 +1088,6 @@ export default function GamesPage() {
           <label className="flex items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform">
             <input
               type="checkbox"
-              checked={formData.favorite === 'true'}
-              onChange={e => setFormData(prev => ({ ...prev, favorite: e.target.checked ? 'true' : 'false' }))}
-              className="accent-teal-500 w-4 h-4"
-            />
-            <span className="text-sm text-[#ccc]">المفضلة</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform">
-            <input
-              type="checkbox"
               checked={formData.watched === 'true'}
               onChange={e => setFormData(prev => ({ ...prev, watched: e.target.checked ? 'true' : 'false' }))}
               className="accent-teal-500 w-4 h-4"
@@ -1187,7 +1147,6 @@ export default function GamesPage() {
               {selectedItem.year && <Badge className="bg-teal-500/20 text-teal-400 border-teal-500/30 text-xs">{selectedItem.year}</Badge>}
               {platformBadge && <Badge className={`bg-gradient-to-l ${platformBadge.color} text-white text-xs border-0`}>{platformBadge.label}</Badge>}
               {selectedItem.watched && <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">✓ لعبتها</Badge>}
-              {selectedItem.favorite && <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">♥ مفضلة</Badge>}
             </div>
             {selectedItem.rating && (
               <div className="mt-2 text-sm text-[#aaa]">التقييم العام: <span className="text-teal-400 font-bold">{selectedItem.rating}</span></div>
@@ -1252,14 +1211,6 @@ export default function GamesPage() {
           >
             <Edit3 className="w-4 h-4 ml-1" />
             تعديل
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => toggleFavorite(selectedItem)}
-            className={`border-[#333] text-sm ${selectedItem.favorite ? 'text-red-400 border-red-400/30' : 'text-[#999]'}`}
-          >
-            <Heart className={`w-4 h-4 ml-1 ${selectedItem.favorite ? 'fill-red-400' : ''}`} />
-            {selectedItem.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}
           </Button>
           <Button
             variant="outline"
@@ -1335,10 +1286,6 @@ export default function GamesPage() {
           <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-3 text-center">
             <div className="text-2xl font-bold text-yellow-400">{stats.unplayed}</div>
             <div className="text-xs text-[#888]">لم ألعبها</div>
-          </div>
-          <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-red-400">{stats.favorites}</div>
-            <div className="text-xs text-[#888]">المفضلة</div>
           </div>
         </div>
 
@@ -1631,7 +1578,7 @@ export default function GamesPage() {
             <Gamepad2 className="w-16 h-16 text-[#333] mx-auto mb-4" />
             <h3 className="text-xl font-bold text-[#666]">لا توجد ألعاب</h3>
             <p className="text-sm text-[#555] mt-1">
-              {debouncedSearch ? 'لم يتم العثور على نتائج' : 'أضف ألعابك المفضلة للعبها لاحقاً'}
+              {debouncedSearch ? 'لم يتم العثور على نتائج' : 'أضف ألعابك للعبها لاحقاً'}
             </p>
             {!debouncedSearch && (
               <Button
@@ -1653,7 +1600,7 @@ export default function GamesPage() {
                 key={item.id}
                 item={item}
                 onClick={() => openDetails(item)}
-                onToggleFavorite={() => toggleFavorite(item)}
+                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
                 onTogglePlayed={() => togglePlayed(item)}
                 onQuickRate={() => openQuickRate(item)}
                 viewMode={viewMode}

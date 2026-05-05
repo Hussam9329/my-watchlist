@@ -25,7 +25,6 @@ model MediaItem {
   pages          Int?
   tags           String   @default("")
   notes          String   @default("")
-  favorite       Boolean  @default(false)
   watched        Boolean  @default(false)
   watchedAt      String?
   userRating     Float?

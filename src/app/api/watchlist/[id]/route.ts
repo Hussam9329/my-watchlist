@@ -50,7 +50,6 @@ export async function PUT(
         pages: body.pages ? parseInt(body.pages) : null,
         tags: Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || ''),
         notes: body.notes,
-        favorite: body.favorite,
         watched: body.watched,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
         userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
