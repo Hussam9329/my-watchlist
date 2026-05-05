@@ -15,7 +15,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, BookOpen, Star, Check, X, Search, Loader2, Edit3, Grid3X3, List,
-  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark,
+  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3,
   Settings, Trash2, ArrowRight
 } from 'lucide-react'
 import { MediaItem, MetadataResult } from '@/lib/types'

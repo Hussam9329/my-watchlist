@@ -15,8 +15,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, Star, X, Search, Loader2, Edit3, Grid3X3, List,
-  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays,
-  Settings, Trash2, ArrowRight, Gamepad2, Monitor, Smartphone
+  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3,
+  Trash2, ArrowRight, Gamepad2, Monitor, Smartphone
 } from 'lucide-react'
 import { MediaItem, MetadataResult } from '@/lib/types'
 import { normalizeGenres, normalizeTags } from '@/lib/format'
