@@ -165,6 +165,10 @@ export default function GamesPage() {
   // Data
   const [games, setGames] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalGames, setTotalGames] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // UI
   const [activeTab, setActiveTab] = useState('all')
@@ -205,29 +209,74 @@ export default function GamesPage() {
   // Refs
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const observerCallbackRef = useRef<(() => void) | null>(null)
 
   // ==================== Fetch Games ====================
-  const fetchGames = useCallback(async () => {
-    setLoading(true)
+  const fetchGames = useCallback(async (pageNum: number = 1, reset = false) => {
+    if (pageNum === 1) {
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
       const params = new URLSearchParams()
       params.set('type', 'game')
-      params.set('limit', '100')
+      params.set('limit', '20')
+      params.set('page', String(pageNum))
       if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
-      setGames(data.items || [])
+      if (reset || pageNum === 1) {
+        setGames(data.items || [])
+      } else {
+        setGames(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
+          return [...prev, ...newItems]
+        })
+      }
+      setTotalGames(data.total || 0)
+      setHasMore(data.hasMore || false)
     } catch {
       toast.error('خطأ في جلب البيانات')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [debouncedSearch])
 
   useEffect(() => {
     if (!isAuthChecked) return
-    fetchGames()
+    setPage(1)
+    fetchGames(1, true)
   }, [isAuthChecked, fetchGames])
+
+  // ==================== Infinite Scroll ====================
+  observerCallbackRef.current = () => {
+    if (hasMore && !loadingMore && !loading) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchGames(nextPage)
+    }
+  }
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect()
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && observerCallbackRef.current) {
+          observerCallbackRef.current()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
+    return () => { if (observerRef.current) observerRef.current.disconnect() }
+  }, [])
 
   // ==================== CRUD ====================
   const createItem = async () => {
@@ -277,7 +326,7 @@ export default function GamesPage() {
       setShowEditForm(false)
       setShowDetails(false)
       setSelectedItem(null)
-      fetchGames()
+      fetchGames(1, true)
     } catch {
       toast.error('خطأ في التحديث')
     } finally {
@@ -294,7 +343,7 @@ export default function GamesPage() {
       setShowDeleteConfirm(false)
       setShowDetails(false)
       setSelectedItem(null)
-      fetchGames()
+      fetchGames(1, true)
     } catch {
       toast.error('خطأ في الحذف')
     }
@@ -452,7 +501,8 @@ export default function GamesPage() {
     try {
       const { imported, duplicates } = await importDataFromFile(file, 'game')
       toast.success(`تم استيراد ${imported} لعبة (${duplicates} مكرر)`)
-      fetchGames()
+      fetchGames(1, true)
+      setPage(1)
     } catch {
       toast.error('خطأ في استيراد الملف')
     }
@@ -1006,7 +1056,7 @@ export default function GamesPage() {
                 <h1 className="text-lg font-bold text-white truncate">
                   🎮 أريد لعبها
                 </h1>
-                <p className="text-xs text-[#666]">{TAB_CONFIG[activeTab]?.plural} • {processedItems.length} لعبة</p>
+                <p className="text-xs text-[#666]">{TAB_CONFIG[activeTab]?.plural} • {totalGames} لعبة</p>
               </div>
             </div>
 
@@ -1192,6 +1242,20 @@ export default function GamesPage() {
                 viewMode={viewMode}
               />
             ))}
+          </div>
+        )}
+
+        {/* Infinite scroll trigger */}
+        {!loading && hasMore && (
+          <div ref={loadMoreRef} className="flex justify-center py-8">
+            {loadingMore && <Loader2 className="w-6 h-6 animate-spin text-teal-400" />}
+          </div>
+        )}
+
+        {/* Results count */}
+        {!loading && processedItems.length > 0 && (
+          <div className="text-center text-xs text-[#555] mt-4">
+            عرض {processedItems.length} من {totalGames} لعبة
           </div>
         )}
       </main>

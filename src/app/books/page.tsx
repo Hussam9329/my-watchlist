@@ -145,6 +145,10 @@ export default function BooksPage() {
   // Data
   const [books, setBooks] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalBooks, setTotalBooks] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // UI
   const [searchQuery, setSearchQuery] = useState('')
@@ -184,29 +188,74 @@ export default function BooksPage() {
   // Refs
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const observerCallbackRef = useRef<(() => void) | null>(null)
 
   // ==================== Fetch Books ====================
-  const fetchBooks = useCallback(async () => {
-    setLoading(true)
+  const fetchBooks = useCallback(async (pageNum: number = 1, reset = false) => {
+    if (pageNum === 1) {
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
       const params = new URLSearchParams()
       params.set('type', 'book')
-      params.set('limit', '100')
+      params.set('limit', '20')
+      params.set('page', String(pageNum))
       if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
-      setBooks(data.items || [])
+      if (reset || pageNum === 1) {
+        setBooks(data.items || [])
+      } else {
+        setBooks(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
+          return [...prev, ...newItems]
+        })
+      }
+      setTotalBooks(data.total || 0)
+      setHasMore(data.hasMore || false)
     } catch {
       toast.error('خطأ في جلب البيانات')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [debouncedSearch])
 
   useEffect(() => {
     if (!isAuthChecked) return
-    fetchBooks()
+    setPage(1)
+    fetchBooks(1, true)
   }, [isAuthChecked, fetchBooks])
+
+  // ==================== Infinite Scroll ====================
+  observerCallbackRef.current = () => {
+    if (hasMore && !loadingMore && !loading) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchBooks(nextPage)
+    }
+  }
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect()
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && observerCallbackRef.current) {
+          observerCallbackRef.current()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
+    return () => { if (observerRef.current) observerRef.current.disconnect() }
+  }, [])
 
   // ==================== CRUD ====================
   const createItem = async () => {
@@ -237,7 +286,7 @@ export default function BooksPage() {
       toast.success('تمت إضافة الكتاب بنجاح')
       setShowAddForm(false)
       resetForm()
-      fetchBooks()
+      fetchBooks(1, true)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة')
     } finally {
@@ -260,7 +309,7 @@ export default function BooksPage() {
       setShowEditForm(false)
       setShowDetails(false)
       setSelectedItem(null)
-      fetchBooks()
+      fetchBooks(1, true)
     } catch {
       toast.error('خطأ في التحديث')
     } finally {
@@ -277,7 +326,7 @@ export default function BooksPage() {
       setShowDeleteConfirm(false)
       setShowDetails(false)
       setSelectedItem(null)
-      fetchBooks()
+      fetchBooks(1, true)
     } catch {
       toast.error('خطأ في الحذف')
     }
@@ -419,7 +468,7 @@ export default function BooksPage() {
     try {
       const { imported, duplicates } = await importDataFromFile(file, 'book')
       toast.success(`تم استيراد ${imported} كتاب (${duplicates} مكرر)`)
-      fetchBooks()
+      fetchBooks(1, true)
     } catch {
       toast.error('خطأ في استيراد الملف')
     }
@@ -859,7 +908,7 @@ export default function BooksPage() {
                 <BookOpen className="w-5 h-5 text-emerald-400" />
                 أريد قرائته
               </h1>
-              <p className="text-xs text-[#666]">{books.length} كتاب</p>
+              <p className="text-xs text-[#666]">{totalBooks} كتاب</p>
             </div>
 
             {/* Actions */}
@@ -1053,10 +1102,17 @@ export default function BooksPage() {
           </div>
         )}
 
+        {/* Infinite scroll trigger */}
+        {!loading && hasMore && (
+          <div ref={loadMoreRef} className="flex justify-center py-8">
+            {loadingMore && <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />}
+          </div>
+        )}
+
         {/* Results count */}
         {!loading && processedItems.length > 0 && (
-          <div className="text-center text-xs text-[#555] mt-6">
-            عرض {processedItems.length} من {books.length} كتاب
+          <div className="text-center text-xs text-[#555] mt-4">
+            عرض {processedItems.length} من {totalBooks} كتاب
           </div>
         )}
       </main>
