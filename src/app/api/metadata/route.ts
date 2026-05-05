@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const TMDB_API_KEY = '2dca580c2a14b55200e784d157207b4d'
+
+/** Fetch English poster for a TMDB movie/tv ID when not available from search results */
+async function fetchEnglishPoster(tmdbId: number, tmdbType: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?language=en-US&api_key=${TMDB_API_KEY}`,
+      { cache: 'no-store' }
+    )
+    const data = await res.json()
+    return data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -74,8 +90,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
+    // ==================== Movies / TV / Anime ====================
     const tmdbType = type === 'movie' ? 'movie' : 'tv'
-    const TMDB_API_KEY = '2dca580c2a14b55200e784d157207b4d'
 
     // Search in both English and Arabic in parallel
     const [enResponse, arResponse] = await Promise.all([
@@ -92,30 +108,41 @@ export async function POST(request: NextRequest) {
     const enData = await enResponse.json()
     const arData = await arResponse.json()
 
-    // Create a map of Arabic results by TMDB ID for poster/title lookup
+    // Create maps by TMDB ID for cross-referencing
     const arResultsMap = new Map<number, any>(
       (arData.results || []).map((r: any) => [r.id, r])
     )
-
-    // Also create a map of English results by TMDB ID
     const enResultsMap = new Map<number, any>(
       (enData.results || []).map((r: any) => [r.id, r])
     )
 
-    // Use English results as primary, fall back to Arabic if English returns nothing
-    const primaryResults = (enData.results && enData.results.length > 0)
-      ? enData.results
-      : (arData.results || [])
+    // Merge results: use English results as primary, add Arabic-only results as fallback
+    const seenIds = new Set<number>()
+    const mergedResults: any[] = []
 
-    if (primaryResults.length > 0) {
-      const results = primaryResults.slice(0, 5).map((result: any) => {
+    // Add English results first (these are preferred for non-Arabic films)
+    for (const r of (enData.results || [])) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id)
+        mergedResults.push(r)
+      }
+    }
+
+    // Add Arabic-only results (found in Arabic search but not in English)
+    for (const r of (arData.results || [])) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id)
+        mergedResults.push(r)
+      }
+    }
+
+    if (mergedResults.length > 0) {
+      // Process results — for non-Arabic films, fetch English poster if not available
+      const resultsPromises = mergedResults.slice(0, 5).map(async (result: any) => {
         const arResult = arResultsMap.get(result.id)
         const enResult = enResultsMap.get(result.id)
         const isArabic = result.original_language === 'ar'
 
-        // Determine the English title for non-Arabic films
-        // If we're using Arabic results as primary (English returned nothing),
-        // we need to get the English title from enResult if available
         let displayTitle: string
         let displayOriginalTitle: string
         let displayPoster: string | null
@@ -130,13 +157,26 @@ export async function POST(request: NextRequest) {
             : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
           displayOverview = arResult?.overview || result.overview || enResult?.overview || 'لا يوجد وصف'
         } else {
-          // Non-Arabic film: English title, English poster
+          // Non-Arabic film: English title, English poster (ALWAYS)
           displayTitle = enResult?.title || enResult?.name || result.title || result.name
           displayOriginalTitle = result.original_title || result.original_name || enResult?.original_title || ''
-          displayPoster = enResult?.poster_path
-            ? `https://image.tmdb.org/t/p/w500${enResult.poster_path}`
-            : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
-          displayOverview = arResult?.overview || result.overview || 'لا يوجد وصف'
+
+          // Priority: English poster from enResult > English poster from direct TMDB fetch > fallback
+          if (enResult?.poster_path) {
+            // We have the English poster from search results
+            displayPoster = `https://image.tmdb.org/t/p/w500${enResult.poster_path}`
+          } else if (result.poster_path && enResult) {
+            // result is from English search, use its poster
+            displayPoster = `https://image.tmdb.org/t/p/w500${result.poster_path}`
+          } else if (result.id && !enResult) {
+            // Result found only in Arabic search — fetch English poster directly from TMDB
+            const fetchedPoster = await fetchEnglishPoster(result.id, tmdbType)
+            displayPoster = fetchedPoster || (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
+          } else {
+            displayPoster = result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null
+          }
+
+          displayOverview = arResult?.overview || enResult?.overview || result.overview || 'لا يوجد وصف'
         }
 
         return {
@@ -150,6 +190,8 @@ export async function POST(request: NextRequest) {
           genres: []
         }
       })
+
+      const results = await Promise.all(resultsPromises)
       return NextResponse.json({ results })
     }
 
