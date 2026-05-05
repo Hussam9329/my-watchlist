@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { TMDB_API_KEY, TMDB_BASE_URL, fetchEnglishPosterById } from '@/lib/tmdb'
+import { TMDB_API_KEY, TMDB_BASE_URL, fetchEnglishDetailsById } from '@/lib/tmdb'
 
 export async function POST(request: NextRequest) {
   try {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (mergedResults.length > 0) {
-      // Process results — for non-Arabic films, fetch English poster if not available
+      // Process results — for non-Arabic works, always ensure English display
       const resultsPromises = mergedResults.slice(0, 5).map(async (result: any) => {
         const arResult = arResultsMap.get(result.id)
         const enResult = enResultsMap.get(result.id)
@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
         let displayOriginalTitle: string
         let displayPoster: string | null
         let displayOverview: string
+        let displayYear: string
 
         if (isArabic) {
           // Arabic original film: Arabic title, Arabic poster
@@ -141,33 +142,48 @@ export async function POST(request: NextRequest) {
             ? `https://image.tmdb.org/t/p/w500${arResult.poster_path}`
             : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
           displayOverview = arResult?.overview || result.overview || enResult?.overview || 'لا يوجد وصف'
+          displayYear = (result.release_date || result.first_air_date || '').split('-')[0]
         } else {
-          // Non-Arabic film: English title, English poster (ALWAYS)
-          displayTitle = enResult?.title || enResult?.name || result.title || result.name
-          displayOriginalTitle = result.original_title || result.original_name || enResult?.original_title || ''
+          // Non-Arabic work (English, Asian, etc.): ALWAYS show English title & poster
+          // If we have the English search result, use it directly
+          // If not found in English search, fetch English details from TMDB by ID
 
-          // Priority: English poster from enResult > English poster from direct TMDB fetch > fallback
-          if (enResult?.poster_path) {
-            // We have the English poster from search results
-            displayPoster = `https://image.tmdb.org/t/p/w500${enResult.poster_path}`
-          } else if (result.poster_path && enResult) {
-            // result is from English search, use its poster
-            displayPoster = `https://image.tmdb.org/t/p/w500${result.poster_path}`
-          } else if (result.id && !enResult) {
-            // Result found only in Arabic search — fetch English poster directly from TMDB
-            const fetchedPoster = await fetchEnglishPosterById(result.id, tmdbType)
-            displayPoster = fetchedPoster || (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
-          } else {
-            displayPoster = result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null
+          let englishData = enResult // data from English search (may be null)
+
+          if (!englishData && result.id) {
+            // Result found only in Arabic search — fetch full English details from TMDB
+            englishData = await fetchEnglishDetailsById(result.id, tmdbType)
           }
 
-          displayOverview = arResult?.overview || enResult?.overview || result.overview || 'لا يوجد وصف'
+          // Title: English title (from en search or fetched), fallback to original title
+          displayTitle = englishData?.title || englishData?.name || result.title || result.name || ''
+          // Original title: the work's native title (Japanese, Korean, etc.)
+          displayOriginalTitle = englishData?.original_title || englishData?.original_name || result.original_title || result.original_name || ''
+          // If displayTitle and displayOriginalTitle are the same (English film), clear originalTitle
+          if (displayTitle === displayOriginalTitle) {
+            displayOriginalTitle = ''
+          }
+
+          // Poster: English poster
+          if (englishData?.poster_path) {
+            displayPoster = `https://image.tmdb.org/t/p/w500${englishData.poster_path}`
+          } else if (result.poster_path) {
+            displayPoster = `https://image.tmdb.org/t/p/w500${result.poster_path}`
+          } else {
+            displayPoster = null
+          }
+
+          // Overview: prefer Arabic overview for user, fallback to English
+          displayOverview = arResult?.overview || englishData?.overview || result.overview || 'لا يوجد وصف'
+
+          // Year: from English data or original result
+          displayYear = (englishData?.release_date || englishData?.first_air_date || result.release_date || result.first_air_date || '').split('-')[0]
         }
 
         return {
           title: displayTitle,
           originalTitle: displayOriginalTitle,
-          year: (result.release_date || result.first_air_date || enResult?.release_date || enResult?.first_air_date || '').split('-')[0],
+          year: displayYear,
           poster: displayPoster,
           overview: displayOverview,
           rating: result.vote_average ? result.vote_average.toFixed(1) : null,
