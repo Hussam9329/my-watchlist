@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-const TMDB_API_KEY = '2dca580c2a14b55200e784d157207b4d'
-
-/** Fetch English poster for a TMDB movie/tv ID when not available from search results */
-async function fetchEnglishPoster(tmdbId: number, tmdbType: string): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?language=en-US&api_key=${TMDB_API_KEY}`,
-      { cache: 'no-store' }
-    )
-    const data = await res.json()
-    return data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null
-  } catch {
-    return null
-  }
-}
+import { TMDB_API_KEY, TMDB_BASE_URL, fetchEnglishPosterById } from '@/lib/tmdb'
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,11 +81,11 @@ export async function POST(request: NextRequest) {
     // Search in both English and Arabic in parallel
     const [enResponse, arResponse] = await Promise.all([
       fetch(
-        `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
+        `${TMDB_BASE_URL}/search/${tmdbType}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
         { cache: 'no-store' }
       ),
       fetch(
-        `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
+        `${TMDB_BASE_URL}/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
         { cache: 'no-store' }
       )
     ])
@@ -170,7 +155,7 @@ export async function POST(request: NextRequest) {
             displayPoster = `https://image.tmdb.org/t/p/w500${result.poster_path}`
           } else if (result.id && !enResult) {
             // Result found only in Arabic search — fetch English poster directly from TMDB
-            const fetchedPoster = await fetchEnglishPoster(result.id, tmdbType)
+            const fetchedPoster = await fetchEnglishPosterById(result.id, tmdbType)
             displayPoster = fetchedPoster || (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
           } else {
             displayPoster = result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null

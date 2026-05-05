@@ -80,7 +80,7 @@ export async function exportDataToFile(type?: string, fileNamePrefix = 'hussamvi
 /** Import data from JSON file */
 export async function importDataFromFile(
   file: File,
-  itemType: string,
+  itemType?: string,
 ): Promise<{ imported: number; duplicates: number }> {
   const text = await file.text()
   const items = JSON.parse(text)
@@ -91,7 +91,8 @@ export async function importDataFromFile(
 
   for (const item of items) {
     try {
-      const body = buildImportBody(item, itemType)
+      const resolvedType = itemType || item.type || 'movie'
+      const body = buildImportBody(item, resolvedType)
       const res = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

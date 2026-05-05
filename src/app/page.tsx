@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Gamepad2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-const APP_PASSWORD = '204871'
+const APP_PASSWORD = process.env.NEXT_PUBLIC_APP_PASSWORD || '204871'
 
 export default function HussamVisionHome() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)

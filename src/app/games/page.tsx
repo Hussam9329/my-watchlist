@@ -23,7 +23,7 @@ import { normalizeGenres, normalizeTags } from '@/lib/format'
 import { compressImage } from '@/lib/image'
 import { getRatingColor, getRatingBg } from '@/lib/rating'
 import { SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
-import { buildItemBody, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, itemMatchesTab, getPlatformBadge } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { RatingStars } from '@/components/shared/RatingStars'
@@ -370,24 +370,7 @@ export default function GamesPage() {
   }
 
   const openEditForm = (item: MediaItem) => {
-    const itemGenres = normalizeGenres(item.genres)
-    const itemTags = normalizeTags(item.tags)
-    setFormData({
-      title: item.title || '',
-      originalTitle: item.originalTitle || '',
-      year: item.year || '',
-      type: 'game',
-      poster: item.poster || '',
-      rating: item.rating || '',
-      overview: item.overview || '',
-      genres: itemGenres.join(', '),
-      author: item.author || '',
-      tags: itemTags.join(', '),
-      notes: item.notes || '',
-      userRating: item.userRating != null ? String(item.userRating) : '',
-      rewatch: item.rewatch ? 'true' : 'false',
-      ratingStatus: item.ratingStatus || 'watched',
-    })
+    setFormData(itemToFormData(item))
     setSelectedItem(item)
     setShowEditForm(true)
   }
@@ -1152,7 +1135,7 @@ export default function GamesPage() {
                     variant="outline"
                     size="sm"
                     className="w-full border-[#333] text-[#999] hover:text-white text-xs"
-                    onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterStatus('all'); setShowFilters(false) }}
+                    onClick={() => { setFilterGenre(''); setFilterYear(''); setShowFilters(false) }}
                   >
                     مسح الفلاتر
                   </Button>

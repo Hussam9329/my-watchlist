@@ -3,83 +3,119 @@ import { prisma } from '@/lib/db'
 
 export async function GET() {
   try {
-    const ratedItems = await prisma.mediaItem.findMany({
-      where: {
-        type: { in: ['movie', 'series', 'anime'] },
-        userRating: { not: null }
-      },
-      select: {
-        title: true,
-        type: true,
-        genres: true,
-        year: true,
-        userRating: true,
-        ratingStatus: true,
-        runtime: true,
-        addedAt: true,
-      }
-    })
+    // Use SQL aggregation instead of fetching all items into memory
 
-    const totalRated = ratedItems.length
+    // 1. Main stats: totals, averages, counts by type, max rating, this month count
+    const mainStats = await prisma.$queryRaw<Array<{
+      total_rated: bigint
+      avg_rating: number | null
+      movie_count: bigint
+      series_count: bigint
+      anime_count: bigint
+      avg_movie_rating: number | null
+      avg_series_rating: number | null
+      avg_anime_rating: number | null
+      max_rating: number | null
+      this_month: bigint
+    }>>`
+      SELECT
+        COUNT(*) as total_rated,
+        AVG("userRating") as avg_rating,
+        COUNT(*) FILTER (WHERE "type" = 'movie') as movie_count,
+        COUNT(*) FILTER (WHERE "type" = 'series') as series_count,
+        COUNT(*) FILTER (WHERE "type" = 'anime') as anime_count,
+        AVG("userRating") FILTER (WHERE "type" = 'movie') as avg_movie_rating,
+        AVG("userRating") FILTER (WHERE "type" = 'series') as avg_series_rating,
+        AVG("userRating") FILTER (WHERE "type" = 'anime') as avg_anime_rating,
+        MAX("userRating") as max_rating,
+        COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM "addedAt") = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM "addedAt") = EXTRACT(MONTH FROM NOW())) as this_month
+      FROM "MediaItem"
+      WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL
+    `
 
-    const genreMap: Record<string, number> = {}
-    ratedItems.forEach(item => {
-      if (item.genres) {
-        item.genres.split(',').map(g => g.trim()).filter(Boolean).forEach(g => {
-          genreMap[g] = (genreMap[g] || 0) + 1
-        })
-      }
-    })
-    const topGenre = Object.keys(genreMap).sort((a, b) => genreMap[b] - genreMap[a])[0] || '-'
+    const stats = mainStats[0]
 
-    const ratings = ratedItems.map(x => x.userRating!).filter(x => x !== null && x !== undefined)
-    const avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
+    // 2. Top genre (most common genre from comma-separated genres field)
+    const topGenreResult = await prisma.$queryRaw<Array<{ genre: string; count: bigint }>>`
+      SELECT trim(unnest(string_to_array("genres", ','))) as genre, COUNT(*) as count
+      FROM "MediaItem"
+      WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL AND "genres" != ''
+      GROUP BY genre
+      ORDER BY count DESC
+      LIMIT 1
+    `
+    const topGenre = topGenreResult.length > 0 && topGenreResult[0].genre ? topGenreResult[0].genre : '-'
 
-    const yearMap: Record<string, number> = {}
-    ratedItems.forEach(item => {
-      if (item.year) yearMap[item.year] = (yearMap[item.year] || 0) + 1
-    })
-    const topYear = Object.keys(yearMap).sort((a, b) => yearMap[b] - yearMap[a])[0] || '-'
+    // 3. Genre count (number of distinct genres)
+    const genreCountResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT genre) as count
+      FROM (
+        SELECT trim(unnest(string_to_array("genres", ','))) as genre
+        FROM "MediaItem"
+        WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL AND "genres" != ''
+      ) sub
+      WHERE genre != ''
+    `
+    const genreCount = Number(genreCountResult[0]?.count || 0)
 
-    const now = new Date()
-    const thisMonth = ratedItems.filter(item => {
-      const d = new Date(item.addedAt)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-    }).length
+    // 4. Top year
+    const topYearResult = await prisma.$queryRaw<Array<{ year: string; count: bigint }>>`
+      SELECT "year", COUNT(*) as count
+      FROM "MediaItem"
+      WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL AND "year" IS NOT NULL AND "year" != ''
+      GROUP BY "year"
+      ORDER BY count DESC
+      LIMIT 1
+    `
+    const topYear = topYearResult.length > 0 ? topYearResult[0].year : '-'
 
-    const movies = ratedItems.filter(i => i.type === 'movie')
-    const series = ratedItems.filter(i => i.type === 'series')
-    const anime = ratedItems.filter(i => i.type === 'anime')
+    // 5. Top decade
+    const topDecadeResult = await prisma.$queryRaw<Array<{ decade: string; count: bigint }>>`
+      SELECT (FLOOR(CAST("year" AS NUMERIC) / 10) * 10)::TEXT || 's' as decade, COUNT(*) as count
+      FROM "MediaItem"
+      WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL
+        AND "year" ~ '^[0-9]+$' AND CAST("year" AS INTEGER) >= 1930
+      GROUP BY decade
+      ORDER BY count DESC
+      LIMIT 1
+    `
+    const topDecade = topDecadeResult.length > 0 ? topDecadeResult[0].decade : '-'
 
-    const decadeMap: Record<string, number> = {}
-    ratedItems.forEach(item => {
-      const y = Number(item.year)
-      if (Number.isInteger(y) && y >= 1930) {
-        const decade = Math.floor(y / 10) * 10 + 's'
-        decadeMap[decade] = (decadeMap[decade] || 0) + 1
-      }
-    })
-    const topDecade = Object.keys(decadeMap).sort((a, b) => decadeMap[b] - decadeMap[a])[0] || '-'
+    // 6. Max rating title
+    const maxRating = stats?.max_rating ? Math.round(Number(stats.max_rating) * 100) / 100 : 0
+    const maxRatingTitleResult = await prisma.$queryRaw<Array<{ title: string }>>`
+      SELECT "title" FROM "MediaItem"
+      WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL
+      ORDER BY "userRating" DESC, "addedAt" ASC
+      LIMIT 1
+    `
+    const maxRatingTitle = maxRatingTitleResult.length > 0 ? maxRatingTitleResult[0].title : '-'
 
-    const maxRating = ratings.length ? Math.max(...ratings) : 0
-    const topRatedItem = ratedItems.find(x => x.userRating === maxRating)
-    const maxRatingTitle = topRatedItem?.title || '-'
+    const totalRated = Number(stats?.total_rated || 0)
+    const avgRating = stats?.avg_rating ? Math.round(Number(stats.avg_rating) * 100) / 100 : 0
+    const thisMonth = Number(stats?.this_month || 0)
+    const movieCount = Number(stats?.movie_count || 0)
+    const seriesCount = Number(stats?.series_count || 0)
+    const animeCount = Number(stats?.anime_count || 0)
+    const avgMovieRating = stats?.avg_movie_rating ? Math.round(Number(stats.avg_movie_rating) * 100) / 100 : 0
+    const avgSeriesRating = stats?.avg_series_rating ? Math.round(Number(stats.avg_series_rating) * 100) / 100 : 0
+    const avgAnimeRating = stats?.avg_anime_rating ? Math.round(Number(stats.avg_anime_rating) * 100) / 100 : 0
 
     return NextResponse.json({
       totalRated,
       topGenre,
-      avgRating: Math.round(avgRating * 100) / 100,
+      avgRating,
       topYear,
       topDecade,
       thisMonth,
-      movieCount: movies.length,
-      seriesCount: series.length,
-      animeCount: anime.length,
-      avgMovieRating: Math.round((movies.length ? movies.reduce((a, m) => a + (m.userRating || 0), 0) / movies.length : 0) * 100) / 100,
-      avgSeriesRating: Math.round((series.length ? series.reduce((a, s) => a + (s.userRating || 0), 0) / series.length : 0) * 100) / 100,
-      avgAnimeRating: Math.round((anime.length ? anime.reduce((a, s) => a + (s.userRating || 0), 0) / anime.length : 0) * 100) / 100,
-      genreCount: Object.keys(genreMap).length,
-      maxRating: Math.round(maxRating * 100) / 100,
+      movieCount,
+      seriesCount,
+      animeCount,
+      avgMovieRating,
+      avgSeriesRating,
+      avgAnimeRating,
+      genreCount,
+      maxRating,
       maxRatingTitle,
     })
   } catch (error) {

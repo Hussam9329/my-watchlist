@@ -1,30 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-
-const TMDB_API_KEY = '2dca580c2a14b55200e784d157207b4d'
+import { fetchEnglishPosterByTitle } from '@/lib/tmdb'
 
 /** Detect if text contains Arabic characters */
 function hasArabicChars(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text)
-}
-
-/** Fetch English poster for a TMDB movie/tv by title */
-async function fetchEnglishPosterFromTMDB(title: string, type: string): Promise<string | null> {
-  const tmdbType = type === 'tv' || type === 'anime' || type === 'series' ? 'tv' : 'movie'
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/search/${tmdbType}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
-      { cache: 'no-store' }
-    )
-    const data = await res.json()
-    if (data.results && data.results.length > 0) {
-      const match = data.results[0]
-      return match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : null
-    }
-    return null
-  } catch {
-    return null
-  }
 }
 
 /**
@@ -76,7 +56,7 @@ export async function POST(request: NextRequest) {
       // Non-Arabic film — try to get English poster
       // Use originalTitle for better TMDB matching (it's usually in English/original language)
       const searchTitle = item.originalTitle || item.title
-      const newPoster = await fetchEnglishPosterFromTMDB(searchTitle, item.type)
+      const newPoster = await fetchEnglishPosterByTitle(searchTitle, item.type)
 
       if (newPoster && newPoster !== item.poster) {
         changes.push({

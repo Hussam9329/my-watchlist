@@ -79,7 +79,20 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const updateData: any = { ...body }
+    const ALLOWED_FIELDS = new Set([
+      'title', 'originalTitle', 'type', 'year', 'poster', 'genres',
+      'overview', 'userRating', 'notes', 'status', 'addedAt',
+      'tmdbId', 'imdbId', 'seasonCount', 'episodeCount',
+      'rating', 'episodes', 'seasons', 'duration', 'author',
+      'pages', 'tags', 'watched', 'watchedAt', 'rewatch',
+      'runtime', 'ratingStatus'
+    ])
+    const updateData: Record<string, any> = {}
+    for (const [key, value] of Object.entries(body)) {
+      if (ALLOWED_FIELDS.has(key)) {
+        updateData[key] = value
+      }
+    }
     if (body.watchedAt) updateData.watchedAt = String(body.watchedAt)
     if (body.genres !== undefined) {
       updateData.genres = Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || '')

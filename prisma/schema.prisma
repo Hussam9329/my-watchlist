@@ -33,4 +33,13 @@ model MediaItem {
   ratingStatus   String   @default("watched")
   addedAt        DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([type])
+  @@index([userRating])
+  @@index([year])
+  @@index([addedAt])
+  @@index([title])
+  @@index([originalTitle])
+  @@index([type, userRating])
+  @@index([type, addedAt])
 }

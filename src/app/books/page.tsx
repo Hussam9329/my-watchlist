@@ -22,7 +22,7 @@ import { MediaItem, MetadataResult } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { getRatingColor, getRatingBg } from '@/lib/rating'
 import { SORT_OPTIONS } from '@/lib/constants'
-import { buildItemBody, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, filterMediaItems } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { RatingStars } from '@/components/shared/RatingStars'
@@ -354,23 +354,7 @@ export default function BooksPage() {
   }
 
   const openEditForm = (item: MediaItem) => {
-    setFormData({
-      title: item.title || '',
-      originalTitle: item.originalTitle || '',
-      year: item.year || '',
-      type: 'book',
-      poster: item.poster || '',
-      rating: item.rating || '',
-      overview: item.overview || '',
-      genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
-      author: item.author || '',
-      pages: item.pages != null ? String(item.pages) : '',
-      tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
-      notes: item.notes || '',
-      userRating: item.userRating != null ? String(item.userRating) : '',
-      rewatch: item.rewatch ? 'true' : 'false',
-      ratingStatus: item.ratingStatus || 'watched',
-    })
+    setFormData(itemToFormData(item))
     setSelectedItem(item)
     setShowEditForm(true)
   }
@@ -393,7 +377,12 @@ export default function BooksPage() {
   // ==================== Unique genres/years for filters ====================
   const allGenres = useMemo(() => {
     const genreSet = new Set<string>()
-    books.forEach(b => (b.genres || []).forEach(g => { if (g.trim()) genreSet.add(g.trim()) }))
+    books.forEach(b => {
+      const genreList = typeof b.genres === 'string'
+        ? b.genres.split(',').map(g => g.trim()).filter(Boolean)
+        : Array.isArray(b.genres) ? b.genres : []
+      genreList.forEach(g => { if (g.trim()) genreSet.add(g.trim()) })
+    })
     return Array.from(genreSet).sort()
   }, [books])
 
@@ -725,9 +714,9 @@ export default function BooksPage() {
               </div>
             )}
             {/* Genres */}
-            {selectedItem.genres.length > 0 && (
+            {(Array.isArray(selectedItem.genres) ? selectedItem.genres : typeof selectedItem.genres === 'string' ? selectedItem.genres.split(',').map(g => g.trim()).filter(Boolean) : []).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {selectedItem.genres.map((g, i) => (
+                {(Array.isArray(selectedItem.genres) ? selectedItem.genres : typeof selectedItem.genres === 'string' ? selectedItem.genres.split(',').map(g => g.trim()).filter(Boolean) : []).map((g: string, i: number) => (
                   <Badge key={i} variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
                     {g}
                   </Badge>
@@ -746,11 +735,11 @@ export default function BooksPage() {
         )}
 
         {/* Tags */}
-        {selectedItem.tags.length > 0 && (
+        {selectedItem.tags && (Array.isArray(selectedItem.tags) ? selectedItem.tags : typeof selectedItem.tags === 'string' ? selectedItem.tags.split(',').map(t => t.trim()).filter(Boolean) : []).length > 0 && (
           <div>
             <h3 className="text-sm font-bold text-[#ccc] mb-1">الوسوم</h3>
             <div className="flex flex-wrap gap-1">
-              {selectedItem.tags.map((t, i) => (
+              {(Array.isArray(selectedItem.tags) ? selectedItem.tags : typeof selectedItem.tags === 'string' ? selectedItem.tags.split(',').map(t => t.trim()).filter(Boolean) : []).map((t: string, i: number) => (
                 <Badge key={i} variant="outline" className="text-[10px] border-[#444] text-[#aaa]">
                   {t}
                 </Badge>

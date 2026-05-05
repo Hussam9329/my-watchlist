@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { formatItem } from '@/lib/format'
 
+const ALLOWED_SORT_FIELDS = new Set([
+  'title', 'title_asc', 'title_desc',
+  'year', 'year_asc', 'year_desc',
+  'addedAt', 'addedAt_asc', 'addedAt_desc',
+  'userRating', 'userRating_asc', 'userRating_desc',
+  'originalTitle', 'originalTitle_asc', 'originalTitle_desc'
+])
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const search = searchParams.get('search')
     const hasRating = searchParams.get('hasRating')
-    const sortBy = searchParams.get('sortBy') || 'addedAt_desc'
+    let sortBy = searchParams.get('sortBy') || 'addedAt_desc'
     const filterGenre = searchParams.get('genre')
     const filterYear = searchParams.get('year')
     const filterRatingMin = searchParams.get('ratingMin')
@@ -46,6 +54,11 @@ export async function GET(request: NextRequest) {
       } else {
         where.userRating = { not: null, ...ratingFilter }
       }
+    }
+
+    // Validate sortBy against allowlist
+    if (!ALLOWED_SORT_FIELDS.has(sortBy)) {
+      sortBy = 'addedAt_desc'
     }
 
     // Parse sort - handle multi-underscore field names like userRating
@@ -163,9 +176,31 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const ALLOWED_TYPES = new Set(['movie', 'series', 'anime', 'book', 'game', 'tv'])
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+
+    // Basic input validation
+    if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
+      return NextResponse.json({ error: 'title must be a non-empty string' }, { status: 400 })
+    }
+    if (!body.type || typeof body.type !== 'string' || !ALLOWED_TYPES.has(body.type)) {
+      return NextResponse.json({ error: 'type must be one of: movie, series, anime, book, game, tv' }, { status: 400 })
+    }
+    if (body.year !== undefined && typeof body.year !== 'string') {
+      return NextResponse.json({ error: 'year must be a string' }, { status: 400 })
+    }
+    if (body.poster !== undefined && body.poster !== null && typeof body.poster !== 'string') {
+      return NextResponse.json({ error: 'poster must be a string or null' }, { status: 400 })
+    }
+    if (body.overview !== undefined && typeof body.overview !== 'string') {
+      return NextResponse.json({ error: 'overview must be a string' }, { status: 400 })
+    }
+    if (body.userRating !== undefined && body.userRating !== null && typeof body.userRating !== 'number') {
+      return NextResponse.json({ error: 'userRating must be a number or null' }, { status: 400 })
+    }
 
     // Check duplicates: same type + same year + (same title OR same originalTitle)
     const orConditions: any[] = [{ title: body.title }]

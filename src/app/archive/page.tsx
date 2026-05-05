@@ -24,7 +24,7 @@ import { MediaItem, MetadataResult, StatsData } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { formatRating, getRatingColor, getRatingBg } from '@/lib/rating'
 import { WL_SORT_OPTIONS, RT_SORT_OPTIONS, RATING_STATUSES } from '@/lib/constants'
-import { buildItemBody, itemToFormData, exportDataToFile, buildImportBody } from '@/lib/crud'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
@@ -238,6 +238,7 @@ export default function ArchivePage() {
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const observerCallbackRef = useRef<(() => void) | null>(null)
 
   // ==================== Fetch Watchlist ====================
   const fetchWatchlist = useCallback(async (page: number, reset = false) => {
@@ -357,21 +358,27 @@ export default function ArchivePage() {
   }, [isAuthChecked, mainTab, fetchStats])
 
   // ==================== Infinite Scroll ====================
+  // Keep the callback ref up to date with latest closure values
+  observerCallbackRef.current = () => {
+    if (mainTab === 'watchlist' && wlHasMore && !wlLoading) {
+      const nextPage = wlPage + 1
+      setWlPage(nextPage)
+      fetchWatchlist(nextPage)
+    } else if (mainTab === 'ratings' && rtHasMore && !rtLoading) {
+      const nextPage = rtPage + 1
+      setRtPage(nextPage)
+      fetchRatings(nextPage)
+    }
+  }
+
+  // Create observer once; re-observe when the target element changes (mainTab switch)
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect()
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          if (mainTab === 'watchlist' && wlHasMore && !wlLoading) {
-            const nextPage = wlPage + 1
-            setWlPage(nextPage)
-            fetchWatchlist(nextPage)
-          } else if (mainTab === 'ratings' && rtHasMore && !rtLoading) {
-            const nextPage = rtPage + 1
-            setRtPage(nextPage)
-            fetchRatings(nextPage)
-          }
+        if (entries[0].isIntersecting && observerCallbackRef.current) {
+          observerCallbackRef.current()
         }
       },
       { threshold: 0.1 }
@@ -379,7 +386,7 @@ export default function ArchivePage() {
 
     if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
     return () => { if (observerRef.current) observerRef.current.disconnect() }
-  }, [mainTab, wlHasMore, rtHasMore, wlLoading, rtLoading, wlPage, rtPage, fetchWatchlist, fetchRatings])
+  }, [mainTab])
 
   // ==================== CRUD Operations ====================
   const createItem = async () => {
@@ -430,13 +437,11 @@ export default function ArchivePage() {
       toast.success('تمت الإضافة بنجاح')
       setShowAddForm(false)
       resetForm()
-      // Refresh both lists and switch to the correct tab to show the new item
+      // Switch to the correct tab to show the new item, then refresh both lists
       if (resData.userRating != null) {
         setMainTab('ratings')
-        fetchRatings(1, true)
       } else {
         setMainTab('watchlist')
-        fetchWatchlist(1, true)
       }
       fetchRatings(1, true)
       fetchWatchlist(1, true)
@@ -631,25 +636,7 @@ export default function ArchivePage() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const text = await file.text()
-      const items = JSON.parse(text)
-      if (!Array.isArray(items)) throw new Error('Invalid format')
-      let imported = 0
-      let duplicates = 0
-      for (const item of items) {
-        try {
-          const body = buildImportBody(item, item.type || 'movie')
-          const res = await fetch('/api/watchlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-          if (res.ok) imported++
-          else duplicates++
-        } catch {
-          duplicates++
-        }
-      }
+      const { imported, duplicates } = await importDataFromFile(file)
       toast.success(`تم استيراد ${imported} عنصر (${duplicates} مكرر)`)
       fetchWatchlist(1, true)
       fetchRatings(1, true)
