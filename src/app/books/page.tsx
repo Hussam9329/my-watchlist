@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { toast } from 'sonner'
 import {
-  Plus, BookOpen, Star, Check, X, Eye, EyeOff, Search, Loader2, Edit3, Grid3X3, List,
+  Plus, BookOpen, Star, Check, X, Search, Loader2, Edit3, Grid3X3, List,
   Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark,
   Settings, Trash2, Cloud, CloudOff, ArrowRight
 } from 'lucide-react'
@@ -75,8 +75,6 @@ const SORT_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'الكل' },
-  { value: 'unread', label: 'لم يُقرأ' },
-  { value: 'read', label: 'مقروء' },
 ]
 
 // ==================== Helpers ====================
@@ -176,12 +174,11 @@ interface BookCardProps {
   item: MediaItem
   onClick: () => void
   onDelete: () => void
-  onToggleRead: () => void
   onQuickRate: () => void
   viewMode: 'grid' | 'list'
 }
 
-const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onToggleRead, onQuickRate, viewMode }: BookCardProps) {
+const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuickRate, viewMode }: BookCardProps) {
   if (viewMode === 'list') {
     return (
       <div
@@ -209,9 +206,7 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onToggl
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-          {item.watched && <Check className="w-4 h-4 text-emerald-400" />}
-        </div>
+
       </div>
     )
   }
@@ -230,14 +225,7 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onToggl
             <BookOpen className="w-10 h-10 text-[#444]" />
           </div>
         )}
-        {/* Badges overlay */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
-          {item.watched && (
-            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-          )}
-        </div>
+
         {/* Book badge */}
         <div className="absolute top-2 left-2">
           <div className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-l from-emerald-500 to-emerald-700 text-white">
@@ -273,13 +261,7 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onToggl
           >
             <Trash2 className="w-5 h-5" />
           </button>
-          <button
-            onClick={onToggleRead}
-            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-            title={item.watched ? 'إلغاء القراءة' : 'تمت القراءة'}
-          >
-            {item.watched ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
+
         </div>
       </div>
       {/* Info */}
@@ -329,7 +311,7 @@ export default function BooksPage() {
   const [formData, setFormData] = useState<Record<string, string>>({
     title: '', originalTitle: '', year: '', type: 'book', poster: '', rating: '',
     overview: '', genres: '', author: '', pages: '', tags: '', notes: '',
-    watched: 'false', watchedAt: '', userRating: '',
+    userRating: '',
     rewatch: 'false', ratingStatus: 'watched',
   })
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -410,8 +392,6 @@ export default function BooksPage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        watched: formData.watched === 'true',
-        watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
         rewatch: formData.rewatch === 'true',
         ratingStatus: formData.ratingStatus || 'watched',
@@ -457,8 +437,6 @@ export default function BooksPage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        watched: formData.watched === 'true',
-        watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
         rewatch: formData.rewatch === 'true',
         ratingStatus: formData.ratingStatus || 'watched',
@@ -493,23 +471,6 @@ export default function BooksPage() {
       fetchBooks()
     } catch {
       toast.error('خطأ في الحذف')
-    }
-  }
-
-  const toggleRead = async (item: MediaItem) => {
-    try {
-      const res = await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ watched: !item.watched, watchedAt: !item.watched ? new Date().toISOString().split('T')[0] : null }),
-      })
-      if (!res.ok) throw new Error('خطأ')
-      const updated = await res.json()
-      setBooks(prev => prev.map(i => i.id === item.id ? { ...i, watched: !i.watched, watchedAt: !i.watched ? new Date().toISOString().split('T')[0] : null } : i))
-      if (selectedItem?.id === item.id) setSelectedItem(updated)
-      toast.success(!item.watched ? 'تم تحديد كمقروء' : 'تم إلغاء تحديد القراءة')
-    } catch {
-      toast.error('خطأ في التحديث')
     }
   }
 
@@ -588,7 +549,7 @@ export default function BooksPage() {
     setFormData({
       title: '', originalTitle: '', year: '', type: 'book', poster: '', rating: '',
       overview: '', genres: '', author: '', pages: '', tags: '', notes: '',
-      watched: 'false', watchedAt: '', userRating: '',
+      userRating: '',
       rewatch: 'false', ratingStatus: 'watched',
     })
     setMetaResults([])
@@ -614,8 +575,6 @@ export default function BooksPage() {
       pages: item.pages != null ? String(item.pages) : '',
       tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
       notes: item.notes || '',
-      watched: item.watched ? 'true' : 'false',
-      watchedAt: item.watchedAt || '',
       userRating: item.userRating != null ? String(item.userRating) : '',
       rewatch: item.rewatch ? 'true' : 'false',
       ratingStatus: item.ratingStatus || 'watched',
@@ -663,11 +622,9 @@ export default function BooksPage() {
     return items.filter(item => {
       if (filterGenre && !(item.genres || []).some(g => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
       if (filterYear && item.year !== filterYear) return false
-      if (filterStatus === 'read' && !item.watched) return false
-      if (filterStatus === 'unread' && item.watched) return false
       return true
     })
-  }, [filterGenre, filterYear, filterStatus])
+  }, [filterGenre, filterYear])
 
   const processedItems = useMemo(() => {
     return filterItems(sortItems(books))
@@ -689,14 +646,12 @@ export default function BooksPage() {
   // ==================== Stats ====================
   const stats = useMemo(() => {
     const total = books.length
-    const read = books.filter(b => b.watched).length
-    const unread = total - read
     const rated = books.filter(b => b.userRating != null)
     const avgRating = rated.length > 0 ? (rated.reduce((sum, b) => sum + (b.userRating ?? 0), 0) / rated.length) : 0
     const totalPages = books.reduce((sum, b) => sum + (b.pages ?? 0), 0)
     const topGenre = allGenres.length > 0 ? allGenres[0] : '-'
     const topRated = rated.length > 0 ? rated.reduce((best, b) => (b.userRating ?? 0) > (best.userRating ?? 0) ? b : best, rated[0]) : null
-    return { total, read, unread, avgRating, totalPages, topGenre, topRated }
+    return { total, avgRating, totalPages, topGenre, topRated }
   }, [books, allGenres])
 
   // ==================== Export/Import ====================
@@ -745,8 +700,6 @@ export default function BooksPage() {
             pages: item.pages || null,
             tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
             notes: item.notes || '',
-            watched: item.watched || false,
-            watchedAt: item.watchedAt || null,
             userRating: item.userRating != null ? item.userRating : null,
             rewatch: item.rewatch || false,
             ratingStatus: item.ratingStatus || 'watched',
@@ -993,20 +946,6 @@ export default function BooksPage() {
             className="bg-[#111] border-[#333] text-white placeholder:text-[#555]"
           />
         </div>
-
-        {/* Checkboxes */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <label className="flex items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform">
-            <input
-              type="checkbox"
-              checked={formData.watched === 'true'}
-              onChange={e => setFormData(prev => ({ ...prev, watched: e.target.checked ? 'true' : 'false' }))}
-              className="accent-emerald-500"
-            />
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm text-[#ccc]">مقروء</span>
-          </label>
-        </div>
       </div>
     </div>
   )
@@ -1091,21 +1030,8 @@ export default function BooksPage() {
           </div>
         )}
 
-        {/* Read date */}
-        {selectedItem.watchedAt && (
-          <div className="text-xs text-[#666]">
-            تاريخ القراءة: {selectedItem.watchedAt}
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#2a2a2a]">
-          <Button
-            onClick={() => toggleRead(selectedItem)}
-            className={`flex-1 ${selectedItem.watched ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#333] hover:bg-[#444]'} text-white`}
-          >
-            {selectedItem.watched ? <><Check className="w-4 h-4 ml-1" /> مقروء</> : <><Eye className="w-4 h-4 ml-1" /> لم يُقرأ</>}
-          </Button>
           <Button
             onClick={() => { openQuickRate(selectedItem) }}
             variant="outline"
@@ -1139,14 +1065,6 @@ export default function BooksPage() {
         <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-4 text-center">
           <div className="text-2xl font-bold text-emerald-400">{stats.total}</div>
           <div className="text-xs text-[#888] mt-1">إجمالي الكتب</div>
-        </div>
-        <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-400">{stats.read}</div>
-          <div className="text-xs text-[#888] mt-1">مقروء</div>
-        </div>
-        <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-yellow-400">{stats.unread}</div>
-          <div className="text-xs text-[#888] mt-1">لم يُقرأ</div>
         </div>
         <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-4 text-center">
           <div className="text-2xl font-bold text-emerald-400">{stats.avgRating.toFixed(1)}</div>
@@ -1399,7 +1317,6 @@ export default function BooksPage() {
                 item={item}
                 onClick={() => openDetails(item)}
                 onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                onToggleRead={() => toggleRead(item)}
                 onQuickRate={() => openQuickRate(item)}
                 viewMode="grid"
               />
@@ -1413,7 +1330,6 @@ export default function BooksPage() {
                 item={item}
                 onClick={() => openDetails(item)}
                 onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                onToggleRead={() => toggleRead(item)}
                 onQuickRate={() => openQuickRate(item)}
                 viewMode="list"
               />

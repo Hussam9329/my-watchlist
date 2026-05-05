@@ -13,10 +13,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { toast } from 'sonner'
 import {
-  Plus, Film, Tv, Sparkles, Star, Check, X, Eye, EyeOff, Search, Loader2,
+  Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
   Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
   BarChart3, CalendarDays, Bookmark, Settings, Trash2, Cloud, CloudOff,
-  ArrowRight, Dice5, Printer, Trophy, SlidersHorizontal, Share2, FileText
+  Dice5, Printer, Trophy, SlidersHorizontal, Share2, FileText
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -38,8 +38,7 @@ interface MediaItem {
   pages?: number | null
   tags: string[]
   notes: string
-  watched: boolean
-  watchedAt?: string | null
+
   userRating?: number | null
   rewatch: boolean
   runtime?: number | null
@@ -182,8 +181,6 @@ function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
     pages: item.pages != null ? String(item.pages) : '',
     tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
     notes: item.notes || '',
-    watched: item.watched ? 'true' : 'false',
-    watchedAt: item.watchedAt || '',
     userRating: item.userRating != null ? String(item.userRating) : '',
     rewatch: item.rewatch ? 'true' : 'false',
     runtime: item.runtime != null ? String(item.runtime) : '',
@@ -260,11 +257,10 @@ interface MediaCardProps {
   onClick: () => void
   onQuickRate: () => void
   onDelete: () => void
-  onToggleWatched: () => void
   viewMode: 'grid' | 'list'
 }
 
-const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onDelete, onToggleWatched, viewMode }: MediaCardProps) {
+const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, onDelete, viewMode }: MediaCardProps) {
   const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
   const TypeIcon = typeConf.icon
 
@@ -297,9 +293,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-          {item.watched && <Eye className="w-4 h-4 text-green-400" />}
-        </div>
+
       </div>
     )
   }
@@ -319,14 +313,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
             <TypeIcon className="w-10 h-10 text-[#444]" />
           </div>
         )}
-        {/* Badges overlay */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
-          {item.watched && (
-            <div className="w-7 h-7 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-              <Eye className="w-3.5 h-3.5 text-green-400" />
-            </div>
-          )}
-        </div>
+
         {/* Type badge */}
         <div className="absolute top-2 left-2">
           <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-l ${typeConf.color} text-black`}>
@@ -362,13 +349,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
           >
             <Trash2 className="w-5 h-5" />
           </button>
-          <button
-            onClick={onToggleWatched}
-            className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:scale-110 transition-transform"
-            title={item.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
-          >
-            {item.watched ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
+
         </div>
       </div>
       {/* Info */}
@@ -451,8 +432,8 @@ export default function ArchivePage() {
   const [formData, setFormData] = useState<Record<string, string>>({
     title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
     overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
-    author: '', pages: '', tags: '', notes: '', watched: 'false',
-    watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
+    author: '', pages: '', tags: '', notes: '',
+    userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
   })
   const [formSubmitting, setFormSubmitting] = useState(false)
 
@@ -644,8 +625,6 @@ export default function ArchivePage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        watched: formData.watched === 'true',
-        watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
         rewatch: formData.rewatch === 'true',
         runtime: formData.runtime ? parseInt(formData.runtime) : null,
@@ -725,8 +704,6 @@ export default function ArchivePage() {
         pages: formData.pages ? parseInt(formData.pages) : null,
         tags: formData.tags,
         notes: formData.notes,
-        watched: formData.watched === 'true',
-        watchedAt: formData.watchedAt || null,
         userRating: formData.userRating ? parseFloat(formData.userRating) : null,
         rewatch: formData.rewatch === 'true',
         runtime: formData.runtime ? parseInt(formData.runtime) : null,
@@ -787,22 +764,7 @@ export default function ArchivePage() {
     }
   }
 
-  const toggleWatched = async (item: MediaItem) => {
-    try {
-      const res = await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ watched: !item.watched, watchedAt: !item.watched ? new Date().toISOString().split('T')[0] : null }),
-      })
-      if (!res.ok) throw new Error('خطأ')
-      const updated = await res.json()
-      setWlItems(prev => prev.map(i => i.id === item.id ? { ...i, watched: !i.watched } : i))
-      setRtItems(prev => prev.map(i => i.id === item.id ? { ...i, watched: !i.watched } : i))
-      if (selectedItem?.id === item.id) setSelectedItem(updated)
-    } catch {
-      toast.error('خطأ في التحديث')
-    }
-  }
+
 
   // ==================== Metadata Search ====================
   const searchMetadata = useCallback(async (query?: string) => {
@@ -884,8 +846,8 @@ export default function ArchivePage() {
     setFormData({
       title: '', originalTitle: '', year: '', type: 'movie', poster: '', rating: '',
       overview: '', genres: '', episodes: '', seasons: '', duration: '', status: '',
-      author: '', pages: '', tags: '', notes: '', watched: 'false',
-      watchedAt: '', userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
+      author: '', pages: '', tags: '', notes: '',
+      userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
     })
     setMetaResults([])
     setMetaQuery('')
@@ -1005,8 +967,7 @@ export default function ArchivePage() {
             pages: item.pages || null,
             tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
             notes: item.notes || '',
-            watched: item.watched || false,
-            watchedAt: item.watchedAt || null,
+
             userRating: item.userRating != null ? item.userRating : null,
             rewatch: item.rewatch || false,
             runtime: item.runtime || null,
@@ -1156,7 +1117,7 @@ export default function ArchivePage() {
             <Badge className={`bg-gradient-to-l ${(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).color} text-black text-xs`}>
               {(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).label}
             </Badge>
-            {selectedItem.watched && <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><Eye className="w-3 h-3 ml-1" />تمت المشاهدة</Badge>}
+
           </div>
           {selectedItem.rating && (
             <div className="mt-2 text-sm text-[#d4af37]">⭐ التقييم العام: {selectedItem.rating}</div>
@@ -1213,9 +1174,7 @@ export default function ArchivePage() {
         {selectedItem.ratingStatus && (
           <div><span className="text-[#888]">حالة التقييم: </span><span className="text-[#ccc]">{RATING_STATUSES.find(s => s.value === selectedItem.ratingStatus)?.label || selectedItem.ratingStatus}</span></div>
         )}
-        {selectedItem.watchedAt && (
-          <div><span className="text-[#888]">تاريخ المشاهدة: </span><span className="text-[#ccc]">{selectedItem.watchedAt}</span></div>
-        )}
+
         {selectedItem.tags && selectedItem.tags.length > 0 && (
           <div className="col-span-2">
             <span className="text-[#888]">الوسوم: </span>
@@ -1242,15 +1201,7 @@ export default function ArchivePage() {
           <Star className="w-4 h-4 ml-1" />
           {selectedItem.userRating != null ? 'تعديل التقييم' : 'تقييم'}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => toggleWatched(selectedItem)}
-          className="border-[#2a2a2a] text-[#888]"
-        >
-          {selectedItem.watched ? <EyeOff className="w-4 h-4 ml-1" /> : <Eye className="w-4 h-4 ml-1" />}
-          {selectedItem.watched ? 'إلغاء المشاهدة' : 'تمت المشاهدة'}
-        </Button>
+
         <Button
           size="sm"
           variant="outline"
@@ -1568,25 +1519,7 @@ export default function ArchivePage() {
             />
           </div>
 
-          {/* Toggles */}
-          <div className="flex flex-wrap items-center gap-3 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, watched: prev.watched === 'true' ? 'false' : 'true' }))}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.watched === 'true' ? 'bg-green-500/10 text-green-400' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
-            >
-              <Eye className="w-4 h-4" />
-              <span>تمت المشاهدة</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, rewatch: prev.rewatch === 'true' ? 'false' : 'true' }))}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${formData.rewatch === 'true' ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#666] hover:bg-[#2a2a2a]'}`}
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span>إعادة مشاهدة</span>
-            </button>
-          </div>
+
         </>
       )}
       {/* === End of edit-only fields === */}
@@ -2311,7 +2244,6 @@ export default function ArchivePage() {
                         onClick={() => openDetails(item)}
                         onQuickRate={() => openQuickRate(item)}
                         onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                        onToggleWatched={() => toggleWatched(item)}
                         viewMode="grid"
                       />
                     ))}
@@ -2325,7 +2257,6 @@ export default function ArchivePage() {
                         onClick={() => openDetails(item)}
                         onQuickRate={() => openQuickRate(item)}
                         onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                        onToggleWatched={() => toggleWatched(item)}
                         viewMode="list"
                       />
                     ))}
@@ -2527,10 +2458,7 @@ export default function ArchivePage() {
                           <span className="text-xs text-[#555] shrink-0">-</span>
                         )}
 
-                        {/* Badges */}
-                        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                          {item.watched && <Eye className="w-3.5 h-3.5 text-green-400" />}
-                        </div>
+
                       </div>
                     )
                   })}
