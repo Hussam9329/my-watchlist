@@ -193,6 +193,58 @@ function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
   }
 }
 
+// ==================== Responsive Modal Wrapper (OUTSIDE component for stable reference) ====================
+function ResponsiveModal({
+  open,
+  onOpenChange,
+  title,
+  children,
+  footerContent,
+  wide = false,
+  isMobile,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  children: React.ReactNode
+  footerContent?: React.ReactNode
+  wide?: boolean
+  isMobile: boolean
+}) {
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92vh]">
+          <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
+            <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-4 py-3" data-vaul-no-drag>
+            {children}
+          </div>
+          {footerContent && (
+            <DrawerFooter className="border-t border-[#2a2a2a]">
+              {footerContent}
+            </DrawerFooter>
+          )}
+        </DrawerContent>
+      </Drawer>
+    )
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ==================== Skeleton Grid ====================
 function SkeletonGrid({ count = 6 }: { count?: number }) {
   return (
@@ -426,6 +478,7 @@ export default function ArchivePage() {
 
   // Refs
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -779,14 +832,18 @@ export default function ArchivePage() {
   }
 
   // ==================== Metadata Search ====================
-  const searchMetadata = async () => {
-    if (!metaQuery.trim()) return
+  const searchMetadata = useCallback(async (query?: string) => {
+    const q = query ?? metaQuery
+    if (!q.trim()) {
+      setMetaResults([])
+      return
+    }
     setMetaLoading(true)
     try {
       const res = await fetch('/api/metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: metaQuery, type: formData.type || 'movie' }),
+        body: JSON.stringify({ query: q, type: formData.type || 'movie' }),
       })
       const data = await res.json()
       setMetaResults(data.results || [])
@@ -795,7 +852,20 @@ export default function ArchivePage() {
     } finally {
       setMetaLoading(false)
     }
-  }
+  }, [metaQuery, formData.type])
+
+  // Debounced auto-search: triggers 600ms after user stops typing
+  useEffect(() => {
+    if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current)
+    if (!metaQuery.trim()) {
+      setMetaResults([])
+      return
+    }
+    metaSearchTimerRef.current = setTimeout(() => {
+      searchMetadata()
+    }, 600)
+    return () => { if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current) }
+  }, [metaQuery, searchMetadata])
 
   const selectMetadata = (result: MetadataResult) => {
     setFormData(prev => ({
@@ -1249,26 +1319,28 @@ export default function ArchivePage() {
         <label className="text-xs font-bold text-[#d4af37] flex items-center gap-1.5">
           <Search className="w-3.5 h-3.5" />
           بحث تلقائي
+          {metaLoading && <Loader2 className="w-3 h-3 animate-spin text-[#d4af37]" />}
         </label>
-        <div className="flex gap-2">
+        <div className="relative">
           <Input
             value={metaQuery}
             onChange={(e) => setMetaQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && searchMetadata()}
-            placeholder="ابحث عن العنوان..."
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm h-11"
+            placeholder="اكتب اسم الفيلم أو المسلسل... (بحث تلقائي)"
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm h-11 pl-10"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck="false"
           />
-          <Button
-            onClick={searchMetadata}
-            disabled={metaLoading}
-            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0 h-11 px-4"
-          >
-            {metaLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-          </Button>
+          {metaQuery && (
+            <button
+              type="button"
+              onClick={() => { setMetaQuery(''); setMetaResults([]) }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         {metaResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
@@ -2040,56 +2112,6 @@ export default function ArchivePage() {
     </div>
   )
 
-  // ==================== Responsive Modal Wrapper ====================
-  const ResponsiveModal = ({
-    open,
-    onOpenChange,
-    title,
-    children,
-    footerContent,
-    wide = false,
-  }: {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    title: string
-    children: React.ReactNode
-    footerContent?: React.ReactNode
-    wide?: boolean
-  }) => {
-    if (isMobile) {
-      return (
-        <Drawer open={open} onOpenChange={onOpenChange}>
-          <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92vh]">
-            <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
-              <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 py-3" data-vaul-no-drag>
-              {children}
-            </div>
-            {footerContent && (
-              <DrawerFooter className="border-t border-[#2a2a2a]">
-                {footerContent}
-              </DrawerFooter>
-            )}
-          </DrawerContent>
-        </Drawer>
-      )
-    }
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
-          </DialogHeader>
-          {children}
-        </DialogContent>
-      </Dialog>
-    )
-  }
-
   // ==================== Main Render ====================
   return (
     <div className="min-h-[100dvh] bg-[#0a0a0a] text-white" dir="rtl">
@@ -2612,6 +2634,7 @@ export default function ArchivePage() {
         open={showDetails}
         onOpenChange={setShowDetails}
         title="تفاصيل العمل"
+        isMobile={isMobile}
       >
         {detailContent}
       </ResponsiveModal>
@@ -2622,6 +2645,7 @@ export default function ArchivePage() {
         onOpenChange={setShowAddForm}
         title="إضافة عمل جديد"
         wide
+        isMobile={isMobile}
       >
         {formContent(false)}
       </ResponsiveModal>
@@ -2632,6 +2656,7 @@ export default function ArchivePage() {
         onOpenChange={setShowEditForm}
         title="تعديل العمل"
         wide
+        isMobile={isMobile}
       >
         {formContent(true)}
       </ResponsiveModal>
@@ -2641,6 +2666,7 @@ export default function ArchivePage() {
         open={showQuickRate}
         onOpenChange={setShowQuickRate}
         title="تقييم العمل"
+        isMobile={isMobile}
       >
         {quickRateContent}
       </ResponsiveModal>
@@ -2650,6 +2676,7 @@ export default function ArchivePage() {
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title="تأكيد الحذف"
+        isMobile={isMobile}
       >
         {deleteConfirmContent}
       </ResponsiveModal>
@@ -2659,6 +2686,7 @@ export default function ArchivePage() {
         open={showMovieNight}
         onOpenChange={setShowMovieNight}
         title="ليلة الأفلام"
+        isMobile={isMobile}
       >
         {movieNightContent}
       </ResponsiveModal>
