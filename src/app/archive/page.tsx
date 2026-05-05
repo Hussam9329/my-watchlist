@@ -93,7 +93,17 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
 }
 
-const SORT_OPTIONS = [
+const WL_SORT_OPTIONS = [
+  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
+  { value: 'addedAt_asc', label: 'أضيف أولاً' },
+  { value: 'title_asc', label: 'الاسم أ-ي' },
+  { value: 'title_desc', label: 'الاسم ي-أ' },
+  { value: 'year_desc', label: 'السنة (جديد)' },
+  { value: 'year_asc', label: 'السنة (قديم)' },
+  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
+]
+
+const RT_SORT_OPTIONS = [
   { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
   { value: 'addedAt_asc', label: 'أضيف أولاً' },
   { value: 'title_asc', label: 'الاسم أ-ي' },
@@ -397,13 +407,20 @@ export default function ArchivePage() {
   // UI state
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [sortBy, setSortBy] = useState('addedAt_desc')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showFilters, setShowFilters] = useState(false)
-  const [filterGenre, setFilterGenre] = useState('')
-  const [filterYear, setFilterYear] = useState('')
-  const [filterRatingMin, setFilterRatingMin] = useState('')
-  const [filterRatingMax, setFilterRatingMax] = useState('')
+  // Separate sort & filter state per tab
+  const [wlSortBy, setWlSortBy] = useState('addedAt_desc')
+  const [rtSortBy, setRtSortBy] = useState('addedAt_desc')
+  const [wlShowFilters, setWlShowFilters] = useState(false)
+  const [rtShowFilters, setRtShowFilters] = useState(false)
+  const [wlFilterGenre, setWlFilterGenre] = useState('')
+  const [rtFilterGenre, setRtFilterGenre] = useState('')
+  const [wlFilterYear, setWlFilterYear] = useState('')
+  const [rtFilterYear, setRtFilterYear] = useState('')
+  const [wlFilterRatingMin, setWlFilterRatingMin] = useState('')
+  const [rtFilterRatingMin, setRtFilterRatingMin] = useState('')
+  const [wlFilterRatingMax, setWlFilterRatingMax] = useState('')
+  const [rtFilterRatingMax, setRtFilterRatingMax] = useState('')
 
   // Modals
   const [showDetails, setShowDetails] = useState(false)
@@ -467,11 +484,11 @@ export default function ArchivePage() {
       if (wlType !== 'all') params.set('type', wlType)
       params.set('hasRating', 'false')
       if (debouncedSearch) params.set('search', debouncedSearch)
-      params.set('sortBy', sortBy)
-      if (filterGenre) params.set('genre', filterGenre)
-      if (filterYear) params.set('year', filterYear)
-      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
-      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
+      params.set('sortBy', wlSortBy)
+      if (wlFilterGenre) params.set('genre', wlFilterGenre)
+      if (wlFilterYear) params.set('year', wlFilterYear)
+      if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
+      if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
       params.set('page', String(page))
       params.set('limit', '20')
       const res = await fetch(`/api/watchlist?${params}`)
@@ -492,7 +509,7 @@ export default function ArchivePage() {
     } finally {
       setWlLoading(false)
     }
-  }, [wlType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax])
+  }, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
   const fetchRatings = useCallback(async (page: number, reset = false) => {
@@ -502,11 +519,11 @@ export default function ArchivePage() {
       if (rtType !== 'all') params.set('type', rtType)
       params.set('hasRating', 'true')
       if (debouncedSearch) params.set('search', debouncedSearch)
-      params.set('sortBy', sortBy)
-      if (filterGenre) params.set('genre', filterGenre)
-      if (filterYear) params.set('year', filterYear)
-      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
-      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
+      params.set('sortBy', rtSortBy)
+      if (rtFilterGenre) params.set('genre', rtFilterGenre)
+      if (rtFilterYear) params.set('year', rtFilterYear)
+      if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
+      if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
       params.set('page', String(page))
       params.set('limit', '20')
       const res = await fetch(`/api/watchlist?${params}`)
@@ -527,7 +544,7 @@ export default function ArchivePage() {
     } finally {
       setRtLoading(false)
     }
-  }, [rtType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax])
+  }, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])
 
   // ==================== Fetch Stats ====================
   const fetchStats = useCallback(async () => {
@@ -548,7 +565,7 @@ export default function ArchivePage() {
     if (!isAuthChecked) return
     setWlPage(1)
     fetchWatchlist(1, true)
-  }, [isAuthChecked, wlType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax, fetchWatchlist])
+  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
   // Fetch all available years & genres from database
   useEffect(() => {
@@ -569,7 +586,7 @@ export default function ArchivePage() {
     if (!isAuthChecked || mainTab !== 'ratings') return
     setRtPage(1)
     fetchRatings(1, true)
-  }, [isAuthChecked, mainTab, rtType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax, fetchRatings])
+  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'stats') return
@@ -1856,7 +1873,7 @@ export default function ArchivePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
+                  onClick={() => setWlShowFilters(!wlShowFilters)}
                   className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
                 >
                   <SlidersHorizontal className="w-4 h-4" />
@@ -1869,12 +1886,12 @@ export default function ArchivePage() {
                   </PopoverTrigger>
                   <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
                     <div className="space-y-1">
-                      {SORT_OPTIONS.map(opt => (
+                      {WL_SORT_OPTIONS.map(opt => (
                         <button
                           key={opt.value}
-                          onClick={() => { setSortBy(opt.value); }}
+                          onClick={() => { setWlSortBy(opt.value); }}
                           className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
-                            sortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
+                            wlSortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
                           }`}
                         >
                           {opt.label}
@@ -1895,9 +1912,9 @@ export default function ArchivePage() {
             </div>
 
             {/* Filters */}
-            {showFilters && (
+            {wlShowFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={filterGenre || 'all'} onValueChange={v => setFilterGenre(v === 'all' ? '' : v)}>
+                <Select value={wlFilterGenre || 'all'} onValueChange={v => setWlFilterGenre(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="التصنيف" />
                   </SelectTrigger>
@@ -1908,7 +1925,7 @@ export default function ArchivePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={filterYear || 'all'} onValueChange={v => setFilterYear(v === 'all' ? '' : v)}>
+                <Select value={wlFilterYear || 'all'} onValueChange={v => setWlFilterYear(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="السنة" />
                   </SelectTrigger>
@@ -1920,15 +1937,15 @@ export default function ArchivePage() {
                   </SelectContent>
                 </Select>
                 <Input
-                  value={filterRatingMin}
-                  onChange={(e) => setFilterRatingMin(e.target.value)}
+                  value={wlFilterRatingMin}
+                  onChange={(e) => setWlFilterRatingMin(e.target.value)}
                   placeholder="تقييم من"
                   className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
                   type="number"
                 />
                 <Input
-                  value={filterRatingMax}
-                  onChange={(e) => setFilterRatingMax(e.target.value)}
+                  value={wlFilterRatingMax}
+                  onChange={(e) => setWlFilterRatingMax(e.target.value)}
                   placeholder="تقييم إلى"
                   className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
                   type="number"
@@ -1936,7 +1953,7 @@ export default function ArchivePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterRatingMin(''); setFilterRatingMax('') }}
+                  onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
                   className="text-[#888] text-xs"
                 >
                   مسح الفلاتر
@@ -2035,7 +2052,7 @@ export default function ArchivePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
+                  onClick={() => setRtShowFilters(!rtShowFilters)}
                   className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
                 >
                   <SlidersHorizontal className="w-4 h-4" />
@@ -2048,12 +2065,12 @@ export default function ArchivePage() {
                   </PopoverTrigger>
                   <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
                     <div className="space-y-1">
-                      {SORT_OPTIONS.map(opt => (
+                      {RT_SORT_OPTIONS.map(opt => (
                         <button
                           key={opt.value}
-                          onClick={() => { setSortBy(opt.value) }}
+                          onClick={() => { setRtSortBy(opt.value) }}
                           className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
-                            sortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
+                            rtSortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
                           }`}
                         >
                           {opt.label}
@@ -2066,9 +2083,9 @@ export default function ArchivePage() {
             </div>
 
             {/* Filters */}
-            {showFilters && (
+            {rtShowFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={filterGenre || 'all'} onValueChange={v => setFilterGenre(v === 'all' ? '' : v)}>
+                <Select value={rtFilterGenre || 'all'} onValueChange={v => setRtFilterGenre(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="التصنيف" />
                   </SelectTrigger>
@@ -2079,7 +2096,7 @@ export default function ArchivePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={filterYear || 'all'} onValueChange={v => setFilterYear(v === 'all' ? '' : v)}>
+                <Select value={rtFilterYear || 'all'} onValueChange={v => setRtFilterYear(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="السنة" />
                   </SelectTrigger>
@@ -2091,15 +2108,15 @@ export default function ArchivePage() {
                   </SelectContent>
                 </Select>
                 <Input
-                  value={filterRatingMin}
-                  onChange={(e) => setFilterRatingMin(e.target.value)}
+                  value={rtFilterRatingMin}
+                  onChange={(e) => setRtFilterRatingMin(e.target.value)}
                   placeholder="تقييم من"
                   className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
                   type="number"
                 />
                 <Input
-                  value={filterRatingMax}
-                  onChange={(e) => setFilterRatingMax(e.target.value)}
+                  value={rtFilterRatingMax}
+                  onChange={(e) => setRtFilterRatingMax(e.target.value)}
                   placeholder="تقييم إلى"
                   className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
                   type="number"
@@ -2107,7 +2124,7 @@ export default function ArchivePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterRatingMin(''); setFilterRatingMax('') }}
+                  onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
                   className="text-[#888] text-xs"
                 >
                   مسح الفلاتر

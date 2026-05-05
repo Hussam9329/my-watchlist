@@ -55,38 +55,107 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Map sortBy to Prisma orderBy
-    const [sortField, sortDir] = sortBy.split('_')
+    // Parse sort - handle multi-underscore field names like userRating
+    const lastUnderscore = sortBy.lastIndexOf('_')
+    const sortField = sortBy.substring(0, lastUnderscore)
+    const sortDir = sortBy.substring(lastUnderscore + 1)
     const direction = sortDir === 'asc' ? 'asc' : 'desc'
-    let orderBy: any
-    switch (sortField) {
-      case 'title':
-        orderBy = { title: direction }
-        break
-      case 'year':
-        orderBy = { year: direction }
-        break
-      case 'userRating':
-        orderBy = { userRating: { sort: direction, nulls: 'last' } }
-        break
-      case 'rating':
-        orderBy = { rating: direction }
-        break
-      case 'addedAt':
-      default:
-        orderBy = { addedAt: direction }
-        break
-    }
 
-    const [items, total] = await Promise.all([
-      prisma.mediaItem.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.mediaItem.count({ where })
-    ])
+    // For year and rating sorting, we need raw SQL because they are String fields
+    // that need numeric comparison, not alphabetical
+    const needsRawSort = sortField === 'year' || sortField === 'rating'
+
+    let items: any[]
+    let total: number
+
+    if (needsRawSort) {
+      // Build WHERE clauses for raw SQL
+      const conditions: string[] = []
+      const params: any[] = []
+      let paramIndex = 1
+
+      if (type) {
+        conditions.push(`"type" = $${paramIndex++}`)
+        params.push(type)
+      }
+      if (hasRating === 'true') {
+        conditions.push(`"userRating" IS NOT NULL`)
+      } else if (hasRating === 'false') {
+        conditions.push(`"userRating" IS NULL`)
+      }
+      if (search) {
+        conditions.push(`("title" ILIKE $${paramIndex++} OR "originalTitle" ILIKE $${paramIndex++})`)
+        params.push(`%${search}%`)
+        params.push(`%${search}%`)
+      }
+      if (filterYear) {
+        conditions.push(`"year" = $${paramIndex++}`)
+        params.push(filterYear)
+      }
+      if (filterGenre) {
+        conditions.push(`"genres" LIKE $${paramIndex++}`)
+        params.push(`%${filterGenre}%`)
+      }
+      if (filterRatingMin) {
+        conditions.push(`"userRating" >= $${paramIndex++}`)
+        params.push(parseFloat(filterRatingMin))
+      }
+      if (filterRatingMax) {
+        conditions.push(`"userRating" <= $${paramIndex++}`)
+        params.push(parseFloat(filterRatingMax))
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+      // Build ORDER BY with numeric cast
+      let orderClause: string
+      if (sortField === 'year') {
+        orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}`
+      } else if (sortField === 'rating') {
+        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE 0 END ${direction.toUpperCase()}`
+      } else {
+        orderClause = `ORDER BY "addedAt" DESC`
+      }
+
+      // Count query
+      const countResult = await prisma.$queryRawUnsafe(
+        `SELECT COUNT(*) as count FROM "MediaItem" ${whereClause}`,
+        ...params
+      )
+      total = Number((countResult as any[])[0]?.count || 0)
+
+      // Data query
+      const dataParams = [...params, limit, skip]
+      items = await prisma.$queryRawUnsafe(
+        `SELECT * FROM "MediaItem" ${whereClause} ${orderClause} LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
+        ...dataParams
+      )
+    } else {
+      // Use Prisma ORM for other sort fields
+      let orderBy: any
+      switch (sortField) {
+        case 'title':
+          orderBy = { title: direction }
+          break
+        case 'userRating':
+          orderBy = { userRating: { sort: direction, nulls: 'last' } }
+          break
+        case 'addedAt':
+        default:
+          orderBy = { addedAt: direction }
+          break
+      }
+
+      ;[items, total] = await Promise.all([
+        prisma.mediaItem.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+        }),
+        prisma.mediaItem.count({ where })
+      ])
+    }
 
     return NextResponse.json({
       items: items.map(formatItem),
