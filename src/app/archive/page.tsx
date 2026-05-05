@@ -16,7 +16,7 @@ import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
   Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
   BarChart3, CalendarDays, Bookmark, Trash2,
-  Dice5, Trophy, SlidersHorizontal, Share2
+  Dice5, Trophy, SlidersHorizontal
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -752,8 +752,6 @@ export default function ArchivePage() {
     }
   }
 
-
-
   // ==================== Metadata Search ====================
   const searchMetadata = useCallback(async (query?: string) => {
     const q = query ?? metaQuery
@@ -990,25 +988,6 @@ export default function ArchivePage() {
     const random = pool[Math.floor(Math.random() * pool.length)]
     setMovieNightResult(random)
     setShowMovieNight(true)
-  }
-
-  // ==================== Share ====================
-  const handleShare = async () => {
-    const items = processedRtItems
-    const text = items.map((item, i) =>
-      `${i + 1}. ${item.title} (${item.year}) - ${formatRating(item.userRating)}/100`
-    ).join('\n')
-    const shareText = `تقييماتي - HussamVision\n\n${text}`
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'تقييماتي - HussamVision', text: shareText })
-      } catch {
-        // user cancelled
-      }
-    } else {
-      await navigator.clipboard.writeText(shareText)
-      toast.success('تم النسخ إلى الحافظة')
-    }
   }
 
   // ==================== Unique genres/years for filters ====================
@@ -2072,15 +2051,6 @@ export default function ArchivePage() {
                 )
               })}
               <div className="flex-1 min-w-2" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShare}
-                className="border-[#2a2a2a] text-[#d4af37] hover:bg-[#d4af37]/10 text-xs shrink-0"
-              >
-                <Share2 className="w-3.5 h-3.5 ml-1" />
-                مشاركة
-              </Button>
             </div>
 
             {/* Controls row */}
