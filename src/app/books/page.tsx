@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import {
   Plus, BookOpen, Star, Check, X, Search, Loader2, Edit3, Grid3X3, List,
   Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark,
-  Settings, Trash2, Cloud, CloudOff, ArrowRight
+  Settings, Trash2, ArrowRight
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -71,10 +71,6 @@ const SORT_OPTIONS = [
   { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
   { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
   { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-]
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'الكل' },
 ]
 
 // ==================== Helpers ====================
@@ -296,7 +292,6 @@ export default function BooksPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterGenre, setFilterGenre] = useState('')
   const [filterYear, setFilterYear] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
 
   // Modals
   const [showDetails, setShowDetails] = useState(false)
@@ -1263,16 +1258,6 @@ export default function BooksPage() {
           {/* Filters Panel */}
           {showFilters && (
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="bg-[#111] border-[#333] text-white w-[120px] h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                  {STATUS_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={filterYear} onValueChange={v => setFilterYear(v === '__all__' ? '' : v)}>
                 <SelectTrigger className="bg-[#111] border-[#333] text-white w-[110px] h-9 text-sm">
                   <SelectValue placeholder="السنة" />
@@ -1295,12 +1280,12 @@ export default function BooksPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {(filterGenre || filterYear || filterStatus !== 'all') && (
+              {(filterGenre || filterYear) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-[#999] hover:text-white text-xs"
-                  onClick={() => { setFilterGenre(''); setFilterYear(''); setFilterStatus('all') }}
+                  onClick={() => { setFilterGenre(''); setFilterYear('') }}
                 >
                   <X className="w-3 h-3 ml-1" />
                   مسح الفلاتر
@@ -1319,14 +1304,14 @@ export default function BooksPage() {
           <div className="text-center py-20">
             <BookOpen className="w-16 h-16 text-[#333] mx-auto mb-4" />
             <h3 className="text-xl font-bold text-[#555] mb-2">
-              {debouncedSearch || filterGenre || filterYear || filterStatus !== 'all' ? 'لا توجد نتائج' : 'لا توجد كتب'}
+              {debouncedSearch || filterGenre || filterYear ? 'لا توجد نتائج' : 'لا توجد كتب'}
             </h3>
             <p className="text-sm text-[#444] mb-6">
-              {debouncedSearch || filterGenre || filterYear || filterStatus !== 'all'
+              {debouncedSearch || filterGenre || filterYear
                 ? 'جرّب تعديل معايير البحث أو الفلترة'
                 : 'ابدأ بإضافة الكتب التي تريد قراءتها'}
             </p>
-            {!debouncedSearch && filterStatus === 'all' && (
+            {!debouncedSearch && !filterGenre && !filterYear && (
               <Button
                 onClick={openAddForm}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"

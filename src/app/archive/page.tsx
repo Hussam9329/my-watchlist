@@ -15,8 +15,8 @@ import { toast } from 'sonner'
 import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
   Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
-  BarChart3, CalendarDays, Bookmark, Settings, Trash2, Cloud, CloudOff,
-  Dice5, Printer, Trophy, SlidersHorizontal, Share2, FileText
+  BarChart3, CalendarDays, Bookmark, Trash2,
+  Dice5, Trophy, SlidersHorizontal, Share2
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -129,12 +129,6 @@ function getRatingBg(rating: number) {
   if (rating >= 70) return 'bg-green-500/20 border-green-500/30 text-green-400'
   if (rating >= 40) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
   return 'bg-red-500/20 border-red-500/30 text-red-400'
-}
-
-function getRatingBarColor(rating: number) {
-  if (rating >= 70) return 'bg-green-500'
-  if (rating >= 40) return 'bg-yellow-500'
-  return 'bg-red-500'
 }
 
 const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.7): Promise<string> => {
@@ -417,16 +411,6 @@ export default function ArchivePage() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [showQuickRate, setShowQuickRate] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
-  // Print preview
-  const [showPrintPreview, setShowPrintPreview] = useState(false)
-  const [printType, setPrintType] = useState('all')
-  const [printSortBy, setPrintSortBy] = useState('userRating_desc')
-  const [printGenreFilter, setPrintGenreFilter] = useState('')
-  const [printYearFilter, setPrintYearFilter] = useState('')
-  const [printRatingMin, setPrintRatingMin] = useState('')
-  const [printRatingMax, setPrintRatingMax] = useState('')
-  const [allRatedItems, setAllRatedItems] = useState<MediaItem[]>([])
 
   // Form state
   const [formData, setFormData] = useState<Record<string, string>>({
@@ -1008,65 +992,10 @@ export default function ArchivePage() {
     setShowMovieNight(true)
   }
 
-  // ==================== Print Preview ====================
-  const openPrintPreview = async () => {
-    try {
-      const params = new URLSearchParams()
-      params.set('hasRating', 'true')
-      params.set('limit', '1000')
-      const res = await fetch(`/api/watchlist?${params}`)
-      const data = await res.json()
-      setAllRatedItems(data.items || [])
-      setShowPrintPreview(true)
-    } catch {
-      toast.error('خطأ في جلب البيانات')
-    }
-  }
-
-  const filteredPrintItems = useMemo(() => {
-    let items = [...allRatedItems]
-    if (printType !== 'all') items = items.filter(i => i.type === printType)
-    if (printGenreFilter) items = items.filter(i => (i.genres || []).some(g => g.toLowerCase().includes(printGenreFilter.toLowerCase())))
-    if (printYearFilter) items = items.filter(i => i.year === printYearFilter)
-    if (printRatingMin) items = items.filter(i => i.userRating != null && i.userRating >= parseFloat(printRatingMin))
-    if (printRatingMax) items = items.filter(i => i.userRating != null && i.userRating <= parseFloat(printRatingMax))
-
-    const [field, direction] = printSortBy.split('_')
-    items.sort((a, b) => {
-      let aVal: string | number = ''
-      let bVal: string | number = ''
-      switch (field) {
-        case 'title': aVal = a.title; bVal = b.title; break
-        case 'year': aVal = a.year; bVal = b.year; break
-        case 'userRating': aVal = a.userRating ?? -1; bVal = b.userRating ?? -1; break
-        default: aVal = a.userRating ?? -1; bVal = b.userRating ?? -1
-      }
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-      }
-      return direction === 'asc' ? ((aVal as number) - (bVal as number)) : ((bVal as number) - (aVal as number))
-    })
-    return items
-  }, [allRatedItems, printType, printSortBy, printGenreFilter, printYearFilter, printRatingMin, printRatingMax])
-
-  const handlePrint = () => {
-    // Build URL from current print filters
-    const params = new URLSearchParams()
-    params.set('type', printType)
-    params.set('sortBy', printSortBy)
-    if (printGenreFilter) params.set('genre', printGenreFilter)
-    if (printYearFilter) params.set('year', printYearFilter)
-    if (printRatingMin) params.set('ratingMin', printRatingMin)
-    if (printRatingMax) params.set('ratingMax', printRatingMax)
-    const url = `/api/print?${params.toString()}`
-    const printWindow = window.open(url, '_blank', 'width=900,height=700')
-    if (!printWindow) {
-      toast.error('تم حظر النافذة المنبثقة - اسمح بالنوافذ المنبثقة لهذا الموقع')
-    }
-  }
-
+  // ==================== Share ====================
   const handleShare = async () => {
-    const text = filteredPrintItems.map((item, i) =>
+    const items = processedRtItems
+    const text = items.map((item, i) =>
       `${i + 1}. ${item.title} (${item.year}) - ${formatRating(item.userRating)}/100`
     ).join('\n')
     const shareText = `تقييماتي - HussamVision\n\n${text}`
@@ -1845,195 +1774,6 @@ export default function ArchivePage() {
     </div>
   )
 
-  // ==================== Print Preview Overlay ====================
-  const printPreviewOverlay = showPrintPreview && (
-    <div className="fixed inset-0 z-50 bg-[#0a0a0a]/98 backdrop-blur-sm flex flex-col no-print" dir="rtl">
-      {/* Compact Header */}
-      <div className="shrink-0 bg-[#0a0a0a] border-b border-[#2a2a2a] px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center">
-              <Printer className="w-4 h-4 text-black" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">معاينة الطباعة</h2>
-              <p className="text-xs text-[#666]">{filteredPrintItems.length} عمل</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={handlePrint} className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-4 text-sm font-bold">
-              <Printer className="w-3.5 h-3.5 ml-1.5" />
-              طباعة
-            </Button>
-            <Button onClick={handleShare} variant="outline" size="sm" className="border-[#2a2a2a] text-[#ccc] h-9 px-3 text-sm">
-              <Share2 className="w-3.5 h-3.5 ml-1" />
-              مشاركة
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowPrintPreview(false)}
-              className="text-[#888] h-9 w-9 p-0"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Filters Row */}
-        <div className="flex flex-wrap gap-2 mt-3">
-          <Select value={printType} onValueChange={setPrintType}>
-            <SelectTrigger className="w-24 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-              <SelectItem value="all">الكل</SelectItem>
-              <SelectItem value="movie">أفلام</SelectItem>
-              <SelectItem value="series">مسلسلات</SelectItem>
-              <SelectItem value="anime">أنمي</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={printSortBy} onValueChange={setPrintSortBy}>
-            <SelectTrigger className="w-32 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-              {SORT_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            value={printGenreFilter}
-            onChange={(e) => setPrintGenreFilter(e.target.value)}
-            placeholder="التصنيف"
-            className="w-20 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
-          />
-          <Input
-            value={printYearFilter}
-            onChange={(e) => setPrintYearFilter(e.target.value)}
-            placeholder="السنة"
-            className="w-16 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
-          />
-          <Input
-            value={printRatingMin}
-            onChange={(e) => setPrintRatingMin(e.target.value)}
-            placeholder="من"
-            className="w-14 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
-            type="number"
-          />
-          <Input
-            value={printRatingMax}
-            onChange={(e) => setPrintRatingMax(e.target.value)}
-            placeholder="إلى"
-            className="w-14 bg-[#1a1a1a] border-[#2a2a2a] text-xs h-8"
-            type="number"
-          />
-          {(printType !== 'all' || printGenreFilter || printYearFilter || printRatingMin || printRatingMax) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setPrintType('all'); setPrintGenreFilter(''); setPrintYearFilter(''); setPrintRatingMin(''); setPrintRatingMax('') }}
-              className="text-red-400 text-xs h-8 px-2"
-            >
-              <X className="w-3 h-3 ml-1" />
-              مسح
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div id="print-container" className="p-4 sm:p-6 max-w-4xl mx-auto">
-          {/* Print Header - only visible when printing */}
-          <div className="print-only text-center mb-8">
-            <h1 className="text-3xl font-black mb-1">
-              <span className="text-[#d4af37]">Hussam</span><span className="text-[#b8960f]">Vision</span>
-            </h1>
-            <p className="text-sm text-gray-500 mb-4">تقييماتي - {new Date().toLocaleDateString('ar-SA')}</p>
-            <div className="w-24 h-0.5 bg-[#d4af37] mx-auto" />
-          </div>
-
-          {/* Screen-only summary bar */}
-          <div className="no-print flex items-center gap-3 mb-4">
-            {/* Stats pills */}
-            {(() => {
-              const movies = filteredPrintItems.filter(i => i.type === 'movie').length
-              const series = filteredPrintItems.filter(i => i.type === 'series').length
-              const anime = filteredPrintItems.filter(i => i.type === 'anime').length
-              const avgRating = filteredPrintItems.length > 0
-                ? (filteredPrintItems.reduce((sum, i) => sum + (i.userRating ?? 0), 0) / filteredPrintItems.filter(i => i.userRating != null).length).toFixed(1)
-                : '0'
-              return (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-lg bg-[#d4af37]/10 text-[#d4af37] text-xs font-bold">{movies} فيلم</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#e6c65a]/10 text-[#e6c65a] text-xs font-bold">{series} مسلسل</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#c9a227]/10 text-[#c9a227] text-xs font-bold">{anime} أنمي</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-green-500/10 text-green-400 text-xs font-bold">متوسط {avgRating}</span>
-                </div>
-              )
-            })()}
-          </div>
-
-          {/* Print Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b-2 border-[#d4af37]/30">
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-8">#</th>
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs">العنوان</th>
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-16">النوع</th>
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-12">السنة</th>
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-20">التصنيفات</th>
-                  <th className="text-right py-2.5 px-2 text-[#d4af37] font-bold text-xs w-16">التقييم</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPrintItems.map((item, idx) => {
-                  const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
-                  return (
-                    <tr key={item.id} className={`border-b border-[#1a1a1a] ${idx % 2 === 0 ? 'bg-[#111]' : 'bg-transparent'}`}>
-                      <td className="py-2 px-2 text-[#555] text-xs font-mono">{idx + 1}</td>
-                      <td className="py-2 px-2 font-bold text-white text-sm">{item.title}</td>
-                      <td className="py-2 px-2">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-l ${typeConf.color} text-black`}>
-                          {typeConf.label}
-                        </span>
-                      </td>
-                      <td className="py-2 px-2 text-[#888] text-xs">{item.year}</td>
-                      <td className="py-2 px-2 text-[#666] text-xs">{(item.genres || []).slice(0, 2).join(' • ')}</td>
-                      <td className="py-2 px-2">
-                        {item.userRating != null ? (
-                          <div className="flex items-center gap-1">
-                            <div className="w-12 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${getRatingBarColor(item.userRating)}`}
-                                style={{ width: `${item.userRating}%` }}
-                              />
-                            </div>
-                            <span className={`text-xs font-bold ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[#444]">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Print Footer */}
-          <div className="print-only text-center mt-8 pt-4 border-t border-gray-300">
-            <p className="text-xs text-gray-400">HussamVision - {new Date().toLocaleDateString('ar-SA')}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
   // ==================== Main Render ====================
   return (
     <div className="min-h-[100dvh] bg-[#0a0a0a] text-white" dir="rtl">
@@ -2335,11 +2075,11 @@ export default function ArchivePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={openPrintPreview}
+                onClick={handleShare}
                 className="border-[#2a2a2a] text-[#d4af37] hover:bg-[#d4af37]/10 text-xs shrink-0"
               >
-                <Printer className="w-3.5 h-3.5 ml-1" />
-                طباعة
+                <Share2 className="w-3.5 h-3.5 ml-1" />
+                مشاركة
               </Button>
             </div>
 
@@ -2536,19 +2276,6 @@ export default function ArchivePage() {
         )}
       </main>
 
-      {/* FAB - Print button (ratings tab only, on mobile) */}
-      {mainTab === 'ratings' && isMobile && (
-        <div className="fixed bottom-6 right-6 z-30 safe-bottom">
-          <Button
-            onClick={openPrintPreview}
-            className="w-14 h-14 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] text-black shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-transform"
-            size="icon"
-          >
-            <Printer className="w-6 h-6" />
-          </Button>
-        </div>
-      )}
-
       {/* Modals */}
 
       {/* Details Modal */}
@@ -2613,8 +2340,6 @@ export default function ArchivePage() {
         {movieNightContent}
       </ResponsiveModal>
 
-      {/* Print Preview Overlay */}
-      {printPreviewOverlay}
     </div>
   )
 }

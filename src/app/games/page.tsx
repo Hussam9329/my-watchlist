@@ -14,8 +14,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { toast } from 'sonner'
 import {
   Plus, Star, X, Search, Loader2, Edit3, Grid3X3, List,
-  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays, Bookmark,
-  Settings, Trash2, Cloud, CloudOff, ArrowRight, Gamepad2, Monitor, Smartphone
+  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays,
+  Settings, Trash2, ArrowRight, Gamepad2, Monitor, Smartphone
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -78,10 +78,6 @@ const SORT_OPTIONS = [
   { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
   { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
   { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-]
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'الكل' },
 ]
 
 const PLATFORM_OPTIONS = [
@@ -356,7 +352,6 @@ export default function GamesPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterGenre, setFilterGenre] = useState('')
   const [filterYear, setFilterYear] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
 
   // Modals
   const [showDetails, setShowDetails] = useState(false)
@@ -686,7 +681,7 @@ export default function GamesPage() {
       if (filterYear && item.year !== filterYear) return false
       return true
     })
-  }, [activeTab, filterGenre, filterYear, filterStatus])
+  }, [activeTab, filterGenre, filterYear])
 
   const processedItems = useMemo(() => {
     return filterItems(sortItems(games))
@@ -1440,24 +1435,11 @@ export default function GamesPage() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="border-[#2a2a2a] text-[#999] hover:text-white active:scale-[0.97] transition-transform shrink-0">
                   <Filter className="w-4 h-4 ml-1" />
-                  {(filterGenre || filterYear || filterStatus !== 'all') && <span className="w-2 h-2 rounded-full bg-teal-400" />}
+                  {(filterGenre || filterYear) && <span className="w-2 h-2 rounded-full bg-teal-400" />}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="bg-[#1a1a1a] border-[#2a2a2a] w-64" align="end" dir="rtl">
                 <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-[#999]">الحالة</label>
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="bg-[#111] border-[#333] text-white text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#1a1a1a] border-[#333]">
-                        {STATUS_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-white focus:bg-[#2a2a2a] focus:text-white">{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="space-y-1">
                     <label className="text-xs text-[#999]">السنة</label>
                     <Select value={filterYear} onValueChange={setFilterYear}>
