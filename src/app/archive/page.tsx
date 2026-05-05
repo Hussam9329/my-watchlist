@@ -29,24 +29,14 @@ import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
 // ==================== Constants ====================
-<<<<<<< HEAD
 const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string; dotColor: string }> = {
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
   series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
+  tv: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
   movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10', dotColor: 'bg-[#8B4513]' },
   game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10', dotColor: 'bg-[#2e8b57]' },
-=======
-const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
-  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
-  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
-  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
-  tv: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
-  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
-  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
-  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
->>>>>>> dbdf77f (إصلاح خلط الأفلام والمسلسلات)
 }
 
 // ==================== Memoized Card ====================
@@ -546,12 +536,11 @@ export default function ArchivePage() {
       ...prev,
       // Auto-set type from TMDB result (movie/series/anime) — this is the correct type
       // detected from the actual TMDB endpoint, preventing series/movie mixing
+      // Use TMDB type for media items, but keep current type for books/games
       type: result.type && result.type !== 'book' && result.type !== 'game' ? result.type : prev.type,
       title: result.title || prev.title,
       originalTitle: result.originalTitle || prev.originalTitle,
       year: result.year || prev.year,
-      // Auto-update the type to match the actual TMDB result type
-      type: result.type || prev.type,
       poster: result.poster || prev.poster,
       overview: result.overview || prev.overview,
       rating: result.rating || prev.rating,
@@ -833,7 +822,7 @@ export default function ArchivePage() {
         {metaResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
             {metaResults.map((result, idx) => {
-              const rTypeConf = TYPE_CONFIG[result.type] || TYPE_CONFIG.movie
+              const rTypeConf = TYPE_CONFIG[result.type || 'movie'] || TYPE_CONFIG.movie
               const RTypeIcon = rTypeConf.icon
               return (
               <button

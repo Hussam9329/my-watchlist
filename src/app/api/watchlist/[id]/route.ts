@@ -35,19 +35,19 @@ export async function PUT(
         rating: body.rating ? String(body.rating) : null,
         overview: body.overview,
         genres: Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || ''),
-        episodes: body.episodes ? parseInt(body.episodes) : null,
-        seasons: body.seasons ? parseInt(body.seasons) : null,
+        episodes: body.episodes && !isNaN(Number(body.episodes)) ? parseInt(String(body.episodes)) : null,
+        seasons: body.seasons && !isNaN(Number(body.seasons)) ? parseInt(String(body.seasons)) : null,
         duration: body.duration,
         status: body.status,
         author: body.author,
-        pages: body.pages ? parseInt(body.pages) : null,
+        pages: body.pages && !isNaN(Number(body.pages)) ? parseInt(String(body.pages)) : null,
         tags: Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || ''),
         notes: body.notes,
         watched: body.watched,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
         userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
         rewatch: body.rewatch || false,
-        runtime: body.runtime ? parseInt(body.runtime) : null,
+        runtime: body.runtime && !isNaN(Number(body.runtime)) ? parseInt(String(body.runtime)) : null,
         ratingStatus: body.ratingStatus || 'watched',
       }
     })
@@ -82,7 +82,6 @@ export async function PATCH(
     const ALLOWED_FIELDS = new Set([
       'title', 'originalTitle', 'type', 'year', 'poster', 'genres',
       'overview', 'userRating', 'notes', 'status', 'addedAt',
-      'tmdbId', 'imdbId', 'seasonCount', 'episodeCount',
       'rating', 'episodes', 'seasons', 'duration', 'author',
       'pages', 'tags', 'watched', 'watchedAt', 'rewatch',
       'runtime', 'ratingStatus'
@@ -98,7 +97,23 @@ export async function PATCH(
       updateData.genres = Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || '')
     }
     if (body.userRating !== undefined) {
-      updateData.userRating = body.userRating != null ? parseFloat(String(body.userRating)) : null
+      updateData.userRating = body.userRating != null && !isNaN(Number(body.userRating)) ? parseFloat(String(body.userRating)) : null
+    }
+    // Ensure numeric fields are properly validated
+    if (body.episodes !== undefined) {
+      updateData.episodes = body.episodes != null && !isNaN(Number(body.episodes)) ? parseInt(String(body.episodes)) : null
+    }
+    if (body.seasons !== undefined) {
+      updateData.seasons = body.seasons != null && !isNaN(Number(body.seasons)) ? parseInt(String(body.seasons)) : null
+    }
+    if (body.pages !== undefined) {
+      updateData.pages = body.pages != null && !isNaN(Number(body.pages)) ? parseInt(String(body.pages)) : null
+    }
+    if (body.runtime !== undefined) {
+      updateData.runtime = body.runtime != null && !isNaN(Number(body.runtime)) ? parseInt(String(body.runtime)) : null
+    }
+    if (body.tags !== undefined) {
+      updateData.tags = Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || '')
     }
 
     const item = await prisma.mediaItem.update({
