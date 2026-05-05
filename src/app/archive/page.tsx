@@ -1050,7 +1050,19 @@ export default function ArchivePage() {
   }, [allRatedItems, printType, printSortBy, printGenreFilter, printYearFilter, printRatingMin, printRatingMax])
 
   const handlePrint = () => {
-    window.print()
+    // Build URL from current print filters
+    const params = new URLSearchParams()
+    params.set('type', printType)
+    params.set('sortBy', printSortBy)
+    if (printGenreFilter) params.set('genre', printGenreFilter)
+    if (printYearFilter) params.set('year', printYearFilter)
+    if (printRatingMin) params.set('ratingMin', printRatingMin)
+    if (printRatingMax) params.set('ratingMax', printRatingMax)
+    const url = `/api/print?${params.toString()}`
+    const printWindow = window.open(url, '_blank', 'width=900,height=700')
+    if (!printWindow) {
+      toast.error('تم حظر النافذة المنبثقة - اسمح بالنوافذ المنبثقة لهذا الموقع')
+    }
   }
 
   const handleShare = async () => {
