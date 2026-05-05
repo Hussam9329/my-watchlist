@@ -1243,7 +1243,7 @@ export default function ArchivePage() {
 
   // ==================== Form Content (shared between Dialog and Drawer) ====================
   const formContent = (isEdit: boolean) => (
-    <div className="space-y-5 overflow-y-auto p-1" style={{ maxHeight: isMobile ? 'calc(80vh - 120px)' : 'calc(80vh - 80px)' }}>
+    <div className="space-y-5 overflow-y-auto p-1 max-h-[70vh]">
       {/* Metadata Search */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-[#d4af37] flex items-center gap-1.5">
@@ -1257,6 +1257,10 @@ export default function ArchivePage() {
             onKeyDown={(e) => e.key === 'Enter' && searchMetadata()}
             placeholder="ابحث عن العنوان..."
             className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm h-11"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
           />
           <Button
             onClick={searchMetadata}
@@ -1331,6 +1335,9 @@ export default function ArchivePage() {
           onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
           placeholder="عنوان العمل"
           className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck="false"
         />
       </div>
 
@@ -1344,6 +1351,9 @@ export default function ArchivePage() {
             placeholder="Original Title"
             className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
             dir="ltr"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck="false"
           />
         </div>
       )}
@@ -2053,7 +2063,7 @@ export default function ArchivePage() {
             <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
               <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 py-3">
+            <div className="px-4 py-3" data-vaul-no-drag>
               {children}
             </div>
             {footerContent && (
@@ -2067,7 +2077,10 @@ export default function ArchivePage() {
     }
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'sm:max-w-2xl max-w-2xl' : 'sm:max-w-lg max-w-lg'}`}>
+        <DialogContent
+          className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
           </DialogHeader>
