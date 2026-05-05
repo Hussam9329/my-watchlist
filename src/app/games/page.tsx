@@ -209,11 +209,8 @@ export default function GamesPage() {
   // Refs
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
-  const loadMoreRef = useRef<HTMLDivElement | null>(null)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const observerCallbackRef = useRef<(() => void) | null>(null)
 
-  // ==================== Fetch Games ====================
+  // ==================== Fetch Games (Progressive Auto-Load) ====================
   const fetchGames = useCallback(async (pageNum: number = 1, reset = false) => {
     if (pageNum === 1) {
       setLoading(true)
@@ -223,7 +220,7 @@ export default function GamesPage() {
     try {
       const params = new URLSearchParams()
       params.set('type', 'game')
-      params.set('limit', '20')
+      params.set('limit', '50')
       params.set('page', String(pageNum))
       if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/watchlist?${params}`)
@@ -239,6 +236,11 @@ export default function GamesPage() {
       }
       setTotalGames(data.total || 0)
       setHasMore(data.hasMore || false)
+      setPage(pageNum)
+      // Auto-load next page if there are more items
+      if (data.hasMore) {
+        setTimeout(() => fetchGames(pageNum + 1), 100)
+      }
     } catch {
       toast.error('خطأ في جلب البيانات')
     } finally {
@@ -252,31 +254,6 @@ export default function GamesPage() {
     setPage(1)
     fetchGames(1, true)
   }, [isAuthChecked, fetchGames])
-
-  // ==================== Infinite Scroll ====================
-  observerCallbackRef.current = () => {
-    if (hasMore && !loadingMore && !loading) {
-      const nextPage = page + 1
-      setPage(nextPage)
-      fetchGames(nextPage)
-    }
-  }
-
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect()
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && observerCallbackRef.current) {
-          observerCallbackRef.current()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
-    return () => { if (observerRef.current) observerRef.current.disconnect() }
-  }, [])
 
   // ==================== CRUD ====================
   const createItem = async () => {
@@ -1245,17 +1222,17 @@ export default function GamesPage() {
           </div>
         )}
 
-        {/* Infinite scroll trigger */}
-        {!loading && hasMore && (
-          <div ref={loadMoreRef} className="flex justify-center py-8">
-            {loadingMore && <Loader2 className="w-6 h-6 animate-spin text-teal-400" />}
+        {/* Loading more indicator */}
+        {loadingMore && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
           </div>
         )}
 
         {/* Results count */}
-        {!loading && processedItems.length > 0 && (
+        {!loading && !loadingMore && processedItems.length > 0 && (
           <div className="text-center text-xs text-[#555] mt-4">
-            عرض {processedItems.length} من {totalGames} لعبة
+            {totalGames} لعبة
           </div>
         )}
       </main>

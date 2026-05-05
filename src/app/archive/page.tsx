@@ -236,9 +236,6 @@ export default function ArchivePage() {
 
   // Refs
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const loadMoreRef = useRef<HTMLDivElement | null>(null)
-  const observerCallbackRef = useRef<(() => void) | null>(null)
 
   // ==================== Fetch Watchlist ====================
   const fetchWatchlist = useCallback(async (page: number, reset = false) => {
@@ -254,10 +251,10 @@ export default function ArchivePage() {
       if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
       if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
       params.set('page', String(page))
-      params.set('limit', '20')
+      params.set('limit', '50')
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
-      if (reset) {
+      if (reset || page === 1) {
         setWlItems(data.items || [])
       } else {
         setWlItems(prev => {
@@ -268,6 +265,11 @@ export default function ArchivePage() {
       }
       setWlTotal(data.total || 0)
       setWlHasMore(data.hasMore || false)
+      setWlPage(page)
+      // Auto-load next page if there are more items
+      if (data.hasMore) {
+        setTimeout(() => fetchWatchlist(page + 1), 100)
+      }
     } catch {
       toast.error('خطأ في جلب البيانات')
     } finally {
@@ -289,10 +291,10 @@ export default function ArchivePage() {
       if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
       if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
       params.set('page', String(page))
-      params.set('limit', '20')
+      params.set('limit', '50')
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
-      if (reset) {
+      if (reset || page === 1) {
         setRtItems(data.items || [])
       } else {
         setRtItems(prev => {
@@ -303,6 +305,11 @@ export default function ArchivePage() {
       }
       setRtTotal(data.total || 0)
       setRtHasMore(data.hasMore || false)
+      setRtPage(page)
+      // Auto-load next page if there are more items
+      if (data.hasMore) {
+        setTimeout(() => fetchRatings(page + 1), 100)
+      }
     } catch {
       toast.error('خطأ في جلب البيانات')
     } finally {
@@ -356,37 +363,6 @@ export default function ArchivePage() {
     if (!isAuthChecked || mainTab !== 'stats') return
     fetchStats()
   }, [isAuthChecked, mainTab, fetchStats])
-
-  // ==================== Infinite Scroll ====================
-  // Keep the callback ref up to date with latest closure values
-  observerCallbackRef.current = () => {
-    if (mainTab === 'watchlist' && wlHasMore && !wlLoading) {
-      const nextPage = wlPage + 1
-      setWlPage(nextPage)
-      fetchWatchlist(nextPage)
-    } else if (mainTab === 'ratings' && rtHasMore && !rtLoading) {
-      const nextPage = rtPage + 1
-      setRtPage(nextPage)
-      fetchRatings(nextPage)
-    }
-  }
-
-  // Create observer once; re-observe when the target element changes (mainTab switch)
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect()
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && observerCallbackRef.current) {
-          observerCallbackRef.current()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (loadMoreRef.current) observerRef.current.observe(loadMoreRef.current)
-    return () => { if (observerRef.current) observerRef.current.disconnect() }
-  }, [mainTab])
 
   // ==================== CRUD Operations ====================
   const createItem = async () => {
@@ -1669,7 +1645,7 @@ export default function ArchivePage() {
                     ))}
                   </div>
                 )}
-                <div ref={loadMoreRef} className="h-4" />
+                <div className="h-4" />
                 {wlLoading && wlItems.length > 0 && (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
@@ -1867,7 +1843,7 @@ export default function ArchivePage() {
                     )
                   })}
                 </div>
-                <div ref={loadMoreRef} className="h-4" />
+                <div className="h-4" />
                 {rtLoading && rtItems.length > 0 && (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
