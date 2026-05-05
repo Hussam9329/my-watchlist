@@ -29,13 +29,13 @@ import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
 // ==================== Constants ====================
-const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
-  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
-  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
-  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
-  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
-  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
-  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
+const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string; dotColor: string }> = {
+  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
+  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
+  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
+  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
+  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10', dotColor: 'bg-[#8B4513]' },
+  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10', dotColor: 'bg-[#2e8b57]' },
 }
 
 // ==================== Memoized Card ====================
@@ -69,6 +69,10 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
           <div className="flex items-center gap-2 mt-1">
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-l ${typeConf.color} text-black`}>
+              <TypeIcon className="w-2.5 h-2.5" />
+              {typeConf.label}
+            </span>
             <span className="text-xs text-[#888]">{item.year}</span>
             {item.userRating != null && (
               <span className={`text-xs font-bold ${getRatingColor(item.userRating, 100, 'green')}`}>
@@ -527,6 +531,9 @@ export default function ArchivePage() {
   const selectMetadata = (result: MetadataResult) => {
     setFormData(prev => ({
       ...prev,
+      // Auto-set type from TMDB result (movie/series/anime) — this is the correct type
+      // detected from the actual TMDB endpoint, preventing series/movie mixing
+      type: result.type && result.type !== 'book' && result.type !== 'game' ? result.type : prev.type,
       title: result.title || prev.title,
       originalTitle: result.originalTitle || prev.originalTitle,
       year: result.year || prev.year,
@@ -810,7 +817,10 @@ export default function ArchivePage() {
         </div>
         {metaResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
-            {metaResults.map((result, idx) => (
+            {metaResults.map((result, idx) => {
+              const rTypeConf = TYPE_CONFIG[result.type] || TYPE_CONFIG.movie
+              const RTypeIcon = rTypeConf.icon
+              return (
               <button
                 key={idx}
                 onClick={() => selectMetadata(result)}
@@ -820,12 +830,16 @@ export default function ArchivePage() {
                   <img src={result.poster} alt="" className="w-11 h-16 rounded-lg object-cover shrink-0 shadow-md" />
                 ) : (
                   <div className="w-11 h-16 rounded-lg bg-[#2a2a2a] flex items-center justify-center shrink-0">
-                    <Film className="w-4 h-4 text-[#555]" />
+                    <RTypeIcon className="w-4 h-4 text-[#555]" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-white truncate">{result.title}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0 rounded bg-gradient-to-l ${rTypeConf.color} text-black`}>
+                      <RTypeIcon className="w-2 h-2" />
+                      {rTypeConf.label}
+                    </span>
                     <span className="text-xs text-[#888]">{result.year}</span>
                     {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
                   </div>
@@ -834,7 +848,8 @@ export default function ArchivePage() {
                   <Check className="w-3.5 h-3.5 text-[#d4af37]" />
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

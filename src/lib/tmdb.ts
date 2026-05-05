@@ -10,6 +10,11 @@ export interface TMDBEnglishDetails {
   poster_path: string | null
   release_date: string | null
   first_air_date: string | null
+  number_of_episodes: number | null
+  number_of_seasons: number | null
+  runtime: number | null
+  status: string | null
+  genres: { id: number; name: string }[] | null
 }
 
 /**
@@ -36,6 +41,11 @@ export async function fetchEnglishDetailsById(
       poster_path: data.poster_path || null,
       release_date: data.release_date || null,
       first_air_date: data.first_air_date || null,
+      number_of_episodes: data.number_of_episodes ?? null,
+      number_of_seasons: data.number_of_seasons ?? null,
+      runtime: data.runtime ?? null,
+      status: data.status ?? null,
+      genres: data.genres ?? null,
     }
   } catch {
     return null

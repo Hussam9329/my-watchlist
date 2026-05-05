@@ -76,56 +76,89 @@ export async function POST(request: NextRequest) {
     }
 
     // ==================== Movies / TV / Anime ====================
-    const tmdbType = type === 'movie' ? 'movie' : 'tv'
+    // Search BOTH movie and TV endpoints in parallel so the user sees
+    // results from both categories and can pick the correct one.
+    // This prevents the series/movie mixing bug where users accidentally
+    // save a TV show as a movie (or vice versa).
 
-    // Search in both English and Arabic in parallel
-    const [enResponse, arResponse] = await Promise.all([
+    const [movieEnRes, movieArRes, tvEnRes, tvArRes] = await Promise.all([
       fetch(
-        `${TMDB_BASE_URL}/search/${tmdbType}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
+        `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
         { cache: 'no-store' }
       ),
       fetch(
-        `${TMDB_BASE_URL}/search/${tmdbType}?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
+        `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
         { cache: 'no-store' }
-      )
+      ),
+      fetch(
+        `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
+        { cache: 'no-store' }
+      ),
+      fetch(
+        `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
+        { cache: 'no-store' }
+      ),
     ])
 
-    const enData = await enResponse.json()
-    const arData = await arResponse.json()
+    const [movieEnData, movieArData, tvEnData, tvArData] = await Promise.all([
+      movieEnRes.json(),
+      movieArRes.json(),
+      tvEnRes.json(),
+      tvArRes.json(),
+    ])
 
-    // Create maps by TMDB ID for cross-referencing
-    const arResultsMap = new Map<number, any>(
-      (arData.results || []).map((r: any) => [r.id, r])
+    // Build maps by TMDB ID for cross-referencing
+    const movieEnMap = new Map<number, any>(
+      (movieEnData.results || []).map((r: any) => [r.id, r])
     )
-    const enResultsMap = new Map<number, any>(
-      (enData.results || []).map((r: any) => [r.id, r])
+    const movieArMap = new Map<number, any>(
+      (movieArData.results || []).map((r: any) => [r.id, r])
+    )
+    const tvEnMap = new Map<number, any>(
+      (tvEnData.results || []).map((r: any) => [r.id, r])
+    )
+    const tvArMap = new Map<number, any>(
+      (tvArData.results || []).map((r: any) => [r.id, r])
     )
 
-    // Merge results: use English results as primary, add Arabic-only results as fallback
-    const seenIds = new Set<number>()
-    const mergedResults: any[] = []
+    // Merge all results — deduplicated by (tmdbType, tmdbId) combo
+    const seenKeys = new Set<string>()
+    const allRawResults: { result: any; tmdbType: 'movie' | 'tv' }[] = []
 
-    // Add English results first (these are preferred for non-Arabic films)
-    for (const r of (enData.results || [])) {
-      if (!seenIds.has(r.id)) {
-        seenIds.add(r.id)
-        mergedResults.push(r)
+    // Prioritize the user's selected type first, then show the other type
+    const selectedTmdbType = type === 'movie' ? 'movie' : 'tv'
+    const otherTmdbType = selectedTmdbType === 'movie' ? 'tv' : 'movie'
+
+    // Add results in priority order: selected type first
+    for (const tmdbType of [selectedTmdbType, otherTmdbType] as const) {
+      const enData = tmdbType === 'movie' ? movieEnData : tvEnData
+      const arData = tmdbType === 'movie' ? movieArData : tvArData
+
+      // English results first
+      for (const r of (enData.results || [])) {
+        const key = `${tmdbType}:${r.id}`
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key)
+          allRawResults.push({ result: r, tmdbType })
+        }
+      }
+      // Arabic-only results
+      for (const r of (arData.results || [])) {
+        const key = `${tmdbType}:${r.id}`
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key)
+          allRawResults.push({ result: r, tmdbType })
+        }
       }
     }
 
-    // Add Arabic-only results (found in Arabic search but not in English)
-    for (const r of (arData.results || [])) {
-      if (!seenIds.has(r.id)) {
-        seenIds.add(r.id)
-        mergedResults.push(r)
-      }
-    }
-
-    if (mergedResults.length > 0) {
-      // Process results — for non-Arabic works, always ensure English display
-      const resultsPromises = mergedResults.slice(0, 5).map(async (result: any) => {
-        const arResult = arResultsMap.get(result.id)
-        const enResult = enResultsMap.get(result.id)
+    if (allRawResults.length > 0) {
+      // Process top results — limit to 8 (4 per type max)
+      const resultsPromises = allRawResults.slice(0, 8).map(async ({ result, tmdbType }) => {
+        const enMap = tmdbType === 'movie' ? movieEnMap : tvEnMap
+        const arMap = tmdbType === 'movie' ? movieArMap : tvArMap
+        const enResult = enMap.get(result.id) || null
+        const arResult = arMap.get(result.id) || null
         const isArabic = result.original_language === 'ar'
 
         let displayTitle: string
@@ -133,6 +166,24 @@ export async function POST(request: NextRequest) {
         let displayPoster: string | null
         let displayOverview: string
         let displayYear: string
+        let displayEpisodes: number | null = null
+        let displaySeasons: number | null = null
+        let displayRuntime: number | null = null
+        let displayStatus: string | null = null
+
+        // Auto-detect the app-level type from TMDB result
+        // For TV results: check if it's anime (origin_country includes JP + genre 16)
+        // Otherwise it's 'series'
+        let detectedType: string
+        if (tmdbType === 'movie') {
+          detectedType = 'movie'
+        } else {
+          // Check if anime: Japanese origin + animation genre, or user selected anime
+          const genreIds: number[] = result.genre_ids || []
+          const originCountry: string[] = result.origin_country || []
+          const isAnime = (originCountry.includes('JP') && genreIds.includes(16)) || type === 'anime'
+          detectedType = isAnime ? 'anime' : 'series'
+        }
 
         if (isArabic) {
           // Arabic original film: Arabic title, Arabic poster
@@ -144,27 +195,19 @@ export async function POST(request: NextRequest) {
           displayOverview = arResult?.overview || result.overview || enResult?.overview || 'لا يوجد وصف'
           displayYear = (result.release_date || result.first_air_date || '').split('-')[0]
         } else {
-          // Non-Arabic work (English, Asian, etc.): ALWAYS show English title & poster
-          // If we have the English search result, use it directly
-          // If not found in English search, fetch English details from TMDB by ID
-
-          let englishData = enResult // data from English search (may be null)
+          // Non-Arabic work: ALWAYS show English title & poster
+          let englishData = enResult
 
           if (!englishData && result.id) {
-            // Result found only in Arabic search — fetch full English details from TMDB
             englishData = await fetchEnglishDetailsById(result.id, tmdbType)
           }
 
-          // Title: English title (from en search or fetched), fallback to original title
           displayTitle = englishData?.title || englishData?.name || result.title || result.name || ''
-          // Original title: the work's native title (Japanese, Korean, etc.)
           displayOriginalTitle = englishData?.original_title || englishData?.original_name || result.original_title || result.original_name || ''
-          // If displayTitle and displayOriginalTitle are the same (English film), clear originalTitle
           if (displayTitle === displayOriginalTitle) {
             displayOriginalTitle = ''
           }
 
-          // Poster: English poster
           if (englishData?.poster_path) {
             displayPoster = `https://image.tmdb.org/t/p/w500${englishData.poster_path}`
           } else if (result.poster_path) {
@@ -173,11 +216,20 @@ export async function POST(request: NextRequest) {
             displayPoster = null
           }
 
-          // Overview: prefer Arabic overview for user, fallback to English
           displayOverview = arResult?.overview || englishData?.overview || result.overview || 'لا يوجد وصف'
-
-          // Year: from English data or original result
           displayYear = (englishData?.release_date || englishData?.first_air_date || result.release_date || result.first_air_date || '').split('-')[0]
+
+          // TV-specific fields from English details
+          if (tmdbType === 'tv' && englishData) {
+            displayEpisodes = englishData.number_of_episodes ?? null
+            displaySeasons = englishData.number_of_seasons ?? null
+            displayStatus = englishData.status ?? null
+          }
+          // Movie-specific fields
+          if (tmdbType === 'movie' && englishData) {
+            displayRuntime = englishData.runtime ?? null
+            displayStatus = englishData.status ?? null
+          }
         }
 
         return {
@@ -187,7 +239,11 @@ export async function POST(request: NextRequest) {
           poster: displayPoster,
           overview: displayOverview,
           rating: result.vote_average ? result.vote_average.toFixed(1) : null,
-          type: type,
+          type: detectedType,
+          episodes: displayEpisodes,
+          seasons: displaySeasons,
+          runtime: displayRuntime,
+          status: displayStatus,
           genres: []
         }
       })
