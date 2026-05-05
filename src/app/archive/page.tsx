@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -348,7 +348,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
       </div>
       {/* Info */}
       <div className="p-2.5">
-        <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+        <h3 className="font-bold text-sm text-white truncate leading-tight">{item.title}</h3>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-[#888]">{item.year}</span>
           {item.genres && item.genres.length > 0 && (
@@ -390,8 +390,9 @@ export default function ArchivePage() {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
 
-  // All years from database
+  // All years/genres from database
   const [dbYears, setDbYears] = useState<string[]>([])
+  const [dbGenres, setDbGenres] = useState<string[]>([])
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('')
@@ -466,6 +467,11 @@ export default function ArchivePage() {
       if (wlType !== 'all') params.set('type', wlType)
       params.set('hasRating', 'false')
       if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('sortBy', sortBy)
+      if (filterGenre) params.set('genre', filterGenre)
+      if (filterYear) params.set('year', filterYear)
+      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
+      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
       params.set('page', String(page))
       params.set('limit', '20')
       const res = await fetch(`/api/watchlist?${params}`)
@@ -486,7 +492,7 @@ export default function ArchivePage() {
     } finally {
       setWlLoading(false)
     }
-  }, [wlType, debouncedSearch])
+  }, [wlType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax])
 
   // ==================== Fetch Ratings ====================
   const fetchRatings = useCallback(async (page: number, reset = false) => {
@@ -496,6 +502,11 @@ export default function ArchivePage() {
       if (rtType !== 'all') params.set('type', rtType)
       params.set('hasRating', 'true')
       if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('sortBy', sortBy)
+      if (filterGenre) params.set('genre', filterGenre)
+      if (filterYear) params.set('year', filterYear)
+      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
+      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
       params.set('page', String(page))
       params.set('limit', '20')
       const res = await fetch(`/api/watchlist?${params}`)
@@ -516,7 +527,7 @@ export default function ArchivePage() {
     } finally {
       setRtLoading(false)
     }
-  }, [rtType, debouncedSearch])
+  }, [rtType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax])
 
   // ==================== Fetch Stats ====================
   const fetchStats = useCallback(async () => {
@@ -537,22 +548,28 @@ export default function ArchivePage() {
     if (!isAuthChecked) return
     setWlPage(1)
     fetchWatchlist(1, true)
-  }, [isAuthChecked, wlType, debouncedSearch, fetchWatchlist])
+  }, [isAuthChecked, wlType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax, fetchWatchlist])
 
-  // Fetch all available years from database
+  // Fetch all available years & genres from database
   useEffect(() => {
     if (!isAuthChecked) return
-    fetch('/api/years')
+    const typeParam = mainTab === 'ratings' ? rtType : wlType
+    const hasRatingParam = mainTab === 'ratings' ? 'true' : 'false'
+    fetch(`/api/years?type=${typeParam !== 'all' ? typeParam : ''}&hasRating=${hasRatingParam}`)
       .then(r => r.json())
       .then(data => { if (data.years) setDbYears(data.years) })
       .catch(() => {})
-  }, [isAuthChecked])
+    fetch(`/api/genres?type=${typeParam !== 'all' ? typeParam : ''}&hasRating=${hasRatingParam}`)
+      .then(r => r.json())
+      .then(data => { if (data.genres) setDbGenres(data.genres) })
+      .catch(() => {})
+  }, [isAuthChecked, mainTab, rtType, wlType])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'ratings') return
     setRtPage(1)
     fetchRatings(1, true)
-  }, [isAuthChecked, mainTab, rtType, debouncedSearch, fetchRatings])
+  }, [isAuthChecked, mainTab, rtType, debouncedSearch, sortBy, filterGenre, filterYear, filterRatingMin, filterRatingMax, fetchRatings])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'stats') return
@@ -861,48 +878,9 @@ export default function ArchivePage() {
     setShowQuickRate(true)
   }
 
-  // ==================== Sort & Filter ====================
-  const sortItems = useCallback((items: MediaItem[]): MediaItem[] => {
-    const sorted = [...items]
-    const [field, direction] = sortBy.split('_')
-    sorted.sort((a, b) => {
-      let aVal: string | number | boolean | null = ''
-      let bVal: string | number | boolean | null = ''
-      switch (field) {
-        case 'addedAt': aVal = a.addedAt; bVal = b.addedAt; break
-        case 'title': aVal = a.title; bVal = b.title; break
-        case 'year': aVal = a.year; bVal = b.year; break
-        case 'userRating': aVal = a.userRating ?? -1; bVal = b.userRating ?? -1; break
-        case 'rating': aVal = a.rating ? parseFloat(a.rating) : -1; bVal = b.rating ? parseFloat(b.rating) : -1; break
-        default: aVal = a.addedAt; bVal = b.addedAt
-      }
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-      }
-      return direction === 'asc'
-        ? ((aVal as number) - (bVal as number))
-        : ((bVal as number) - (aVal as number))
-    })
-    return sorted
-  }, [sortBy])
-
-  const filterItems = useCallback((items: MediaItem[]): MediaItem[] => {
-    return items.filter(item => {
-      if (filterGenre && !(item.genres || []).some(g => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
-      if (filterYear && item.year !== filterYear) return false
-      if (filterRatingMin && (item.userRating == null || item.userRating < parseFloat(filterRatingMin))) return false
-      if (filterRatingMax && (item.userRating == null || item.userRating > parseFloat(filterRatingMax))) return false
-      return true
-    })
-  }, [filterGenre, filterYear, filterRatingMin, filterRatingMax])
-
-  const processedWlItems = useMemo(() => {
-    return filterItems(sortItems(wlItems))
-  }, [wlItems, sortItems, filterItems])
-
-  const processedRtItems = useMemo(() => {
-    return filterItems(sortItems(rtItems))
-  }, [rtItems, sortItems, filterItems])
+  // ==================== Processed Items (server-sorted) ====================
+  const processedWlItems = wlItems
+  const processedRtItems = rtItems
 
   // ==================== Export/Import ====================
   const exportData = async () => {
@@ -990,21 +968,9 @@ export default function ArchivePage() {
     setShowMovieNight(true)
   }
 
-  // ==================== Unique genres/years for filters ====================
-  const allGenres = useMemo(() => {
-    const items = mainTab === 'watchlist' ? wlItems : rtItems
-    const genres = new Set<string>()
-    items.forEach(item => (item.genres || []).forEach(g => { if (g.trim()) genres.add(g.trim()) }))
-    return Array.from(genres).sort()
-  }, [mainTab, wlItems, rtItems])
-
-  const allYears = useMemo(() => {
-    if (dbYears.length > 0) return dbYears
-    const years = new Set<string>()
-    wlItems.forEach(item => { if (item.year) years.add(item.year) })
-    rtItems.forEach(item => { if (item.year) years.add(item.year) })
-    return Array.from(years).sort().reverse()
-  }, [dbYears, wlItems, rtItems])
+  // ==================== Unique genres/years from database ====================
+  const allGenres = dbGenres
+  const allYears = dbYears
 
   // ==================== Auth Loading ====================
   if (!isAuthChecked) {
@@ -1931,7 +1897,7 @@ export default function ArchivePage() {
             {/* Filters */}
             {showFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={filterGenre} onValueChange={setFilterGenre}>
+                <Select value={filterGenre || 'all'} onValueChange={v => setFilterGenre(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="التصنيف" />
                   </SelectTrigger>
@@ -1942,7 +1908,7 @@ export default function ArchivePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={filterYear} onValueChange={setFilterYear}>
+                <Select value={filterYear || 'all'} onValueChange={v => setFilterYear(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="السنة" />
                   </SelectTrigger>
@@ -2102,7 +2068,7 @@ export default function ArchivePage() {
             {/* Filters */}
             {showFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={filterGenre} onValueChange={setFilterGenre}>
+                <Select value={filterGenre || 'all'} onValueChange={v => setFilterGenre(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="التصنيف" />
                   </SelectTrigger>
@@ -2113,7 +2079,7 @@ export default function ArchivePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={filterYear} onValueChange={setFilterYear}>
+                <Select value={filterYear || 'all'} onValueChange={v => setFilterYear(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
                     <SelectValue placeholder="السنة" />
                   </SelectTrigger>
@@ -2183,9 +2149,9 @@ export default function ArchivePage() {
 
                         {/* Title & info */}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-[#666]">{item.year}</span>
+                          <h3 className="font-bold text-base text-white truncate leading-tight">{item.title}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-[#888]">{item.year}</span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-l ${typeConf.color} text-black`}>{typeConf.label}</span>
                             {item.genres && item.genres.length > 0 && (
                               <span className="text-[10px] text-[#555] truncate max-w-[100px]">{item.genres[0]}</span>

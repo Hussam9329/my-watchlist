@@ -15,6 +15,11 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const search = searchParams.get('search')
     const hasRating = searchParams.get('hasRating')
+    const sortBy = searchParams.get('sortBy') || 'addedAt_desc'
+    const filterGenre = searchParams.get('genre')
+    const filterYear = searchParams.get('year')
+    const filterRatingMin = searchParams.get('ratingMin')
+    const filterRatingMax = searchParams.get('ratingMax')
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')))
     const skip = (page - 1) * limit
@@ -32,11 +37,51 @@ export async function GET(request: NextRequest) {
         { originalTitle: { contains: search } }
       ]
     }
+    if (filterYear) {
+      where.year = filterYear
+    }
+    if (filterGenre) {
+      where.genres = { contains: filterGenre }
+    }
+    if (filterRatingMin || filterRatingMax) {
+      const ratingFilter: any = {}
+      if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)
+      if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)
+      // If hasRating is already set, merge with it
+      if (where.userRating && typeof where.userRating === 'object') {
+        where.userRating = { ...where.userRating, ...ratingFilter }
+      } else {
+        where.userRating = { not: null, ...ratingFilter }
+      }
+    }
+
+    // Map sortBy to Prisma orderBy
+    const [sortField, sortDir] = sortBy.split('_')
+    const direction = sortDir === 'asc' ? 'asc' : 'desc'
+    let orderBy: any
+    switch (sortField) {
+      case 'title':
+        orderBy = { title: direction }
+        break
+      case 'year':
+        orderBy = { year: direction }
+        break
+      case 'userRating':
+        orderBy = { userRating: { sort: direction, nulls: 'last' } }
+        break
+      case 'rating':
+        orderBy = { rating: direction }
+        break
+      case 'addedAt':
+      default:
+        orderBy = { addedAt: direction }
+        break
+    }
 
     const [items, total] = await Promise.all([
       prisma.mediaItem.findMany({
         where,
-        orderBy: { addedAt: 'desc' },
+        orderBy,
         skip,
         take: limit,
       }),
