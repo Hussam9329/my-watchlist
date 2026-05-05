@@ -2449,8 +2449,7 @@ export default function ArchivePage() {
                     return (
                       <div
                         key={item.id}
-                        className="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 active:scale-[0.98] transition-transform cursor-pointer hover:border-[#3a3a3a]"
-                        onClick={() => openDetails(item)}
+                        className="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 hover:border-[#3a3a3a] transition-colors"
                       >
                         {/* Rank number */}
                         <span className="text-xs text-[#555] font-mono w-6 text-center shrink-0">{idx + 1}</span>
@@ -2481,7 +2480,14 @@ export default function ArchivePage() {
                           <span className="text-xs text-[#555] shrink-0">-</span>
                         )}
 
-
+                        {/* Delete button - external */}
+                        <button
+                          onClick={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all"
+                          title="حذف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     )
                   })}
