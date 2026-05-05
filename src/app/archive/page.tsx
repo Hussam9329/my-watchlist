@@ -11,77 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useAuth } from '@/hooks/useAuth'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
-  Edit3, Grid3X3, List, Filter, ArrowUpDown, Download, Upload as UploadIcon,
+  Edit3, Grid3X3, List, ArrowUpDown, Download, Upload as UploadIcon,
   BarChart3, CalendarDays, Bookmark, Trash2,
   Dice5, Trophy, SlidersHorizontal
 } from 'lucide-react'
-
-// ==================== Types ====================
-interface MediaItem {
-  id: string
-  title: string
-  originalTitle?: string | null
-  year: string
-  type: string
-  poster?: string | null
-  rating?: string | null
-  overview?: string | null
-  genres: string[]
-  episodes?: number | null
-  seasons?: number | null
-  duration?: string | null
-  status?: string | null
-  author?: string | null
-  pages?: number | null
-  tags: string[]
-  notes: string
-
-  userRating?: number | null
-  rewatch: boolean
-  runtime?: number | null
-  ratingStatus: string
-  addedAt: string
-  updatedAt: string
-}
-
-interface MetadataResult {
-  title: string
-  originalTitle?: string
-  year?: string
-  poster?: string | null
-  overview?: string
-  rating?: string | null
-  type?: string
-  genres?: string[]
-  author?: string
-  pages?: number | null
-  episodes?: number | null
-  seasons?: number | null
-  duration?: string
-  status?: string
-  runtime?: number | null
-}
-
-interface StatsData {
-  totalRated: number
-  topGenre: string
-  avgRating: number
-  topYear: string
-  topDecade: string
-  thisMonth: number
-  movieCount: number
-  seriesCount: number
-  animeCount: number
-  avgMovieRating: number
-  avgSeriesRating: number
-  avgAnimeRating: number
-  genreCount: number
-  maxRating: number
-  maxRatingTitle: string
-}
+import { MediaItem, MetadataResult, StatsData } from '@/lib/types'
+import { compressImage } from '@/lib/image'
+import { formatRating, getRatingColor, getRatingBg } from '@/lib/rating'
+import { WL_SORT_OPTIONS, RT_SORT_OPTIONS, RATING_STATUSES } from '@/lib/constants'
+import { buildItemBody, itemToFormData, exportDataToFile, buildImportBody } from '@/lib/crud'
+import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
+import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
 // ==================== Constants ====================
 const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
@@ -91,168 +36,6 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
   book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
   game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
-}
-
-const WL_SORT_OPTIONS = [
-  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
-  { value: 'addedAt_asc', label: 'أضيف أولاً' },
-  { value: 'title_asc', label: 'الاسم أ-ي' },
-  { value: 'title_desc', label: 'الاسم ي-أ' },
-  { value: 'year_desc', label: 'السنة (جديد)' },
-  { value: 'year_asc', label: 'السنة (قديم)' },
-  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-]
-
-const RT_SORT_OPTIONS = [
-  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
-  { value: 'addedAt_asc', label: 'أضيف أولاً' },
-  { value: 'title_asc', label: 'الاسم أ-ي' },
-  { value: 'title_desc', label: 'الاسم ي-أ' },
-  { value: 'year_desc', label: 'السنة (جديد)' },
-  { value: 'year_asc', label: 'السنة (قديم)' },
-  { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
-  { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
-  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-]
-
-const RATING_STATUSES = [
-  { value: 'watched', label: 'تمت المشاهدة' },
-  { value: 'rewatching', label: 'إعادة مشاهدة' },
-  { value: 'dropped', label: 'متروك' },
-  { value: 'on_hold', label: 'معلق' },
-]
-
-// ==================== Helpers ====================
-function formatRating(num: number | null | undefined) {
-  if (num == null) return '-'
-  const n = Math.round(Number(num) * 100) / 100
-  return Number.isInteger(n) ? String(n) : n.toFixed(2)
-}
-
-function getRatingColor(rating: number) {
-  if (rating >= 70) return 'text-green-400'
-  if (rating >= 40) return 'text-yellow-400'
-  return 'text-red-400'
-}
-
-function getRatingBg(rating: number) {
-  if (rating >= 70) return 'bg-green-500/20 border-green-500/30 text-green-400'
-  if (rating >= 40) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
-  return 'bg-red-500/20 border-red-500/30 text-red-400'
-}
-
-const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let { width, height } = img
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height)
-          width *= ratio; height *= ratio
-        }
-        canvas.width = width; canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('No context')); return }
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.onerror = () => reject(new Error('Load failed'))
-      img.src = e.target?.result as string
-    }
-    reader.onerror = () => reject(new Error('Read failed'))
-    reader.readAsDataURL(file)
-  })
-}
-
-function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
-  return {
-    title: item.title || '',
-    originalTitle: item.originalTitle || '',
-    year: item.year || '',
-    type: item.type || 'movie',
-    poster: item.poster || '',
-    rating: item.rating || '',
-    overview: item.overview || '',
-    genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
-    episodes: item.episodes != null ? String(item.episodes) : '',
-    seasons: item.seasons != null ? String(item.seasons) : '',
-    duration: item.duration || '',
-    status: item.status || '',
-    author: item.author || '',
-    pages: item.pages != null ? String(item.pages) : '',
-    tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
-    notes: item.notes || '',
-    userRating: item.userRating != null ? String(item.userRating) : '',
-    rewatch: item.rewatch ? 'true' : 'false',
-    runtime: item.runtime != null ? String(item.runtime) : '',
-    ratingStatus: item.ratingStatus || 'watched',
-  }
-}
-
-// ==================== Responsive Modal Wrapper (OUTSIDE component for stable reference) ====================
-function ResponsiveModal({
-  open,
-  onOpenChange,
-  title,
-  children,
-  footerContent,
-  wide = false,
-  isMobile,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: string
-  children: React.ReactNode
-  footerContent?: React.ReactNode
-  wide?: boolean
-  isMobile: boolean
-}) {
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92vh]">
-          <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
-            <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 py-3" data-vaul-no-drag>
-            {children}
-          </div>
-          {footerContent && (
-            <DrawerFooter className="border-t border-[#2a2a2a]">
-              {footerContent}
-            </DrawerFooter>
-          )}
-        </DrawerContent>
-      </Drawer>
-    )
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
-        </DialogHeader>
-        {children}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ==================== Skeleton Grid ====================
-function SkeletonGrid({ count = 6 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="aspect-[2/3] rounded-xl skeleton-shimmer" />
-      ))}
-    </div>
-  )
 }
 
 // ==================== Memoized Card ====================
@@ -288,7 +71,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-[#888]">{item.year}</span>
             {item.userRating != null && (
-              <span className={`text-xs font-bold ${getRatingColor(item.userRating)}`}>
+              <span className={`text-xs font-bold ${getRatingColor(item.userRating, 100, 'green')}`}>
                 {formatRating(item.userRating)}
               </span>
             )}
@@ -327,7 +110,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
         {/* Rating overlay */}
         {item.userRating != null && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
-            <div className={`text-lg font-bold ${getRatingColor(item.userRating)}`}>
+            <div className={`text-lg font-bold ${getRatingColor(item.userRating, 100, 'green')}`}>
               {formatRating(item.userRating)}
             </div>
           </div>
@@ -375,7 +158,7 @@ export default function ArchivePage() {
   const isMobile = useIsMobile()
 
   // Auth
-  const [isAuthChecked, setIsAuthChecked] = useState(false)
+  const isAuthChecked = useAuth()
 
   // Main tabs
   const [mainTab, setMainTab] = useState<'watchlist' | 'ratings' | 'stats'>('watchlist')
@@ -406,7 +189,7 @@ export default function ArchivePage() {
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(searchQuery)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   // Separate sort & filter state per tab
   const [wlSortBy, setWlSortBy] = useState('addedAt_desc')
@@ -452,29 +235,9 @@ export default function ArchivePage() {
   const [showMovieNight, setShowMovieNight] = useState(false)
 
   // Refs
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
-
-  // ==================== Auth ====================
-  useEffect(() => {
-    const auth = localStorage.getItem('hussamvision_auth')
-    if (auth !== 'true') {
-      window.location.href = '/'
-      return
-    }
-    setIsAuthChecked(true)
-  }, [])
-
-  // ==================== Debounced Search ====================
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
 
   // ==================== Fetch Watchlist ====================
   const fetchWatchlist = useCallback(async (page: number, reset = false) => {
@@ -630,28 +393,7 @@ export default function ArchivePage() {
     }
     setFormSubmitting(true)
     try {
-      const body: Record<string, unknown> = {
-        title: formData.title,
-        originalTitle: formData.originalTitle || null,
-        year: formData.year,
-        type: formData.type || 'movie',
-        poster: formData.poster || null,
-        rating: formData.rating || null,
-        overview: formData.overview || null,
-        genres: formData.genres,
-        episodes: formData.episodes ? parseInt(formData.episodes) : null,
-        seasons: formData.seasons ? parseInt(formData.seasons) : null,
-        duration: formData.duration || null,
-        status: formData.status || null,
-        author: formData.author || null,
-        pages: formData.pages ? parseInt(formData.pages) : null,
-        tags: formData.tags,
-        notes: formData.notes,
-        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
-        rewatch: formData.rewatch === 'true',
-        runtime: formData.runtime ? parseInt(formData.runtime) : null,
-        ratingStatus: formData.ratingStatus || 'watched',
-      }
+      const body = buildItemBody(formData, formData.type || 'movie')
       const res = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -709,28 +451,7 @@ export default function ArchivePage() {
     if (!selectedItem) return
     setFormSubmitting(true)
     try {
-      const body: Record<string, unknown> = {
-        title: formData.title,
-        originalTitle: formData.originalTitle || null,
-        year: formData.year,
-        type: formData.type,
-        poster: formData.poster || null,
-        rating: formData.rating || null,
-        overview: formData.overview || null,
-        genres: formData.genres,
-        episodes: formData.episodes ? parseInt(formData.episodes) : null,
-        seasons: formData.seasons ? parseInt(formData.seasons) : null,
-        duration: formData.duration || null,
-        status: formData.status || null,
-        author: formData.author || null,
-        pages: formData.pages ? parseInt(formData.pages) : null,
-        tags: formData.tags,
-        notes: formData.notes,
-        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
-        rewatch: formData.rewatch === 'true',
-        runtime: formData.runtime ? parseInt(formData.runtime) : null,
-        ratingStatus: formData.ratingStatus || 'watched',
-      }
+      const body = buildItemBody(formData, formData.type)
       const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -895,25 +616,11 @@ export default function ArchivePage() {
     setShowQuickRate(true)
   }
 
-  // ==================== Processed Items (server-sorted) ====================
-  const processedWlItems = wlItems
-  const processedRtItems = rtItems
 
   // ==================== Export/Import ====================
   const exportData = async () => {
     try {
-      const params = new URLSearchParams()
-      params.set('limit', '1000')
-      const res = await fetch(`/api/watchlist?${params}`)
-      const data = await res.json()
-      const items = data.items || []
-      const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `hussamvision-backup-${new Date().toISOString().split('T')[0]}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      await exportDataToFile(undefined, 'hussamvision-backup')
       toast.success('تم تصدير البيانات')
     } catch {
       toast.error('خطأ في التصدير')
@@ -931,29 +638,7 @@ export default function ArchivePage() {
       let duplicates = 0
       for (const item of items) {
         try {
-          const body = {
-            title: item.title,
-            originalTitle: item.originalTitle || null,
-            year: item.year || '',
-            type: item.type || 'movie',
-            poster: item.poster || null,
-            rating: item.rating || null,
-            overview: item.overview || null,
-            genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
-            episodes: item.episodes || null,
-            seasons: item.seasons || null,
-            duration: item.duration || null,
-            status: item.status || null,
-            author: item.author || null,
-            pages: item.pages || null,
-            tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
-            notes: item.notes || '',
-
-            userRating: item.userRating != null ? item.userRating : null,
-            rewatch: item.rewatch || false,
-            runtime: item.runtime || null,
-            ratingStatus: item.ratingStatus || 'watched',
-          }
+          const body = buildImportBody(item, item.type || 'movie')
           const res = await fetch('/api/watchlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -986,8 +671,6 @@ export default function ArchivePage() {
   }
 
   // ==================== Unique genres/years from database ====================
-  const allGenres = dbGenres
-  const allYears = dbYears
 
   // ==================== Auth Loading ====================
   if (!isAuthChecked) {
@@ -1031,7 +714,7 @@ export default function ArchivePage() {
           )}
           {selectedItem.userRating != null && (
             <div className="mt-2">
-              <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border ${getRatingBg(selectedItem.userRating)}`}>
+              <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border ${getRatingBg(selectedItem.userRating, 100, 'green')}`}>
                 <Trophy className="w-4 h-4" />
                 <span className="font-bold text-lg">{formatRating(selectedItem.userRating)}</span>
                 <span className="text-xs">/100</span>
@@ -1054,7 +737,7 @@ export default function ArchivePage() {
         {selectedItem.genres && selectedItem.genres.length > 0 && (
           <div className="col-span-2">
             <span className="text-[#888]">التصنيفات: </span>
-            <span className="text-[#ccc]">{selectedItem.genres.join(' • ')}</span>
+            <span className="text-[#ccc]">{Array.isArray(selectedItem.genres) ? selectedItem.genres.join(' • ') : selectedItem.genres}</span>
           </div>
         )}
         {selectedItem.episodes && (
@@ -1085,7 +768,7 @@ export default function ArchivePage() {
         {selectedItem.tags && selectedItem.tags.length > 0 && (
           <div className="col-span-2">
             <span className="text-[#888]">الوسوم: </span>
-            <span className="text-[#ccc]">{selectedItem.tags.join(' • ')}</span>
+            <span className="text-[#ccc]">{Array.isArray(selectedItem.tags) ? selectedItem.tags.join(' • ') : selectedItem.tags}</span>
           </div>
         )}
       </div>
@@ -1468,7 +1151,7 @@ export default function ArchivePage() {
         <h3 className="font-bold text-lg text-white">{selectedItem.title}</h3>
         <p className="text-sm text-[#888]">{selectedItem.year} • {(TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.movie).label}</p>
         {selectedItem.userRating != null && (
-          <p className="text-sm mt-1">التقييم الحالي: <span className={`font-bold ${getRatingColor(selectedItem.userRating)}`}>{formatRating(selectedItem.userRating)}</span></p>
+          <p className="text-sm mt-1">التقييم الحالي: <span className={`font-bold ${getRatingColor(selectedItem.userRating, 100, 'green')}`}>{formatRating(selectedItem.userRating)}</span></p>
         )}
       </div>
 
@@ -1920,7 +1603,7 @@ export default function ArchivePage() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
                     <SelectItem value="all">الكل</SelectItem>
-                    {allGenres.map(g => (
+                    {dbGenres.map(g => (
                       <SelectItem key={g} value={g}>{g}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1931,7 +1614,7 @@ export default function ArchivePage() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
                     <SelectItem value="all">الكل</SelectItem>
-                    {allYears.map(y => (
+                    {dbYears.map(y => (
                       <SelectItem key={y} value={y}>{y}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1964,7 +1647,7 @@ export default function ArchivePage() {
             {/* Items */}
             {wlLoading && wlItems.length === 0 ? (
               <SkeletonGrid count={6} />
-            ) : processedWlItems.length === 0 ? (
+            ) : wlItems.length === 0 ? (
               <div className="text-center py-16">
                 <Bookmark className="w-12 h-12 text-[#333] mx-auto mb-4" />
                 <p className="text-[#888] text-lg mb-2">لا توجد أعمال</p>
@@ -1974,7 +1657,7 @@ export default function ArchivePage() {
               <>
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
-                    {processedWlItems.map(item => (
+                    {wlItems.map(item => (
                       <MediaCard
                         key={item.id}
                         item={item}
@@ -1987,7 +1670,7 @@ export default function ArchivePage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {processedWlItems.map(item => (
+                    {wlItems.map(item => (
                       <MediaCard
                         key={item.id}
                         item={item}
@@ -2091,7 +1774,7 @@ export default function ArchivePage() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
                     <SelectItem value="all">الكل</SelectItem>
-                    {allGenres.map(g => (
+                    {dbGenres.map(g => (
                       <SelectItem key={g} value={g}>{g}</SelectItem>
                     ))}
                   </SelectContent>
@@ -2102,7 +1785,7 @@ export default function ArchivePage() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
                     <SelectItem value="all">الكل</SelectItem>
-                    {allYears.map(y => (
+                    {dbYears.map(y => (
                       <SelectItem key={y} value={y}>{y}</SelectItem>
                     ))}
                   </SelectContent>
@@ -2139,7 +1822,7 @@ export default function ArchivePage() {
                   <div key={i} className="h-16 rounded-xl skeleton-shimmer" />
                 ))}
               </div>
-            ) : processedRtItems.length === 0 ? (
+            ) : rtItems.length === 0 ? (
               <div className="text-center py-16">
                 <Trophy className="w-12 h-12 text-[#333] mx-auto mb-4" />
                 <p className="text-[#888] text-lg mb-2">لا توجد تقييمات</p>
@@ -2148,7 +1831,7 @@ export default function ArchivePage() {
             ) : (
               <>
                 <div className="space-y-1.5">
-                  {processedRtItems.map((item, idx) => {
+                  {rtItems.map((item, idx) => {
                     const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
                     const TypeIcon = typeConf.icon
                     return (
@@ -2178,8 +1861,8 @@ export default function ArchivePage() {
 
                         {/* Rating */}
                         {item.userRating != null ? (
-                          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border shrink-0 ${getRatingBg(item.userRating)}`}>
-                            <span className={`font-black text-base ${getRatingColor(item.userRating)}`}>{formatRating(item.userRating)}</span>
+                          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border shrink-0 ${getRatingBg(item.userRating, 100, 'green')}`}>
+                            <span className={`font-black text-base ${getRatingColor(item.userRating, 100, 'green')}`}>{formatRating(item.userRating)}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-[#555] shrink-0">-</span>

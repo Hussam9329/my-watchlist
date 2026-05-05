@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-
-function formatItem(item: any) {
-  return {
-    ...item,
-    genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
-    tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
-  }
-}
+import { formatItem } from '@/lib/format'
 
 export async function GET(
   request: NextRequest,

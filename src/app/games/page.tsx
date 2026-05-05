@@ -9,55 +9,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useAuth } from '@/hooks/useAuth'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, Star, X, Search, Loader2, Edit3, Grid3X3, List,
   Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3, CalendarDays,
   Settings, Trash2, ArrowRight, Gamepad2, Monitor, Smartphone
 } from 'lucide-react'
-
-// ==================== Types ====================
-interface MediaItem {
-  id: string
-  title: string
-  originalTitle?: string | null
-  year: string
-  type: string
-  poster?: string | null
-  rating?: string | null
-  overview?: string | null
-  genres: string[] | string
-  episodes?: number | null
-  seasons?: number | null
-  duration?: string | null
-  status?: string | null
-  author?: string | null
-  pages?: number | null
-  tags: string[] | string
-  notes: string
-
-  userRating?: number | null
-  rewatch: boolean
-  runtime?: number | null
-  ratingStatus: string
-  addedAt: string
-  updatedAt: string
-}
-
-interface MetadataResult {
-  title: string
-  originalTitle?: string
-  year?: string
-  poster?: string | null
-  overview?: string
-  rating?: string | null
-  type?: string
-  genres?: string[]
-  author?: string
-  platform?: string
-}
+import { MediaItem, MetadataResult } from '@/lib/types'
+import { normalizeGenres, normalizeTags } from '@/lib/format'
+import { compressImage } from '@/lib/image'
+import { getRatingColor, getRatingBg } from '@/lib/rating'
+import { SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
+import { buildItemBody, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { sortMediaItems, itemMatchesTab, getPlatformBadge } from '@/lib/sort'
+import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
+import { RatingStars } from '@/components/shared/RatingStars'
 
 // ==================== Tab Config ====================
 const TAB_CONFIG: Record<string, { icon: typeof Gamepad2; label: string; plural: string; color: string; bgColor: string; platform: string }> = {
@@ -65,152 +34,6 @@ const TAB_CONFIG: Record<string, { icon: typeof Gamepad2; label: string; plural:
   pc: { icon: Monitor, label: 'PC', plural: 'ألعاب PC', color: 'from-blue-500 to-indigo-500', bgColor: 'bg-blue-500/10', platform: 'PC' },
   console: { icon: Gamepad2, label: 'كونسول', plural: 'ألعاب كونسول', color: 'from-purple-500 to-violet-500', bgColor: 'bg-purple-500/10', platform: 'Console' },
   mobile: { icon: Smartphone, label: 'موبايل', plural: 'ألعاب موبايل', color: 'from-orange-500 to-red-500', bgColor: 'bg-orange-500/10', platform: 'Mobile' },
-}
-
-// ==================== Constants ====================
-const SORT_OPTIONS = [
-  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
-  { value: 'addedAt_asc', label: 'أضيف أولاً' },
-  { value: 'title_asc', label: 'العنوان أ-ي' },
-  { value: 'title_desc', label: 'العنوان ي-أ' },
-  { value: 'year_desc', label: 'السنة (جديد)' },
-  { value: 'year_asc', label: 'السنة (قديم)' },
-  { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
-  { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
-  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-]
-
-const PLATFORM_OPTIONS = [
-  { value: 'PC', label: 'PC' },
-  { value: 'Console', label: 'كونسول' },
-  { value: 'Mobile', label: 'موبايل' },
-  { value: 'Mac', label: 'Mac' },
-  { value: 'Linux', label: 'Linux' },
-]
-
-// ==================== Helpers ====================
-function normalizeGenres(genres: string[] | string): string[] {
-  if (Array.isArray(genres)) return genres
-  if (typeof genres === 'string' && genres.trim()) return genres.split(',').map(g => g.trim()).filter(Boolean)
-  return []
-}
-
-function normalizeTags(tags: string[] | string): string[] {
-  if (Array.isArray(tags)) return tags
-  if (typeof tags === 'string' && tags.trim()) return tags.split(',').map(t => t.trim()).filter(Boolean)
-  return []
-}
-
-const compressImage = (file: File, maxWidth = 400, maxHeight = 600, quality = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let { width, height } = img
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height)
-          width *= ratio
-          height *= ratio
-        }
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('No context')); return }
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.onerror = () => reject(new Error('Load failed'))
-      img.src = e.target?.result as string
-    }
-    reader.onerror = () => reject(new Error('Read failed'))
-    reader.readAsDataURL(file)
-  })
-}
-
-function getRatingColor(rating: number) {
-  if (rating >= 7) return 'text-teal-400'
-  if (rating >= 4) return 'text-yellow-400'
-  return 'text-red-400'
-}
-
-function getRatingBg(rating: number) {
-  if (rating >= 7) return 'bg-teal-500/20 border-teal-500/30 text-teal-400'
-  if (rating >= 4) return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
-  return 'bg-red-500/20 border-red-500/30 text-red-400'
-}
-
-function getPlatformBadge(item: MediaItem): { label: string; color: string } | null {
-  const platform = (item.author || '').toLowerCase()
-  if (platform.includes('pc') || platform.includes('windows')) return { label: 'PC', color: 'from-blue-500 to-indigo-500' }
-  if (platform.includes('console') || platform.includes('playstation') || platform.includes('xbox') || platform.includes('nintendo')) return { label: 'كونسول', color: 'from-purple-500 to-violet-500' }
-  if (platform.includes('mobile') || platform.includes('android') || platform.includes('ios')) return { label: 'موبايل', color: 'from-orange-500 to-red-500' }
-  if (platform.includes('mac')) return { label: 'Mac', color: 'from-gray-500 to-gray-600' }
-  if (platform.includes('linux')) return { label: 'Linux', color: 'from-yellow-500 to-orange-500' }
-  if (platform) return { label: item.author || '', color: 'from-teal-500 to-cyan-500' }
-  return null
-}
-
-function itemMatchesTab(item: MediaItem, tabKey: string): boolean {
-  const platform = TAB_CONFIG[tabKey]?.platform
-  if (!platform) return true
-  const author = (item.author || '').toLowerCase()
-  if (platform === 'PC') return author.includes('pc') || author.includes('windows') || author.includes('mac') || author.includes('linux')
-  if (platform === 'Console') return author.includes('console') || author.includes('playstation') || author.includes('xbox') || author.includes('nintendo') || author.includes('ps') || author.includes('switch')
-  if (platform === 'Mobile') return author.includes('mobile') || author.includes('android') || author.includes('ios')
-  return true
-}
-
-// ==================== Skeleton Grid ====================
-function SkeletonGrid({ count = 6 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="aspect-[3/4] rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] animate-pulse" />
-      ))}
-    </div>
-  )
-}
-
-// ==================== Rating Stars ====================
-function RatingStars({ rating, onChange, size = 'sm' }: { rating: number | null; onChange?: (r: number) => void; size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClass = size === 'lg' ? 'w-6 h-6' : size === 'md' ? 'w-5 h-5' : 'w-4 h-4'
-  const maxRating = 10
-  const displayRating = rating ?? 0
-
-  if (!onChange) {
-    return (
-      <div className="flex items-center gap-0.5" dir="ltr">
-        {Array.from({ length: maxRating }).map((_, i) => (
-          <Star
-            key={i}
-            className={`${sizeClass} ${i < displayRating ? 'text-teal-400 fill-teal-400' : 'text-[#333]'}`}
-          />
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-0.5 flex-wrap" dir="ltr">
-      {Array.from({ length: maxRating }).map((_, i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onChange(i + 1 === rating ? 0 : i + 1)}
-          className="active:scale-[0.9] transition-transform"
-        >
-          <Star
-            className={`${sizeClass} ${i < (rating ?? 0) ? 'text-teal-400 fill-teal-400' : 'text-[#333] hover:text-teal-400/50'} transition-colors`}
-          />
-        </button>
-      ))}
-      {rating != null && (
-        <span className="text-sm font-bold text-teal-400 mr-1">{rating}/10</span>
-      )}
-    </div>
-  )
 }
 
 // ==================== Memoized Card ====================
@@ -247,7 +70,7 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
             {item.author && <span className="text-xs text-[#888] truncate max-w-[120px]">{item.author}</span>}
             <span className="text-xs text-[#666]">{item.year}</span>
             {item.userRating != null && (
-              <span className={`text-xs font-bold ${getRatingColor(item.userRating)}`}>
+              <span className={`text-xs font-bold ${getRatingColor(item.userRating, 10, 'teal')}`}>
                 {item.userRating}/10
               </span>
             )}
@@ -290,7 +113,7 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
         {/* Rating overlay */}
         {item.userRating != null && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8">
-            <div className={`text-lg font-bold ${getRatingColor(item.userRating)}`}>
+            <div className={`text-lg font-bold ${getRatingColor(item.userRating, 10, 'teal')}`}>
               {item.userRating}/10
             </div>
           </div>
@@ -337,7 +160,7 @@ export default function GamesPage() {
   const isMobile = useIsMobile()
 
   // Auth
-  const [isAuthChecked, setIsAuthChecked] = useState(false)
+  const isAuthChecked = useAuth()
 
   // Data
   const [games, setGames] = useState<MediaItem[]>([])
@@ -346,7 +169,7 @@ export default function GamesPage() {
   // UI
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(searchQuery)
   const [sortBy, setSortBy] = useState('addedAt_desc')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showFilters, setShowFilters] = useState(false)
@@ -380,28 +203,8 @@ export default function GamesPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
 
   // Refs
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
-
-  // ==================== Auth ====================
-  useEffect(() => {
-    const auth = localStorage.getItem('hussamvision_auth')
-    if (auth !== 'true') {
-      window.location.href = '/'
-      return
-    }
-    setIsAuthChecked(true)
-  }, [])
-
-  // ==================== Debounced Search ====================
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
 
   // ==================== Fetch Games ====================
   const fetchGames = useCallback(async () => {
@@ -434,22 +237,7 @@ export default function GamesPage() {
     }
     setFormSubmitting(true)
     try {
-      const body: Record<string, unknown> = {
-        title: formData.title,
-        originalTitle: formData.originalTitle || null,
-        year: formData.year || '',
-        type: 'game',
-        poster: formData.poster || null,
-        rating: formData.rating || null,
-        overview: formData.overview || null,
-        genres: formData.genres,
-        author: formData.author || null,
-        tags: formData.tags,
-        notes: formData.notes,
-        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
-        rewatch: formData.rewatch === 'true',
-        ratingStatus: formData.ratingStatus || 'watched',
-      }
+      const body = buildItemBody(formData, 'game')
       const res = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -478,22 +266,7 @@ export default function GamesPage() {
     if (!selectedItem) return
     setFormSubmitting(true)
     try {
-      const body: Record<string, unknown> = {
-        title: formData.title,
-        originalTitle: formData.originalTitle || null,
-        year: formData.year || '',
-        type: 'game',
-        poster: formData.poster || null,
-        rating: formData.rating || null,
-        overview: formData.overview || null,
-        genres: formData.genres,
-        author: formData.author || null,
-        tags: formData.tags,
-        notes: formData.notes,
-        userRating: formData.userRating ? parseFloat(formData.userRating) : null,
-        rewatch: formData.rewatch === 'true',
-        ratingStatus: formData.ratingStatus || 'watched',
-      }
+      const body = buildItemBody(formData, 'game')
       const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -524,23 +297,6 @@ export default function GamesPage() {
       fetchGames()
     } catch {
       toast.error('خطأ في الحذف')
-    }
-  }
-
-  const setUserRating = async (item: MediaItem, rating: number) => {
-    try {
-      const res = await fetch(`/api/watchlist/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }),
-      })
-      if (!res.ok) throw new Error('خطأ')
-      const updated = await res.json()
-      setGames(prev => prev.map(i => i.id === item.id ? { ...i, userRating: rating, watched: true } : i))
-      if (selectedItem?.id === item.id) setSelectedItem(updated)
-      toast.success(`تم التقييم: ${rating}/10`)
-    } catch {
-      toast.error('خطأ في التقييم')
     }
   }
 
@@ -647,45 +403,14 @@ export default function GamesPage() {
   }
 
   // ==================== Sort & Filter ====================
-  const sortItems = useCallback((items: MediaItem[]): MediaItem[] => {
-    const sorted = [...items]
-    const [field, direction] = sortBy.split('_')
-    sorted.sort((a, b) => {
-      let aVal: string | number | null = ''
-      let bVal: string | number | null = ''
-      switch (field) {
-        case 'addedAt': aVal = a.addedAt; bVal = b.addedAt; break
-        case 'title': aVal = a.title; bVal = b.title; break
-        case 'year': aVal = a.year; bVal = b.year; break
-        case 'userRating': aVal = a.userRating ?? -1; bVal = b.userRating ?? -1; break
-        case 'rating': aVal = a.rating ? parseFloat(a.rating) : -1; bVal = b.rating ? parseFloat(b.rating) : -1; break
-        default: aVal = a.addedAt; bVal = b.addedAt
-      }
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-      }
-      return direction === 'asc'
-        ? ((aVal as number) - (bVal as number))
-        : ((bVal as number) - (aVal as number))
-    })
-    return sorted
-  }, [sortBy])
-
-  const filterItems = useCallback((items: MediaItem[]): MediaItem[] => {
-    return items.filter(item => {
-      // Tab filter
-      if (!itemMatchesTab(item, activeTab)) return false
-      // Genre filter
+  const processedItems = useMemo(() => {
+    return sortMediaItems(games, sortBy).filter(item => {
+      if (!itemMatchesTab(item, activeTab, TAB_CONFIG)) return false
       if (filterGenre && !normalizeGenres(item.genres).some(g => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
-      // Year filter
       if (filterYear && item.year !== filterYear) return false
       return true
     })
-  }, [activeTab, filterGenre, filterYear])
-
-  const processedItems = useMemo(() => {
-    return filterItems(sortItems(games))
-  }, [games, sortItems, filterItems])
+  }, [games, sortBy, filterGenre, filterYear, activeTab])
 
   // ==================== Unique genres/years for filters ====================
   const allGenres = useMemo(() => {
@@ -731,19 +456,7 @@ export default function GamesPage() {
   // ==================== Export/Import ====================
   const exportData = async () => {
     try {
-      const params = new URLSearchParams()
-      params.set('type', 'game')
-      params.set('limit', '1000')
-      const res = await fetch(`/api/watchlist?${params}`)
-      const data = await res.json()
-      const items = data.items || []
-      const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `hussamvision-games-${new Date().toISOString().split('T')[0]}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      await exportDataToFile('game', 'hussamvision-games')
       toast.success('تم تصدير البيانات')
     } catch {
       toast.error('خطأ في التصدير')
@@ -754,40 +467,7 @@ export default function GamesPage() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const text = await file.text()
-      const items = JSON.parse(text)
-      if (!Array.isArray(items)) throw new Error('Invalid format')
-      let imported = 0
-      let duplicates = 0
-      for (const item of items) {
-        try {
-          const body = {
-            title: item.title,
-            originalTitle: item.originalTitle || null,
-            year: item.year || '',
-            type: 'game',
-            poster: item.poster || null,
-            rating: item.rating || null,
-            overview: item.overview || null,
-            genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
-            author: item.author || null,
-            tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
-            notes: item.notes || '',
-            userRating: item.userRating != null ? item.userRating : null,
-            rewatch: item.rewatch || false,
-            ratingStatus: item.ratingStatus || 'watched',
-          }
-          const res = await fetch('/api/watchlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-          if (res.ok) imported++
-          else duplicates++
-        } catch {
-          duplicates++
-        }
-      }
+      const { imported, duplicates } = await importDataFromFile(file, 'game')
       toast.success(`تم استيراد ${imported} لعبة (${duplicates} مكرر)`)
       fetchGames()
     } catch {
@@ -1109,7 +789,7 @@ export default function GamesPage() {
             {selectedItem.userRating != null && (
               <div className="mt-1">
                 <span className="text-sm text-[#aaa]">تقييمي: </span>
-                <span className={`text-sm font-bold ${getRatingColor(selectedItem.userRating)}`}>{selectedItem.userRating}/10</span>
+                <span className={`text-sm font-bold ${getRatingColor(selectedItem.userRating, 10, 'teal')}`}>{selectedItem.userRating}/10</span>
               </div>
             )}
           </div>
@@ -1258,7 +938,7 @@ export default function GamesPage() {
               {stats.topRated.poster && <img src={stats.topRated.poster} alt="" className="w-8 h-10 rounded object-cover" />}
               <div>
                 <div className="text-sm font-bold text-white">{stats.topRated.title}</div>
-                <div className={`text-sm font-bold ${getRatingColor(stats.topRated.userRating ?? 0)}`}>{stats.topRated.userRating}/10</div>
+                <div className={`text-sm font-bold ${getRatingColor(stats.topRated.userRating ?? 0, 10, 'teal')}`}>{stats.topRated.userRating}/10</div>
               </div>
             </div>
           </div>
@@ -1496,7 +1176,7 @@ export default function GamesPage() {
       {/* Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {loading ? (
-          <SkeletonGrid count={8} />
+          <SkeletonGrid count={8} aspectRatio="3/4" variant="pulse" />
         ) : processedItems.length === 0 ? (
           <div className="text-center py-20">
             <Gamepad2 className="w-16 h-16 text-[#333] mx-auto mb-4" />
@@ -1605,7 +1285,7 @@ export default function GamesPage() {
               {selectedItem && (
                 <>
                   <h3 className="text-lg font-bold text-white text-center">{selectedItem.title}</h3>
-                  <RatingStars rating={selectedItem.userRating} onChange={handleQuickRate} size="lg" />
+                  <RatingStars rating={selectedItem.userRating ?? null} onChange={handleQuickRate} size="lg" colorTheme="teal" />
                 </>
               )}
             </div>
@@ -1627,7 +1307,7 @@ export default function GamesPage() {
               {selectedItem && (
                 <>
                   <h3 className="text-lg font-bold text-white text-center">{selectedItem.title}</h3>
-                  <RatingStars rating={selectedItem.userRating} onChange={handleQuickRate} size="lg" />
+                  <RatingStars rating={selectedItem.userRating ?? null} onChange={handleQuickRate} size="lg" colorTheme="teal" />
                 </>
               )}
             </div>
