@@ -849,33 +849,42 @@ export default function BooksPage() {
           />
         </div>
 
-        {/* Poster */}
+        {/* Poster - preview + upload only, no URL field */}
         <div className="space-y-1">
           <label className="text-xs text-[#999]">صورة الغلاف</label>
-          <div className="flex gap-2 items-center">
-            <Input
-              value={formData.poster}
-              onChange={e => setFormData(prev => ({ ...prev, poster: e.target.value }))}
-              placeholder="رابط الصورة"
-              className="bg-[#111] border-[#333] text-white placeholder:text-[#555] flex-1"
-              dir="ltr"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[#333] text-[#999] hover:text-white shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingImage}
-            >
-              {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
-            </Button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <div className="flex items-center gap-3">
+            {formData.poster ? (
+              <div className="relative group shrink-0">
+                <div className="w-16 h-24 rounded-xl overflow-hidden bg-[#2a2a2a] border border-[#333] shadow-lg">
+                  <img src={formData.poster} alt="preview" className="w-full h-full object-cover" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, poster: '' }))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs hover:bg-red-400 transition-colors shadow-md"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <label className="cursor-pointer block flex-1">
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#2a2a2a] text-[#aaa] text-sm hover:bg-[#333] hover:text-white transition-colors min-h-[44px] border border-dashed border-[#444]">
+                  {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+                  <span>رفع صورة مختلفة</span>
+                </div>
+              </label>
+            )}
+            {formData.poster && (
+              <label className="cursor-pointer block">
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#2a2a2a] text-[#aaa] text-xs hover:bg-[#333] hover:text-white transition-colors border border-dashed border-[#444]">
+                  {uploadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadIcon className="w-3 h-3" />}
+                  <span>تغيير</span>
+                </div>
+              </label>
+            )}
           </div>
-          {formData.poster && (
-            <div className="mt-2">
-              <img src={formData.poster} alt="preview" className="w-16 h-24 rounded-lg object-cover border border-[#333]" />
-            </div>
-          )}
         </div>
 
         {/* Rating */}

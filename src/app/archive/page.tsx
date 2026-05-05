@@ -1343,32 +1343,40 @@ export default function ArchivePage() {
         </div>
       )}
 
-      {/* Poster */}
+      {/* Poster - preview + upload only, no URL field */}
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-[#d4af37]">الصورة</label>
-        <div className="flex items-start gap-3">
-          <div className="flex-1 space-y-2">
-            <Input
-              value={formData.poster}
-              onChange={(e) => setFormData(prev => ({ ...prev, poster: e.target.value }))}
-              placeholder="رابط الصورة"
-              className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
-              dir="ltr"
-            />
-            <label className="cursor-pointer block">
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#2a2a2a] text-[#aaa] text-sm hover:bg-[#333] hover:text-white transition-colors min-h-[44px] border border-dashed border-[#3a3a3a]">
-                {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
-                <span>رفع صورة</span>
-              </div>
-            </label>
-          </div>
-          {formData.poster && (
-            <div className="shrink-0">
+        <div className="flex items-center gap-3">
+          {formData.poster ? (
+            <div className="relative group shrink-0">
               <div className="w-16 h-24 sm:w-20 sm:h-30 rounded-xl overflow-hidden bg-[#2a2a2a] border border-[#3a3a3a] shadow-lg">
                 <img src={formData.poster} alt="preview" className="w-full h-full object-cover" />
               </div>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, poster: '' }))}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs hover:bg-red-400 transition-colors shadow-md"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </div>
+          ) : (
+            <label className="cursor-pointer block flex-1">
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#2a2a2a] text-[#aaa] text-sm hover:bg-[#333] hover:text-white transition-colors min-h-[44px] border border-dashed border-[#3a3a3a]">
+                {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+                <span>رفع صورة مختلفة</span>
+              </div>
+            </label>
+          )}
+          {formData.poster && (
+            <label className="cursor-pointer block">
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#2a2a2a] text-[#aaa] text-xs hover:bg-[#333] hover:text-white transition-colors border border-dashed border-[#3a3a3a]">
+                {uploadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadIcon className="w-3 h-3" />}
+                <span>تغيير</span>
+              </div>
+            </label>
           )}
         </div>
       </div>
