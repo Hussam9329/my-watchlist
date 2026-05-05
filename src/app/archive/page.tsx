@@ -602,8 +602,12 @@ export default function ArchivePage() {
 
   // ==================== CRUD Operations ====================
   const createItem = async () => {
-    if (!formData.title.trim() || !formData.year.trim()) {
-      toast.error('العنوان والسنة مطلوبان')
+    if (!formData.title.trim()) {
+      toast.error('ابحث عن العمل أولاً باستخدام البحث التلقائي')
+      return
+    }
+    if (!formData.year.trim()) {
+      toast.error('السنة مطلوبة - اختر عملاً يحتوي على سنة من نتائج البحث')
       return
     }
     setFormSubmitting(true)
@@ -1286,10 +1290,32 @@ export default function ArchivePage() {
         )}
       </div>
 
+      {/* Title - read-only, auto-filled from TMDB */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-[#d4af37]">العنوان</label>
+        {formData.title ? (
+          <div className="flex items-center gap-2 px-3 h-11 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] text-white text-sm font-medium">
+            <span className="flex-1 truncate">{formData.title}</span>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, title: '', year: '', poster: '', originalTitle: '', overview: '', rating: '' }))}
+              className="text-[#666] hover:text-red-400 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center px-3 h-11 rounded-xl bg-[#1a1a1a]/50 border border-dashed border-[#3a3a3a] text-[#555] text-sm">
+            <Search className="w-3.5 h-3.5 ml-2" />
+            ابحث أعلاه لتحديد العنوان تلقائياً
+          </div>
+        )}
+      </div>
+
       {/* Type + Year row */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-[#d4af37]">النوع *</label>
+          <label className="text-xs font-bold text-[#d4af37]">النوع</label>
           <Select value={formData.type} onValueChange={(v) => setFormData(prev => ({ ...prev, type: v }))}>
             <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] h-11">
               <SelectValue />
@@ -1302,28 +1328,17 @@ export default function ArchivePage() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-[#d4af37]">السنة *</label>
-          <Input
-            value={formData.year}
-            onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
-            placeholder="2024"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
-          />
+          <label className="text-xs font-bold text-[#d4af37]">السنة</label>
+          {formData.year ? (
+            <div className="flex items-center px-3 h-11 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] text-white text-sm font-medium">
+              {formData.year}
+            </div>
+          ) : (
+            <div className="flex items-center px-3 h-11 rounded-xl bg-[#1a1a1a]/50 border border-dashed border-[#3a3a3a] text-[#555] text-sm">
+              تلقائي
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Title */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-bold text-[#d4af37]">العنوان *</label>
-        <Input
-          value={formData.title}
-          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-          placeholder="عنوان العمل"
-          className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] h-11"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck="false"
-        />
       </div>
 
       {/* Original Title - only in edit */}

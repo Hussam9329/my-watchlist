@@ -373,8 +373,12 @@ export default function BooksPage() {
 
   // ==================== CRUD ====================
   const createItem = async () => {
-    if (!formData.title.trim() || !formData.year.trim()) {
-      toast.error('العنوان والسنة مطلوبان')
+    if (!formData.title.trim()) {
+      toast.error('ابحث عن الكتاب أولاً باستخدام البحث التلقائي')
+      return
+    }
+    if (!formData.year.trim()) {
+      toast.error('السنة مطلوبة - اختر كتاباً يحتوي على سنة من نتائج البحث')
       return
     }
     setFormSubmitting(true)
@@ -793,15 +797,26 @@ export default function BooksPage() {
       </div>
 
       <div className="border-t border-[#2a2a2a] pt-4 space-y-3">
-        {/* Title */}
+        {/* Title - read-only, auto-filled from search */}
         <div className="space-y-1">
-          <label className="text-xs text-[#999]">العنوان *</label>
-          <Input
-            value={formData.title}
-            onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="عنوان الكتاب"
-            className="bg-[#111] border-[#333] text-white placeholder:text-[#555]"
-          />
+          <label className="text-xs text-[#999]">العنوان</label>
+          {formData.title ? (
+            <div className="flex items-center gap-2 px-3 h-10 rounded-lg bg-[#111] border border-[#333] text-white text-sm font-medium">
+              <span className="flex-1 truncate">{formData.title}</span>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, title: '', year: '', poster: '', originalTitle: '', overview: '', rating: '', author: '', pages: '' }))}
+                className="text-[#666] hover:text-red-400 transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center px-3 h-10 rounded-lg bg-[#111]/50 border border-dashed border-[#444] text-[#555] text-sm">
+              <Search className="w-3.5 h-3.5 ml-2" />
+              ابحث أعلاه لتحديد الكتاب تلقائياً
+            </div>
+          )}
         </div>
 
         {/* Original Title */}
@@ -819,13 +834,16 @@ export default function BooksPage() {
         {/* Year & Pages */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="text-xs text-[#999]">السنة *</label>
-            <Input
-              value={formData.year}
-              onChange={e => setFormData(prev => ({ ...prev, year: e.target.value }))}
-              placeholder="2024"
-              className="bg-[#111] border-[#333] text-white placeholder:text-[#555]"
-            />
+            <label className="text-xs text-[#999]">السنة</label>
+            {formData.year ? (
+              <div className="flex items-center px-3 h-10 rounded-lg bg-[#111] border border-[#333] text-white text-sm font-medium">
+                {formData.year}
+              </div>
+            ) : (
+              <div className="flex items-center px-3 h-10 rounded-lg bg-[#111]/50 border border-dashed border-[#444] text-[#555] text-sm">
+                تلقائي
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <label className="text-xs text-[#999]">عدد الصفحات</label>

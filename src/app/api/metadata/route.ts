@@ -97,32 +97,52 @@ export async function POST(request: NextRequest) {
       (arData.results || []).map((r: any) => [r.id, r])
     )
 
-    if (enData.results && enData.results.length > 0) {
-      const results = enData.results.slice(0, 5).map((result: any) => {
+    // Also create a map of English results by TMDB ID
+    const enResultsMap = new Map<number, any>(
+      (enData.results || []).map((r: any) => [r.id, r])
+    )
+
+    // Use English results as primary, fall back to Arabic if English returns nothing
+    const primaryResults = (enData.results && enData.results.length > 0)
+      ? enData.results
+      : (arData.results || [])
+
+    if (primaryResults.length > 0) {
+      const results = primaryResults.slice(0, 5).map((result: any) => {
         const arResult = arResultsMap.get(result.id)
+        const enResult = enResultsMap.get(result.id)
         const isArabic = result.original_language === 'ar'
 
-        // For Arabic original films: use Arabic title + Arabic poster
-        // For non-Arabic films: use English title + English poster
-        // Overview: always Arabic for UI consistency (from Arabic search results)
-        const displayTitle = isArabic
-          ? (result.original_title || result.original_name)
-          : (result.title || result.name)
+        // Determine the English title for non-Arabic films
+        // If we're using Arabic results as primary (English returned nothing),
+        // we need to get the English title from enResult if available
+        let displayTitle: string
+        let displayOriginalTitle: string
+        let displayPoster: string | null
+        let displayOverview: string
 
-        const displayOriginalTitle = isArabic
-          ? (result.title || result.name) // English transliteration for Arabic films
-          : (result.original_title || result.original_name) // Original language title
-
-        const displayPoster = (isArabic && arResult?.poster_path)
-          ? `https://image.tmdb.org/t/p/w500${arResult.poster_path}`
-          : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
-
-        const displayOverview = arResult?.overview || result.overview || 'لا يوجد وصف'
+        if (isArabic) {
+          // Arabic original film: Arabic title, Arabic poster
+          displayTitle = result.original_title || result.original_name || result.title || result.name
+          displayOriginalTitle = enResult?.title || enResult?.name || result.title || result.name
+          displayPoster = arResult?.poster_path
+            ? `https://image.tmdb.org/t/p/w500${arResult.poster_path}`
+            : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
+          displayOverview = arResult?.overview || result.overview || enResult?.overview || 'لا يوجد وصف'
+        } else {
+          // Non-Arabic film: English title, English poster
+          displayTitle = enResult?.title || enResult?.name || result.title || result.name
+          displayOriginalTitle = result.original_title || result.original_name || enResult?.original_title || ''
+          displayPoster = enResult?.poster_path
+            ? `https://image.tmdb.org/t/p/w500${enResult.poster_path}`
+            : (result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : null)
+          displayOverview = arResult?.overview || result.overview || 'لا يوجد وصف'
+        }
 
         return {
           title: displayTitle,
           originalTitle: displayOriginalTitle,
-          year: (result.release_date || result.first_air_date || '').split('-')[0],
+          year: (result.release_date || result.first_air_date || enResult?.release_date || enResult?.first_air_date || '').split('-')[0],
           poster: displayPoster,
           overview: displayOverview,
           rating: result.vote_average ? result.vote_average.toFixed(1) : null,
