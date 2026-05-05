@@ -36,6 +36,7 @@ export interface MetadataResult {
   overview?: string
   rating?: string | null
   type?: string
+  mediaType?: string // 'movie' or 'tv' — the actual TMDB type
   genres?: string[]
   author?: string
   pages?: number | null

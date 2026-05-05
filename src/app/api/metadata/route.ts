@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
             overview: info.description || 'لا يوجد وصف',
             rating: info.averageRating ? info.averageRating.toFixed(1) : null,
             type: 'book',
+            mediaType: 'book',
             author: info.authors?.join(', ') || 'غير معروف',
             pages: info.pageCount || null,
             genres: info.categories || []
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
             overview: '',
             rating: item.metascore ? (parseInt(item.metascore) / 10).toFixed(1) : null,
             genres: [],
+            type: 'game',
+            mediaType: 'game',
             platform: platformList.length > 0 ? platformList.join(', ') : ''
           }
         })
@@ -76,114 +79,109 @@ export async function POST(request: NextRequest) {
     }
 
     // ==================== Movies / TV / Anime ====================
-    // Search BOTH movie and TV endpoints in parallel so the user sees
-    // results from both categories and can pick the correct one.
-    // This prevents the series/movie mixing bug where users accidentally
-    // save a TV show as a movie (or vice versa).
+    // IMPORTANT FIX: Search BOTH movie and TV endpoints simultaneously
+    // This prevents the mix-up where movies appear as series and vice versa
+    // Each result will carry its actual mediaType ('movie' or 'tv')
 
-    const [movieEnRes, movieArRes, tvEnRes, tvArRes] = await Promise.all([
-      fetch(
-        `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
-        { cache: 'no-store' }
-      ),
-      fetch(
-        `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
-        { cache: 'no-store' }
-      ),
-      fetch(
-        `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
-        { cache: 'no-store' }
-      ),
-      fetch(
-        `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
-        { cache: 'no-store' }
-      ),
-    ])
+    // Determine which TMDB endpoints to search based on selected type
+    const searchEndpoints: ('movie' | 'tv')[] = []
+    if (type === 'movie') {
+      searchEndpoints.push('movie')
+      // Also search TV in case the user selected "movie" but the work is actually a series
+      searchEndpoints.push('tv')
+    } else if (type === 'series' || type === 'anime' || type === 'tv') {
+      searchEndpoints.push('tv')
+      // Also search movies in case the user selected "series" but the work is actually a movie
+      searchEndpoints.push('movie')
+    } else {
+      // Default: search both
+      searchEndpoints.push('movie', 'tv')
+    }
 
-    const [movieEnData, movieArData, tvEnData, tvArData] = await Promise.all([
-      movieEnRes.json(),
-      movieArRes.json(),
-      tvEnRes.json(),
-      tvArRes.json(),
-    ])
+    // Search all endpoints in parallel (English + Arabic for each)
+    const searchPromises = searchEndpoints.map(async (endpoint) => {
+      const [enResponse, arResponse] = await Promise.all([
+        fetch(
+          `${TMDB_BASE_URL}/search/${endpoint}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
+          { cache: 'no-store' }
+        ),
+        fetch(
+          `${TMDB_BASE_URL}/search/${endpoint}?query=${encodeURIComponent(title)}&language=ar&api_key=${TMDB_API_KEY}`,
+          { cache: 'no-store' }
+        )
+      ])
 
-    // Build maps by TMDB ID for cross-referencing
-    const movieEnMap = new Map<number, any>(
-      (movieEnData.results || []).map((r: any) => [r.id, r])
-    )
-    const movieArMap = new Map<number, any>(
-      (movieArData.results || []).map((r: any) => [r.id, r])
-    )
-    const tvEnMap = new Map<number, any>(
-      (tvEnData.results || []).map((r: any) => [r.id, r])
-    )
-    const tvArMap = new Map<number, any>(
-      (tvArData.results || []).map((r: any) => [r.id, r])
-    )
+      const enData = await enResponse.json()
+      const arData = await arResponse.json()
 
-    // Merge all results — deduplicated by (tmdbType, tmdbId) combo
-    const seenKeys = new Set<string>()
-    const allRawResults: { result: any; tmdbType: 'movie' | 'tv' }[] = []
+      return {
+        endpoint,
+        enResults: enData.results || [],
+        arResults: arData.results || []
+      }
+    })
 
-    // Prioritize the user's selected type first, then show the other type
-    const selectedTmdbType = type === 'movie' ? 'movie' : 'tv'
-    const otherTmdbType = selectedTmdbType === 'movie' ? 'tv' : 'movie'
+    const searchResults = await Promise.all(searchPromises)
 
-    // Add results in priority order: selected type first
-    for (const tmdbType of [selectedTmdbType, otherTmdbType] as const) {
-      const enData = tmdbType === 'movie' ? movieEnData : tvEnData
-      const arData = tmdbType === 'movie' ? movieArData : tvArData
+    // Merge all results, deduplicating by TMDB ID and tagging with actual mediaType
+    const seenIds = new Set<number>()
+    const mergedResults: any[] = []
 
+    for (const { endpoint, enResults, arResults } of searchResults) {
       // English results first
-      for (const r of (enData.results || [])) {
-        const key = `${tmdbType}:${r.id}`
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key)
-          allRawResults.push({ result: r, tmdbType })
+      for (const r of enResults) {
+        if (!seenIds.has(r.id)) {
+          seenIds.add(r.id)
+          mergedResults.push({ ...r, _tmdbType: endpoint })
         }
       }
       // Arabic-only results
-      for (const r of (arData.results || [])) {
-        const key = `${tmdbType}:${r.id}`
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key)
-          allRawResults.push({ result: r, tmdbType })
+      for (const r of arResults) {
+        if (!seenIds.has(r.id)) {
+          seenIds.add(r.id)
+          mergedResults.push({ ...r, _tmdbType: endpoint })
         }
       }
     }
 
-    if (allRawResults.length > 0) {
-      // Process top results — limit to 8 (4 per type max)
-      const resultsPromises = allRawResults.slice(0, 8).map(async ({ result, tmdbType }) => {
-        const enMap = tmdbType === 'movie' ? movieEnMap : tvEnMap
-        const arMap = tmdbType === 'movie' ? movieArMap : tvArMap
-        const enResult = enMap.get(result.id) || null
-        const arResult = arMap.get(result.id) || null
+    if (mergedResults.length > 0) {
+      // Process results — for non-Arabic works, always ensure English display
+      const resultsPromises = mergedResults.slice(0, 8).map(async (result: any) => {
+        const tmdbType = result._tmdbType as 'movie' | 'tv'
         const isArabic = result.original_language === 'ar'
+
+        // Determine the actual resolved type for the form
+        // If user selected 'anime', keep it; otherwise use 'series' for TV results
+        let resolvedType: string
+        if (tmdbType === 'movie') {
+          resolvedType = 'movie'
+        } else {
+          // Check if anime: Japanese origin + animation genre, or user selected anime
+          const genreIds: number[] = result.genre_ids || []
+          const originCountry: string[] = result.origin_country || []
+          const isAnime = (originCountry.includes('JP') && genreIds.includes(16)) || type === 'anime'
+          resolvedType = isAnime ? 'anime' : 'series'
+        }
+
+        // Find matching Arabic/English results across all searches
+        let arResult: any = null
+        let enResult: any = null
+        for (const { endpoint, enResults, arResults } of searchResults) {
+          if (endpoint === tmdbType) {
+            enResult = enResults.find((r: any) => r.id === result.id) || null
+            arResult = arResults.find((r: any) => r.id === result.id) || null
+          }
+        }
 
         let displayTitle: string
         let displayOriginalTitle: string
         let displayPoster: string | null
         let displayOverview: string
         let displayYear: string
-        let displayEpisodes: number | null = null
         let displaySeasons: number | null = null
+        let displayEpisodes: number | null = null
         let displayRuntime: number | null = null
-        let displayStatus: string | null = null
-
-        // Auto-detect the app-level type from TMDB result
-        // For TV results: check if it's anime (origin_country includes JP + genre 16)
-        // Otherwise it's 'series'
-        let detectedType: string
-        if (tmdbType === 'movie') {
-          detectedType = 'movie'
-        } else {
-          // Check if anime: Japanese origin + animation genre, or user selected anime
-          const genreIds: number[] = result.genre_ids || []
-          const originCountry: string[] = result.origin_country || []
-          const isAnime = (originCountry.includes('JP') && genreIds.includes(16)) || type === 'anime'
-          detectedType = isAnime ? 'anime' : 'series'
-        }
+        let displayGenres: string[] = []
 
         if (isArabic) {
           // Arabic original film: Arabic title, Arabic poster
@@ -195,19 +193,22 @@ export async function POST(request: NextRequest) {
           displayOverview = arResult?.overview || result.overview || enResult?.overview || 'لا يوجد وصف'
           displayYear = (result.release_date || result.first_air_date || '').split('-')[0]
         } else {
-          // Non-Arabic work: ALWAYS show English title & poster
+          // Non-Arabic work (English, Asian, etc.): ALWAYS show English title & poster
           let englishData = enResult
 
           if (!englishData && result.id) {
             englishData = await fetchEnglishDetailsById(result.id, tmdbType)
           }
 
+          // Title: English title, fallback to original title
           displayTitle = englishData?.title || englishData?.name || result.title || result.name || ''
+          // Original title: the work's native title (Japanese, Korean, etc.)
           displayOriginalTitle = englishData?.original_title || englishData?.original_name || result.original_title || result.original_name || ''
           if (displayTitle === displayOriginalTitle) {
             displayOriginalTitle = ''
           }
 
+          // Poster: English poster
           if (englishData?.poster_path) {
             displayPoster = `https://image.tmdb.org/t/p/w500${englishData.poster_path}`
           } else if (result.poster_path) {
@@ -216,19 +217,28 @@ export async function POST(request: NextRequest) {
             displayPoster = null
           }
 
+          // Overview: prefer Arabic overview for user, fallback to English
           displayOverview = arResult?.overview || englishData?.overview || result.overview || 'لا يوجد وصف'
           displayYear = (englishData?.release_date || englishData?.first_air_date || result.release_date || result.first_air_date || '').split('-')[0]
 
-          // TV-specific fields from English details
-          if (tmdbType === 'tv' && englishData) {
-            displayEpisodes = englishData.number_of_episodes ?? null
-            displaySeasons = englishData.number_of_seasons ?? null
-            displayStatus = englishData.status ?? null
-          }
-          // Movie-specific fields
-          if (tmdbType === 'movie' && englishData) {
-            displayRuntime = englishData.runtime ?? null
-            displayStatus = englishData.status ?? null
+          // Fetch detailed info for TV shows (seasons/episodes) and movies (runtime/genres)
+          try {
+            const detailRes = await fetch(
+              `${TMDB_BASE_URL}/${tmdbType}/${result.id}?language=en-US&api_key=${TMDB_API_KEY}`,
+              { cache: 'no-store' }
+            )
+            const detailData = await detailRes.json()
+
+            if (tmdbType === 'tv') {
+              displaySeasons = detailData.number_of_seasons || null
+              displayEpisodes = detailData.number_of_episodes || null
+              displayGenres = (detailData.genres || []).map((g: any) => g.name)
+            } else {
+              displayRuntime = detailData.runtime || null
+              displayGenres = (detailData.genres || []).map((g: any) => g.name)
+            }
+          } catch {
+            // If detail fetch fails, continue without it
           }
         }
 
@@ -239,12 +249,12 @@ export async function POST(request: NextRequest) {
           poster: displayPoster,
           overview: displayOverview,
           rating: result.vote_average ? result.vote_average.toFixed(1) : null,
-          type: detectedType,
+          type: resolvedType,
+          mediaType: tmdbType, // 'movie' or 'tv' — the actual TMDB type
+          genres: displayGenres,
           episodes: displayEpisodes,
           seasons: displaySeasons,
           runtime: displayRuntime,
-          status: displayStatus,
-          genres: []
         }
       })
 

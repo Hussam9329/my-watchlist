@@ -29,6 +29,7 @@ import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
 // ==================== Constants ====================
+<<<<<<< HEAD
 const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string; dotColor: string }> = {
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
@@ -36,6 +37,16 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10', dotColor: 'bg-[#8B4513]' },
   game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10', dotColor: 'bg-[#2e8b57]' },
+=======
+const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
+  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
+  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#c9a227] to-[#a07d00]', bgColor: 'bg-[#c9a227]/10' },
+  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
+  tv: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#e6c65a] to-[#c9a227]', bgColor: 'bg-[#e6c65a]/10' },
+  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
+  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10' },
+  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10' },
+>>>>>>> dbdf77f (إصلاح خلط الأفلام والمسلسلات)
 }
 
 // ==================== Memoized Card ====================
@@ -529,6 +540,8 @@ export default function ArchivePage() {
   }, [metaQuery, searchMetadata])
 
   const selectMetadata = (result: MetadataResult) => {
+    // IMPORTANT: Auto-set the type based on the actual search result type
+    // This prevents movies from being saved as series and vice versa
     setFormData(prev => ({
       ...prev,
       // Auto-set type from TMDB result (movie/series/anime) — this is the correct type
@@ -537,10 +550,12 @@ export default function ArchivePage() {
       title: result.title || prev.title,
       originalTitle: result.originalTitle || prev.originalTitle,
       year: result.year || prev.year,
+      // Auto-update the type to match the actual TMDB result type
+      type: result.type || prev.type,
       poster: result.poster || prev.poster,
       overview: result.overview || prev.overview,
       rating: result.rating || prev.rating,
-      genres: result.genres ? result.genres.join(', ') : prev.genres,
+      genres: result.genres ? (Array.isArray(result.genres) ? result.genres.join(', ') : result.genres) : prev.genres,
       author: result.author || prev.author,
       pages: result.pages != null ? String(result.pages) : prev.pages,
       episodes: result.episodes != null ? String(result.episodes) : prev.episodes,
@@ -841,6 +856,20 @@ export default function ArchivePage() {
                       {rTypeConf.label}
                     </span>
                     <span className="text-xs text-[#888]">{result.year}</span>
+                    {/* Type badge — clearly show if movie or series to prevent mix-up */}
+                    {result.type && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        result.type === 'movie'
+                          ? 'bg-[#d4af37]/20 text-[#d4af37]'
+                          : result.type === 'series'
+                          ? 'bg-[#e6c65a]/20 text-[#e6c65a]'
+                          : result.type === 'anime'
+                          ? 'bg-[#c9a227]/20 text-[#c9a227]'
+                          : 'bg-[#555]/20 text-[#888]'
+                      }`}>
+                        {TYPE_CONFIG[result.type]?.label || result.type}
+                      </span>
+                    )}
                     {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
                   </div>
                 </div>

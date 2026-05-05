@@ -2,16 +2,22 @@
 
 import { MediaItem } from './types'
 
+/** Normalize type: 'tv' → 'series' to prevent mix-up between movies and series */
+function normalizeType(type: string): string {
+  return type === 'tv' ? 'series' : type
+}
+
 /** Build request body for create/update operations from form data */
 export function buildItemBody(
   formData: Record<string, string>,
   itemType: string,
 ): Record<string, unknown> {
+  const normalizedType = normalizeType(itemType)
   return {
     title: formData.title,
     originalTitle: formData.originalTitle || null,
     year: formData.year || '',
-    type: itemType,
+    type: normalizedType,
     poster: formData.poster || null,
     rating: formData.rating || null,
     overview: formData.overview || null,
@@ -36,11 +42,12 @@ export function buildImportBody(
   item: any,
   itemType: string,
 ): Record<string, unknown> {
+  const normalizedType = normalizeType(itemType)
   return {
     title: item.title,
     originalTitle: item.originalTitle || null,
     year: item.year || '',
-    type: itemType,
+    type: normalizedType,
     poster: item.poster || null,
     rating: item.rating || null,
     overview: item.overview || null,

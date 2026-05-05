@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where: any = {}
-    if (type) where.type = type
+    // Normalize type: 'tv' should match 'series' in the database
+    if (type) {
+      where.type = type === 'tv' ? 'series' : type
+    }
     if (hasRating === 'true') {
       where.userRating = { not: null }
     } else if (hasRating === 'false') {
@@ -81,8 +84,10 @@ export async function GET(request: NextRequest) {
       let paramIndex = 1
 
       if (type) {
+        // Normalize type: 'tv' → 'series'
+        const normalizedTypeForQuery = type === 'tv' ? 'series' : type
         conditions.push(`"type" = $${paramIndex++}`)
-        params.push(type)
+        params.push(normalizedTypeForQuery)
       }
       if (hasRating === 'true') {
         conditions.push(`"userRating" IS NOT NULL`)
@@ -178,6 +183,11 @@ export async function GET(request: NextRequest) {
 
 const ALLOWED_TYPES = new Set(['movie', 'series', 'anime', 'book', 'game', 'tv'])
 
+/** Normalize type: 'tv' → 'series' to prevent mix-up between movies and series */
+function normalizeType(type: string): string {
+  return type === 'tv' ? 'series' : type
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -202,6 +212,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userRating must be a number or null' }, { status: 400 })
     }
 
+    // Normalize type: 'tv' → 'series'
+    const normalizedType = normalizeType(body.type)
+
     // Check duplicates: same type + same year + (same title OR same originalTitle)
     const orConditions: any[] = [{ title: body.title }]
     if (body.originalTitle) {
@@ -212,7 +225,7 @@ export async function POST(request: NextRequest) {
 
     const existing = await prisma.mediaItem.findFirst({
       where: {
-        type: body.type,
+        type: normalizedType,
         year: body.year,
         OR: orConditions
       }
@@ -234,7 +247,7 @@ export async function POST(request: NextRequest) {
         title: body.title,
         originalTitle: body.originalTitle,
         year: body.year,
-        type: body.type,
+        type: normalizedType,
         poster: body.poster,
         rating: body.rating ? String(body.rating) : null,
         overview: body.overview,
