@@ -37,6 +37,7 @@ export interface MetadataResult {
   rating?: string | null
   type?: string
   mediaType?: string // 'movie' or 'tv' — the actual TMDB type
+  typeMismatch?: boolean // true if this result is from a different type endpoint (fallback)
   genres?: string[]
   author?: string
   pages?: number | null

@@ -79,27 +79,29 @@ export async function POST(request: NextRequest) {
     }
 
     // ==================== Movies / TV / Anime ====================
-    // IMPORTANT FIX: Search BOTH movie and TV endpoints simultaneously
-    // This prevents the mix-up where movies appear as series and vice versa
-    // Each result will carry its actual mediaType ('movie' or 'tv')
+    // FIX: Search ONLY the endpoint matching the selected type.
+    // This prevents movies from being fetched as series and vice versa.
+    // If the primary endpoint returns no results, we search the other
+    // endpoint as a fallback — but those results are clearly labeled.
 
-    // Determine which TMDB endpoints to search based on selected type
-    const searchEndpoints: ('movie' | 'tv')[] = []
+    // Determine PRIMARY TMDB endpoint based on selected type
+    let primaryEndpoint: 'movie' | 'tv'
+    let fallbackEndpoint: 'movie' | 'tv' | null = null
+
     if (type === 'movie') {
-      searchEndpoints.push('movie')
-      // Also search TV in case the user selected "movie" but the work is actually a series
-      searchEndpoints.push('tv')
+      primaryEndpoint = 'movie'
+      fallbackEndpoint = 'tv'
     } else if (type === 'series' || type === 'anime' || type === 'tv') {
-      searchEndpoints.push('tv')
-      // Also search movies in case the user selected "series" but the work is actually a movie
-      searchEndpoints.push('movie')
+      primaryEndpoint = 'tv'
+      fallbackEndpoint = 'movie'
     } else {
-      // Default: search both
-      searchEndpoints.push('movie', 'tv')
+      // Unknown type: search both
+      primaryEndpoint = 'movie'
+      fallbackEndpoint = 'tv'
     }
 
-    // Search all endpoints in parallel (English + Arabic for each)
-    const searchPromises = searchEndpoints.map(async (endpoint) => {
+    // Helper: search a single TMDB endpoint (English + Arabic in parallel)
+    async function searchEndpoint(endpoint: 'movie' | 'tv') {
       const [enResponse, arResponse] = await Promise.all([
         fetch(
           `${TMDB_BASE_URL}/search/${endpoint}?query=${encodeURIComponent(title)}&language=en-US&api_key=${TMDB_API_KEY}`,
@@ -119,35 +121,61 @@ export async function POST(request: NextRequest) {
         enResults: enData.results || [],
         arResults: arData.results || []
       }
-    })
+    }
 
-    const searchResults = await Promise.all(searchPromises)
+    // Step 1: Search the PRIMARY endpoint first
+    let primaryResults = await searchEndpoint(primaryEndpoint)
 
-    // Merge all results, deduplicating by TMDB ID and tagging with actual mediaType
+    // Step 2: Collect results from primary endpoint
     const seenIds = new Set<number>()
     const mergedResults: any[] = []
 
-    for (const { endpoint, enResults, arResults } of searchResults) {
-      // English results first
-      for (const r of enResults) {
+    // Add primary English results first
+    for (const r of primaryResults.enResults) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id)
+        mergedResults.push({ ...r, _tmdbType: primaryEndpoint, _isFallback: false })
+      }
+    }
+    // Add primary Arabic-only results
+    for (const r of primaryResults.arResults) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id)
+        mergedResults.push({ ...r, _tmdbType: primaryEndpoint, _isFallback: false })
+      }
+    }
+
+    // Step 3: If primary found fewer than 3 results, also search fallback endpoint
+    let fallbackSearchResults: typeof primaryResults | null = null
+    if (mergedResults.length < 3 && fallbackEndpoint) {
+      fallbackSearchResults = await searchEndpoint(fallbackEndpoint)
+
+      // Add fallback results (clearly marked)
+      for (const r of fallbackSearchResults.enResults) {
         if (!seenIds.has(r.id)) {
           seenIds.add(r.id)
-          mergedResults.push({ ...r, _tmdbType: endpoint })
+          mergedResults.push({ ...r, _tmdbType: fallbackEndpoint, _isFallback: true })
         }
       }
-      // Arabic-only results
-      for (const r of arResults) {
+      for (const r of fallbackSearchResults.arResults) {
         if (!seenIds.has(r.id)) {
           seenIds.add(r.id)
-          mergedResults.push({ ...r, _tmdbType: endpoint })
+          mergedResults.push({ ...r, _tmdbType: fallbackEndpoint, _isFallback: true })
         }
       }
+    }
+
+    // Combine all search results for cross-referencing later
+    const searchResults = [primaryResults]
+    if (fallbackSearchResults) {
+      searchResults.push(fallbackSearchResults)
     }
 
     if (mergedResults.length > 0) {
       // Process results — for non-Arabic works, always ensure English display
       const resultsPromises = mergedResults.slice(0, 8).map(async (result: any) => {
         const tmdbType = result._tmdbType as 'movie' | 'tv'
+        const isFallback = result._isFallback as boolean
         const isArabic = result.original_language === 'ar'
 
         // Determine the actual resolved type for the form
@@ -162,6 +190,10 @@ export async function POST(request: NextRequest) {
           const isAnime = (originCountry.includes('JP') && genreIds.includes(16)) || type === 'anime'
           resolvedType = isAnime ? 'anime' : 'series'
         }
+
+        // Add a warning if this result's type doesn't match the user's selected type
+        // e.g., user selected "movie" but this result is a series (from fallback)
+        const typeMismatch = isFallback
 
         // Find matching Arabic/English results across all searches
         let arResult: any = null
@@ -251,6 +283,7 @@ export async function POST(request: NextRequest) {
           rating: result.vote_average ? result.vote_average.toFixed(1) : null,
           type: resolvedType,
           mediaType: tmdbType, // 'movie' or 'tv' — the actual TMDB type
+          typeMismatch, // true if this result is from the fallback endpoint
           genres: displayGenres,
           episodes: displayEpisodes,
           seasons: displaySeasons,

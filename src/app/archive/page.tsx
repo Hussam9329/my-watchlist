@@ -33,7 +33,6 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
   series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
-  tv: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
   movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
   book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10', dotColor: 'bg-[#8B4513]' },
   game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10', dotColor: 'bg-[#2e8b57]' },
@@ -532,12 +531,23 @@ export default function ArchivePage() {
   const selectMetadata = (result: MetadataResult) => {
     // IMPORTANT: Auto-set the type based on the actual search result type
     // This prevents movies from being saved as series and vice versa
+    // Normalize 'tv' → 'series' to prevent database inconsistencies
+    const resolvedType = result.type === 'tv' ? 'series' : result.type
+    const isMediaItem = resolvedType && resolvedType !== 'book' && resolvedType !== 'game'
+
+    // Show warning if the result type doesn't match the selected form type
+    if (result.typeMismatch && isMediaItem) {
+      const selectedLabel = TYPE_CONFIG[formData.type]?.label || formData.type
+      const resultLabel = TYPE_CONFIG[resolvedType]?.label || resolvedType
+      toast.warning(`⚠️ هذا العمل ${resultLabel} وليس ${selectedLabel}! سيتم تغيير النوع تلقائياً.`, { duration: 4000 })
+    }
+
     setFormData(prev => ({
       ...prev,
       // Auto-set type from TMDB result (movie/series/anime) — this is the correct type
       // detected from the actual TMDB endpoint, preventing series/movie mixing
       // Use TMDB type for media items, but keep current type for books/games
-      type: result.type && result.type !== 'book' && result.type !== 'game' ? result.type : prev.type,
+      type: isMediaItem ? resolvedType : (prev.type === 'tv' ? 'series' : prev.type),
       title: result.title || prev.title,
       originalTitle: result.originalTitle || prev.originalTitle,
       year: result.year || prev.year,
@@ -555,7 +565,9 @@ export default function ArchivePage() {
     }))
     setMetaResults([])
     setMetaQuery('')
-    toast.success('تم استيراد البيانات')
+    if (!result.typeMismatch) {
+      toast.success('تم استيراد البيانات')
+    }
   }
 
   // ==================== Image Upload ====================
@@ -586,9 +598,18 @@ export default function ArchivePage() {
     setMetaQuery('')
   }
 
+  // Normalize 'tv' to 'series' in formData.type whenever it changes
+  useEffect(() => {
+    if (formData.type === 'tv') {
+      setFormData(prev => ({ ...prev, type: 'series' }))
+    }
+  }, [formData.type])
+
   const openAddForm = (type?: string) => {
     resetForm()
-    if (type) setFormData(prev => ({ ...prev, type }))
+    // Normalize 'tv' → 'series' to prevent type inconsistencies
+    const normalizedType = type === 'tv' ? 'series' : type
+    if (normalizedType) setFormData(prev => ({ ...prev, type: normalizedType }))
     setShowAddForm(true)
   }
 
@@ -822,13 +843,17 @@ export default function ArchivePage() {
         {metaResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
             {metaResults.map((result, idx) => {
-              const rTypeConf = TYPE_CONFIG[result.type || 'movie'] || TYPE_CONFIG.movie
+              const normalizedResultType = result.type === 'tv' ? 'series' : (result.type || 'movie')
+              const rTypeConf = TYPE_CONFIG[normalizedResultType] || TYPE_CONFIG.movie
               const RTypeIcon = rTypeConf.icon
+              const isMismatch = result.typeMismatch
               return (
               <button
                 key={idx}
                 onClick={() => selectMetadata(result)}
-                className="flex items-center gap-3 p-2.5 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#d4af37]/50 hover:bg-[#1a1a1a]/80 transition-all text-right active:scale-[0.98]"
+                className={`flex items-center gap-3 p-2.5 rounded-xl bg-[#1a1a1a] border hover:bg-[#1a1a1a]/80 transition-all text-right active:scale-[0.98] ${
+                  isMismatch ? 'border-orange-500/40 hover:border-orange-400/60' : 'border-[#2a2a2a] hover:border-[#d4af37]/50'
+                }`}
               >
                 {result.poster ? (
                   <img src={result.poster} alt="" className="w-11 h-16 rounded-lg object-cover shrink-0 shadow-md" />
@@ -845,18 +870,10 @@ export default function ArchivePage() {
                       {rTypeConf.label}
                     </span>
                     <span className="text-xs text-[#888]">{result.year}</span>
-                    {/* Type badge — clearly show if movie or series to prevent mix-up */}
-                    {result.type && (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        result.type === 'movie'
-                          ? 'bg-[#d4af37]/20 text-[#d4af37]'
-                          : result.type === 'series'
-                          ? 'bg-[#e6c65a]/20 text-[#e6c65a]'
-                          : result.type === 'anime'
-                          ? 'bg-[#c9a227]/20 text-[#c9a227]'
-                          : 'bg-[#555]/20 text-[#888]'
-                      }`}>
-                        {TYPE_CONFIG[result.type]?.label || result.type}
+                    {/* Type mismatch warning badge */}
+                    {isMismatch && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                        ⚠️ نوع مختلف
                       </span>
                     )}
                     {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
