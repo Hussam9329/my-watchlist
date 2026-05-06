@@ -167,13 +167,18 @@ export default function ArchivePage() {
   // Main tabs
   const [mainTab, setMainTab] = useState<'watchlist' | 'ratings' | 'stats'>('watchlist')
 
-  // Watchlist state
-  const [wlType, setWlType] = useState('all')
+  // Watchlist state — separate data per type to prevent mixing
   const [wlItems, setWlItems] = useState<MediaItem[]>([])
   const [wlLoading, setWlLoading] = useState(true)
   const [wlPage, setWlPage] = useState(1)
   const [wlHasMore, setWlHasMore] = useState(false)
   const [wlTotal, setWlTotal] = useState(0)
+  // Separate counts per type (fetched in one pass, split client-side)
+  const [wlMovies, setWlMovies] = useState<MediaItem[]>([])
+  const [wlSeries, setWlSeries] = useState<MediaItem[]>([])
+  const [wlAnime, setWlAnime] = useState<MediaItem[]>([])
+  // Currently expanded section in watchlist
+  const [wlExpanded, setWlExpanded] = useState<string | null>(null)
 
   // Ratings state
   const [rtType, setRtType] = useState('movie')
@@ -246,7 +251,7 @@ export default function ArchivePage() {
     setWlLoading(true)
     try {
       const params = new URLSearchParams()
-      if (wlType !== 'all') params.set('type', wlType)
+      // Fetch ALL types together (no type filter) so we can split them client-side
       params.set('hasRating', 'false')
       if (debouncedSearch) params.set('search', debouncedSearch)
       params.set('sortBy', wlSortBy)
@@ -255,21 +260,41 @@ export default function ArchivePage() {
       if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
       if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
       params.set('page', String(page))
-      params.set('limit', '50')
+      params.set('limit', '200')
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
+      let allItems: MediaItem[] = []
       if (reset || page === 1) {
-        setWlItems(data.items || [])
+        allItems = data.items || []
+        setWlItems(allItems)
       } else {
         setWlItems(prev => {
           const existingIds = new Set(prev.map(i => i.id))
           const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
-          return [...prev, ...newItems]
+          allItems = [...prev, ...newItems]
+          return allItems
         })
       }
       setWlTotal(data.total || 0)
       setWlHasMore(data.hasMore || false)
       setWlPage(page)
+      // Split items by type — this ensures movies/series/anime are always correctly separated
+      const splitItems = (items: MediaItem[]) => {
+        const movies = items.filter(i => i.type === 'movie')
+        const series = items.filter(i => i.type === 'series' || i.type === 'tv')
+        const anime = items.filter(i => i.type === 'anime')
+        return { movies, series, anime }
+      }
+      if (reset || page === 1) {
+        const { movies, series, anime } = splitItems(data.items || [])
+        setWlMovies(movies)
+        setWlSeries(series)
+        setWlAnime(anime)
+      } else {
+        setWlMovies(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'movie' && !prev.some(p => p.id === i.id))])
+        setWlSeries(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => (i.type === 'series' || i.type === 'tv') && !prev.some(p => p.id === i.id))])
+        setWlAnime(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'anime' && !prev.some(p => p.id === i.id))])
+      }
       // Auto-load next page if there are more items
       if (data.hasMore) {
         setTimeout(() => fetchWatchlist(page + 1), 100)
@@ -279,7 +304,7 @@ export default function ArchivePage() {
     } finally {
       setWlLoading(false)
     }
-  }, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
+  }, [debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
   const fetchRatings = useCallback(async (page: number, reset = false) => {
@@ -340,22 +365,22 @@ export default function ArchivePage() {
     if (!isAuthChecked) return
     setWlPage(1)
     fetchWatchlist(1, true)
-  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
+  }, [isAuthChecked, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
   // Fetch all available years & genres from database
   useEffect(() => {
     if (!isAuthChecked) return
-    const typeParam = mainTab === 'ratings' ? rtType : wlType
+    const typeParam = mainTab === 'ratings' ? rtType : ''
     const hasRatingParam = mainTab === 'ratings' ? 'true' : 'false'
-    fetch(`/api/years?type=${typeParam !== 'all' ? typeParam : ''}&hasRating=${hasRatingParam}`)
+    fetch(`/api/years?type=${typeParam}&hasRating=${hasRatingParam}`)
       .then(r => r.json())
       .then(data => { if (data.years) setDbYears(data.years) })
       .catch(() => {})
-    fetch(`/api/genres?type=${typeParam !== 'all' ? typeParam : ''}&hasRating=${hasRatingParam}`)
+    fetch(`/api/genres?type=${typeParam}&hasRating=${hasRatingParam}`)
       .then(r => r.json())
       .then(data => { if (data.genres) setDbGenres(data.genres) })
       .catch(() => {})
-  }, [isAuthChecked, mainTab, rtType, wlType])
+  }, [isAuthChecked, mainTab, rtType])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'ratings') return
@@ -1528,31 +1553,9 @@ export default function ArchivePage() {
 
       {/* Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-6">
-        {/* Watchlist Tab */}
+        {/* Watchlist Tab — SEPARATED sections per type */}
         {mainTab === 'watchlist' && (
-          <div className="space-y-4">
-            {/* Sub-tabs */}
-            <div className="flex items-center gap-2 mobile-tabs-scroll">
-              {['all', 'movie', 'series', 'anime'].map(type => {
-                const conf = TYPE_CONFIG[type]
-                const Icon = conf.icon
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setWlType(type)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                      wlType === type
-                        ? `bg-gradient-to-l ${conf.color} text-black`
-                        : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {conf.label}
-                  </button>
-                )
-              })}
-            </div>
-
+          <div className="space-y-6">
             {/* Controls row */}
             <div className="flex items-center gap-2">
               <div className="flex-1 text-sm text-[#888]">
@@ -1560,7 +1563,7 @@ export default function ArchivePage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Button
-                  onClick={() => openAddForm(wlType !== 'all' ? wlType : 'movie')}
+                  onClick={() => openAddForm('movie')}
                   className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1657,7 +1660,7 @@ export default function ArchivePage() {
               </div>
             )}
 
-            {/* Items */}
+            {/* Loading state */}
             {wlLoading && wlItems.length === 0 ? (
               <SkeletonGrid count={6} />
             ) : wlItems.length === 0 ? (
@@ -1668,34 +1671,190 @@ export default function ArchivePage() {
               </div>
             ) : (
               <>
-                {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
-                    {wlItems.map(item => (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
-                        onClick={() => openDetails(item)}
-                        onQuickRate={() => openQuickRate(item)}
-                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                        viewMode="grid"
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {wlItems.map(item => (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
-                        onClick={() => openDetails(item)}
-                        onQuickRate={() => openQuickRate(item)}
-                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                        viewMode="list"
-                      />
-                    ))}
+                {/* ===== Section: Movies ===== */}
+                {wlMovies.length > 0 && (
+                  <div className="bg-[#111] border border-[#d4af37]/15 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setWlExpanded(wlExpanded === 'movie' ? null : 'movie')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center shadow-lg">
+                          <Film className="w-5 h-5 text-black" />
+                        </div>
+                        <div className="text-right">
+                          <h3 className="font-bold text-white text-base">أفلام</h3>
+                          <span className="text-xs text-[#d4af37]">{wlMovies.length} فيلم</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); openAddForm('movie') }}
+                          className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-8 px-2.5 text-xs font-bold gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          فيلم
+                        </Button>
+                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'movie' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </button>
+                    {(wlExpanded === 'movie' || wlExpanded === null) && (
+                      <div className="px-3 pb-3">
+                        {viewMode === 'grid' ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                            {wlMovies.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="grid"
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {wlMovies.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="list"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="h-4" />
+
+                {/* ===== Section: Series ===== */}
+                {wlSeries.length > 0 && (
+                  <div className="bg-[#111] border border-[#3b82f6]/15 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setWlExpanded(wlExpanded === 'series' ? null : 'series')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] flex items-center justify-center shadow-lg">
+                          <Tv className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="text-right">
+                          <h3 className="font-bold text-white text-base">مسلسلات</h3>
+                          <span className="text-xs text-[#3b82f6]">{wlSeries.length} مسلسل</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); openAddForm('series') }}
+                          className="bg-gradient-to-l from-[#3b82f6] to-[#1d4ed8] text-white h-8 px-2.5 text-xs font-bold gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          مسلسل
+                        </Button>
+                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'series' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </button>
+                    {(wlExpanded === 'series' || wlExpanded === null) && (
+                      <div className="px-3 pb-3">
+                        {viewMode === 'grid' ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                            {wlSeries.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="grid"
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {wlSeries.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="list"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ===== Section: Anime ===== */}
+                {wlAnime.length > 0 && (
+                  <div className="bg-[#111] border border-[#a855f7]/15 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setWlExpanded(wlExpanded === 'anime' ? null : 'anime')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-lg">
+                          <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="text-right">
+                          <h3 className="font-bold text-white text-base">أنمي</h3>
+                          <span className="text-xs text-[#a855f7]">{wlAnime.length} أنمي</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); openAddForm('anime') }}
+                          className="bg-gradient-to-l from-[#a855f7] to-[#7c3aed] text-white h-8 px-2.5 text-xs font-bold gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          أنمي
+                        </Button>
+                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'anime' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </button>
+                    {(wlExpanded === 'anime' || wlExpanded === null) && (
+                      <div className="px-3 pb-3">
+                        {viewMode === 'grid' ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                            {wlAnime.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="grid"
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {wlAnime.map(item => (
+                              <MediaCard
+                                key={item.id}
+                                item={item}
+                                onClick={() => openDetails(item)}
+                                onQuickRate={() => openQuickRate(item)}
+                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                                viewMode="list"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Loading more indicator */}
                 {wlLoading && wlItems.length > 0 && (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
