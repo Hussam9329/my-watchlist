@@ -177,8 +177,16 @@ export default function ArchivePage() {
   const [wlMovies, setWlMovies] = useState<MediaItem[]>([])
   const [wlSeries, setWlSeries] = useState<MediaItem[]>([])
   const [wlAnime, setWlAnime] = useState<MediaItem[]>([])
-  // Currently expanded section in watchlist
-  const [wlExpanded, setWlExpanded] = useState<string | null>(null)
+  // Watchlist type filter: 'all' | 'movie' | 'series' | 'anime'
+  const [wlType, setWlType] = useState<string>('all')
+  // Computed filtered items based on selected type
+  const wlFilteredItems = wlType === 'all'
+    ? wlItems
+    : wlType === 'movie'
+    ? wlMovies
+    : wlType === 'series'
+    ? wlSeries
+    : wlAnime
 
   // Ratings state
   const [rtType, setRtType] = useState('movie')
@@ -1553,17 +1561,50 @@ export default function ArchivePage() {
 
       {/* Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-6">
-        {/* Watchlist Tab — SEPARATED sections per type */}
+        {/* Watchlist Tab — Filter by type */}
         {mainTab === 'watchlist' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Type Filter Tabs */}
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto mobile-tabs-scroll">
+              {[
+                { key: 'all', label: 'الكل', icon: Bookmark, color: 'from-[#d4af37] to-[#b8960f]', count: wlTotal },
+                { key: 'movie', label: 'أفلام', icon: Film, color: 'from-[#d4af37] to-[#b8960f]', count: wlMovies.length },
+                { key: 'series', label: 'مسلسلات', icon: Tv, color: 'from-[#3b82f6] to-[#1d4ed8]', count: wlSeries.length },
+                { key: 'anime', label: 'أنمي', icon: Sparkles, color: 'from-[#a855f7] to-[#7c3aed]', count: wlAnime.length },
+              ].map(tab => {
+                const Icon = tab.icon
+                const isActive = wlType === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setWlType(tab.key)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shrink-0 ${
+                      isActive
+                        ? `bg-gradient-to-l ${tab.color} text-black shadow-lg`
+                        : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-md ${
+                      isActive ? 'bg-black/20 text-black/80' : 'bg-[#2a2a2a] text-[#666]'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                )
+              })}
+              <div className="flex-1 min-w-2" />
+            </div>
+
             {/* Controls row */}
             <div className="flex items-center gap-2">
               <div className="flex-1 text-sm text-[#888]">
-                {wlTotal} عمل
+                {wlFilteredItems.length} عمل
               </div>
               <div className="flex items-center gap-1.5">
                 <Button
-                  onClick={() => openAddForm('movie')}
+                  onClick={() => openAddForm(wlType !== 'all' ? wlType : 'movie')}
                   className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1663,194 +1704,50 @@ export default function ArchivePage() {
             {/* Loading state */}
             {wlLoading && wlItems.length === 0 ? (
               <SkeletonGrid count={6} />
-            ) : wlItems.length === 0 ? (
+            ) : wlFilteredItems.length === 0 ? (
               <div className="text-center py-16">
-                <Bookmark className="w-12 h-12 text-[#333] mx-auto mb-4" />
-                <p className="text-[#888] text-lg mb-2">لا توجد أعمال</p>
+                {wlType === 'movie' ? (
+                  <Film className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                ) : wlType === 'series' ? (
+                  <Tv className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                ) : wlType === 'anime' ? (
+                  <Sparkles className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                ) : (
+                  <Bookmark className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                )}
+                <p className="text-[#888] text-lg mb-2">
+                  {wlType === 'all' ? 'لا توجد أعمال' : `لا توجد ${wlType === 'movie' ? 'أفلام' : wlType === 'series' ? 'مسلسلات' : 'أنميات'}`}
+                </p>
                 <p className="text-[#666] text-sm">أضف أعمالاً جديدة لمتابعتها</p>
               </div>
             ) : (
               <>
-                {/* ===== Section: Movies ===== */}
-                {wlMovies.length > 0 && (
-                  <div className="bg-[#111] border border-[#d4af37]/15 rounded-2xl overflow-hidden">
-                    <button
-                      onClick={() => setWlExpanded(wlExpanded === 'movie' ? null : 'movie')}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center shadow-lg">
-                          <Film className="w-5 h-5 text-black" />
-                        </div>
-                        <div className="text-right">
-                          <h3 className="font-bold text-white text-base">أفلام</h3>
-                          <span className="text-xs text-[#d4af37]">{wlMovies.length} فيلم</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={(e) => { e.stopPropagation(); openAddForm('movie') }}
-                          className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-8 px-2.5 text-xs font-bold gap-1"
-                        >
-                          <Plus className="w-3 h-3" />
-                          فيلم
-                        </Button>
-                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'movie' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </button>
-                    {(wlExpanded === 'movie' || wlExpanded === null) && (
-                      <div className="px-3 pb-3">
-                        {viewMode === 'grid' ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                            {wlMovies.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="grid"
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {wlMovies.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="list"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {/* Items Grid/List — filtered by selected type */}
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    {wlFilteredItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                        viewMode="grid"
+                      />
+                    ))}
                   </div>
-                )}
-
-                {/* ===== Section: Series ===== */}
-                {wlSeries.length > 0 && (
-                  <div className="bg-[#111] border border-[#3b82f6]/15 rounded-2xl overflow-hidden">
-                    <button
-                      onClick={() => setWlExpanded(wlExpanded === 'series' ? null : 'series')}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] flex items-center justify-center shadow-lg">
-                          <Tv className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="text-right">
-                          <h3 className="font-bold text-white text-base">مسلسلات</h3>
-                          <span className="text-xs text-[#3b82f6]">{wlSeries.length} مسلسل</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={(e) => { e.stopPropagation(); openAddForm('series') }}
-                          className="bg-gradient-to-l from-[#3b82f6] to-[#1d4ed8] text-white h-8 px-2.5 text-xs font-bold gap-1"
-                        >
-                          <Plus className="w-3 h-3" />
-                          مسلسل
-                        </Button>
-                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'series' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </button>
-                    {(wlExpanded === 'series' || wlExpanded === null) && (
-                      <div className="px-3 pb-3">
-                        {viewMode === 'grid' ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                            {wlSeries.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="grid"
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {wlSeries.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="list"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ===== Section: Anime ===== */}
-                {wlAnime.length > 0 && (
-                  <div className="bg-[#111] border border-[#a855f7]/15 rounded-2xl overflow-hidden">
-                    <button
-                      onClick={() => setWlExpanded(wlExpanded === 'anime' ? null : 'anime')}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a]/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-lg">
-                          <Sparkles className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="text-right">
-                          <h3 className="font-bold text-white text-base">أنمي</h3>
-                          <span className="text-xs text-[#a855f7]">{wlAnime.length} أنمي</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={(e) => { e.stopPropagation(); openAddForm('anime') }}
-                          className="bg-gradient-to-l from-[#a855f7] to-[#7c3aed] text-white h-8 px-2.5 text-xs font-bold gap-1"
-                        >
-                          <Plus className="w-3 h-3" />
-                          أنمي
-                        </Button>
-                        <svg className={`w-5 h-5 text-[#666] transition-transform ${wlExpanded === 'anime' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </button>
-                    {(wlExpanded === 'anime' || wlExpanded === null) && (
-                      <div className="px-3 pb-3">
-                        {viewMode === 'grid' ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                            {wlAnime.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="grid"
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {wlAnime.map(item => (
-                              <MediaCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => openDetails(item)}
-                                onQuickRate={() => openQuickRate(item)}
-                                onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                                viewMode="list"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                ) : (
+                  <div className="space-y-2">
+                    {wlFilteredItems.map(item => (
+                      <MediaCard
+                        key={item.id}
+                        item={item}
+                        onClick={() => openDetails(item)}
+                        onQuickRate={() => openQuickRate(item)}
+                        onDelete={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
+                        viewMode="list"
+                      />
+                    ))}
                   </div>
                 )}
 
