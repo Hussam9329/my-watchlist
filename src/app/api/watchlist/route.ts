@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     }
     if (search) {
       where.OR = [
-        { title: { contains: search } },
-        { originalTitle: { contains: search } }
+        { title: { contains: search, mode: 'insensitive' } },
+        { originalTitle: { contains: search, mode: 'insensitive' } }
       ]
     }
     if (filterYear) {
@@ -216,19 +216,29 @@ export async function POST(request: NextRequest) {
     const normalizedType = normalizeType(body.type)
 
     // Check duplicates: same type + same year + (same title OR same originalTitle)
-    const orConditions: any[] = [{ title: body.title }]
+    // Case-insensitive comparison to prevent duplicates with different casing
+    const orConditions: any[] = [
+      { title: { equals: body.title, mode: 'insensitive' } }
+    ]
     if (body.originalTitle) {
-      orConditions.push({ originalTitle: body.originalTitle })
+      orConditions.push({ originalTitle: { equals: body.originalTitle, mode: 'insensitive' } })
       // Also check if title matches originalTitle or vice versa
-      orConditions.push({ title: body.originalTitle })
+      orConditions.push({ title: { equals: body.originalTitle, mode: 'insensitive' } })
+    }
+
+    // Build the where clause for duplicate detection
+    const duplicateWhere: any = {
+      type: normalizedType,
+      OR: orConditions
+    }
+    // Only match year if it's non-empty; skip year matching for empty strings
+    // to avoid false positives when year is unknown
+    if (body.year && body.year.trim() !== '') {
+      duplicateWhere.year = body.year
     }
 
     const existing = await prisma.mediaItem.findFirst({
-      where: {
-        type: normalizedType,
-        year: body.year,
-        OR: orConditions
-      }
+      where: duplicateWhere
     })
 
     if (existing) {

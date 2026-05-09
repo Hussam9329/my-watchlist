@@ -422,27 +422,52 @@ export default function ArchivePage() {
       const resData = await res.json()
       if (!res.ok) {
         if (resData.duplicate && resData.existingItem) {
-          // Show the existing item to the user and let them navigate to it
+          // Show the existing item to the user with options to navigate or move it
           const existing = resData.existingItem as MediaItem
-          const tabLabel = existing.userRating != null ? 'تقييماتي' : 'أريد مشاهدته'
-          toast.error(`هذا العمل موجود مسبقاً في "${tabLabel}"!`, {
-            duration: 5000,
-            action: {
-              label: 'عرض',
-              onClick: () => {
-                setShowAddForm(false)
-                resetForm()
-                // Navigate to the correct tab and open the item
-                if (existing.userRating != null) {
-                  setMainTab('ratings')
-                } else {
-                  setMainTab('watchlist')
+          const isInRatings = existing.userRating != null
+          const tabLabel = isInRatings ? 'تقييماتي' : 'أريد مشاهدته'
+
+          setShowAddForm(false)
+          resetForm()
+          setSelectedItem(existing)
+
+          if (isInRatings) {
+            // Item is in ratings — offer to move it back to watchlist
+            toast.error(`هذا العمل موجود في "${tabLabel}" (تقييم: ${existing.userRating}/100). يمكنك نقله لأريد مشاهدته.`, {
+              duration: 8000,
+              action: {
+                label: 'نقل للأرشيف',
+                onClick: async () => {
+                  try {
+                    const patchRes = await fetch(`/api/watchlist/${existing.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userRating: null, watched: false, watchedAt: null }),
+                    })
+                    if (!patchRes.ok) throw new Error('فشل النقل')
+                    toast.success('تم نقل العمل إلى "أريد مشاهدته"')
+                    setMainTab('watchlist')
+                    fetchWatchlist(1, true)
+                    fetchRatings(1, true)
+                  } catch {
+                    toast.error('خطأ في نقل العمل')
+                  }
                 }
-                setSelectedItem(existing)
-                setShowDetails(true)
               }
-            }
-          })
+            })
+          } else {
+            // Item is already in watchlist — just navigate to it
+            toast.error(`هذا العمل موجود مسبقاً في "${tabLabel}"!`, {
+              duration: 6000,
+              action: {
+                label: 'عرض',
+                onClick: () => {
+                  setMainTab('watchlist')
+                  setShowDetails(true)
+                }
+              }
+            })
+          }
           return
         }
         throw new Error(resData.error)
