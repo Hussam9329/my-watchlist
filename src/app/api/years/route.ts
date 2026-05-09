@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const excludeTypes = searchParams.get('excludeTypes')
     const hasRating = searchParams.get('hasRating')
 
     const conditions: string[] = ['"year" IS NOT NULL', '"year" != \'\'']
@@ -14,6 +15,13 @@ export async function GET(request: NextRequest) {
     if (type) {
       conditions.push(`"type" = $${paramIndex++}`)
       params.push(type === 'tv' ? 'series' : type)
+    } else if (excludeTypes) {
+      const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
+      if (excluded.length > 0) {
+        const placeholders = excluded.map(() => `$${paramIndex++}`).join(', ')
+        conditions.push(`"type" NOT IN (${placeholders})`)
+        params.push(...excluded)
+      }
     }
     if (hasRating === 'true') {
       conditions.push(`"userRating" IS NOT NULL`)

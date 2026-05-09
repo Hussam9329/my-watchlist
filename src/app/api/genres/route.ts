@@ -5,10 +5,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const excludeTypes = searchParams.get('excludeTypes')
     const hasRating = searchParams.get('hasRating')
 
     const where: any = {}
-    if (type) where.type = type
+    if (type) {
+      where.type = type
+    } else if (excludeTypes) {
+      const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
+      if (excluded.length > 0) {
+        where.type = { notIn: excluded }
+      }
+    }
     if (hasRating === 'true') {
       where.userRating = { not: null }
     } else if (hasRating === 'false') {

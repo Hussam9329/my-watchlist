@@ -18,7 +18,7 @@ import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
   Edit3, Grid3X3, List, Download, Upload as UploadIcon,
   BarChart3, CalendarDays, Bookmark, Trash2,
-  Dice5, Trophy, SlidersHorizontal
+  Trophy, SlidersHorizontal
 } from 'lucide-react'
 import { MediaItem, MetadataResult, StatsData } from '@/lib/types'
 import { compressImage } from '@/lib/image'
@@ -34,8 +34,7 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
   series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
   movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
-  book: { icon: Bookmark, label: 'كتاب', plural: 'كتب', color: 'from-[#8B4513] to-[#654321]', bgColor: 'bg-[#8B4513]/10', dotColor: 'bg-[#8B4513]' },
-  game: { icon: Dice5, label: 'لعبة', plural: 'ألعاب', color: 'from-[#2e8b57] to-[#1a6b3a]', bgColor: 'bg-[#2e8b57]/10', dotColor: 'bg-[#2e8b57]' },
+  // Note: books & games are NOT in the archive — they have their own dedicated pages
 }
 
 // ==================== Memoized Card ====================
@@ -259,8 +258,9 @@ export default function ArchivePage() {
     setWlLoading(true)
     try {
       const params = new URLSearchParams()
-      // Fetch ALL types together (no type filter) so we can split them client-side
+      // Fetch only media types (movie, series, anime) — exclude books & games which have their own pages
       params.set('hasRating', 'false')
+      params.set('excludeTypes', 'book,game')
       if (debouncedSearch) params.set('search', debouncedSearch)
       params.set('sortBy', wlSortBy)
       if (wlFilterGenre) params.set('genre', wlFilterGenre)
@@ -321,6 +321,8 @@ export default function ArchivePage() {
       const params = new URLSearchParams()
       if (rtType !== 'all') params.set('type', rtType)
       params.set('hasRating', 'true')
+      // Exclude books & games — they have their own pages
+      if (rtType === 'all') params.set('excludeTypes', 'book,game')
       if (debouncedSearch) params.set('search', debouncedSearch)
       params.set('sortBy', rtSortBy)
       if (rtFilterGenre) params.set('genre', rtFilterGenre)
@@ -375,16 +377,18 @@ export default function ArchivePage() {
     fetchWatchlist(1, true)
   }, [isAuthChecked, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
-  // Fetch all available years & genres from database
+  // Fetch all available years & genres from database (exclude books & games for archive)
   useEffect(() => {
     if (!isAuthChecked) return
     const typeParam = mainTab === 'ratings' ? rtType : ''
     const hasRatingParam = mainTab === 'ratings' ? 'true' : 'false'
-    fetch(`/api/years?type=${typeParam}&hasRating=${hasRatingParam}`)
+    // Always exclude books & games from archive page filters
+    const excludeParam = '&excludeTypes=book,game'
+    fetch(`/api/years?type=${typeParam}&hasRating=${hasRatingParam}${excludeParam}`)
       .then(r => r.json())
       .then(data => { if (data.years) setDbYears(data.years) })
       .catch(() => {})
-    fetch(`/api/genres?type=${typeParam}&hasRating=${hasRatingParam}`)
+    fetch(`/api/genres?type=${typeParam}&hasRating=${hasRatingParam}${excludeParam}`)
       .then(r => r.json())
       .then(data => { if (data.genres) setDbGenres(data.genres) })
       .catch(() => {})
@@ -1624,7 +1628,7 @@ export default function ArchivePage() {
   const movieNightContent = movieNightResult && (
     <div className="space-y-4 text-center">
       <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8960f] flex items-center justify-center mx-auto">
-        <Dice5 className="w-8 h-8 text-black" />
+        <Film className="w-8 h-8 text-black" />
       </div>
       <h3 className="text-lg font-bold text-[#d4af37]">🎬 ليلة الأفلام</h3>
       <p className="text-[#888]">العمل المختار عشوائياً:</p>
@@ -1644,7 +1648,7 @@ export default function ArchivePage() {
           onClick={pickRandomMovie}
           className="flex-1 border-[#2a2a2a] text-[#ccc]"
         >
-          <Dice5 className="w-4 h-4 ml-1" />
+          <Film className="w-4 h-4 ml-1" />
           اختر غيره
         </Button>
         <Button
@@ -1756,7 +1760,7 @@ export default function ArchivePage() {
                 className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
                 title="ليلة الأفلام"
               >
-                <Dice5 className="w-4 h-4" />
+                <Film className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"

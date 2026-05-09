@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const excludeTypes = searchParams.get('excludeTypes') // comma-separated types to exclude e.g. "book,game"
     const search = searchParams.get('search')
     const hasRating = searchParams.get('hasRating')
     let sortBy = searchParams.get('sortBy') || 'addedAt_desc'
@@ -30,6 +31,17 @@ export async function GET(request: NextRequest) {
     // Normalize type: 'tv' should match 'series' in the database
     if (type) {
       where.type = type === 'tv' ? 'series' : type
+    }
+    // Exclude specified types (e.g. books and games from archive page)
+    if (excludeTypes) {
+      const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
+      if (excluded.length > 0) {
+        if (where.type) {
+          // Both type and excludeTypes: just use type (excludeTypes is irrelevant when type is specified)
+        } else {
+          where.type = { notIn: excluded }
+        }
+      }
     }
     if (hasRating === 'true') {
       where.userRating = { not: null }
@@ -89,6 +101,14 @@ export async function GET(request: NextRequest) {
         const normalizedTypeForQuery = type === 'tv' ? 'series' : type
         conditions.push(`"type" = $${paramIndex++}`)
         params.push(normalizedTypeForQuery)
+      } else if (excludeTypes) {
+        // Exclude specified types (e.g. books and games)
+        const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
+        if (excluded.length > 0) {
+          const placeholders = excluded.map(() => `$${paramIndex++}`).join(', ')
+          conditions.push(`"type" NOT IN (${placeholders})`)
+          params.push(...excluded)
+        }
       }
       if (hasRating === 'true') {
         conditions.push(`"userRating" IS NOT NULL`)
