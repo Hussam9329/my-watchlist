@@ -7,7 +7,8 @@ const ALLOWED_SORT_FIELDS = new Set([
   'year', 'year_asc', 'year_desc',
   'addedAt', 'addedAt_asc', 'addedAt_desc',
   'userRating', 'userRating_asc', 'userRating_desc',
-  'originalTitle', 'originalTitle_asc', 'originalTitle_desc'
+  'originalTitle', 'originalTitle_asc', 'originalTitle_desc',
+  'rating', 'rating_asc', 'rating_desc'
 ])
 
 export async function GET(request: NextRequest) {
@@ -118,12 +119,14 @@ export async function GET(request: NextRequest) {
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-      // Build ORDER BY with numeric cast
+      // Build ORDER BY with numeric cast for string fields that need numeric comparison
       let orderClause: string
       if (sortField === 'year') {
-        orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}`
+        // Sort by year as integer, with secondary sort by addedAt for same-year items
+        orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else if (sortField === 'rating') {
-        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE 0 END ${direction.toUpperCase()}`
+        // Sort by TMDB rating as float, with secondary sort by addedAt
+        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else {
         orderClause = `ORDER BY "addedAt" DESC`
       }
@@ -146,10 +149,13 @@ export async function GET(request: NextRequest) {
       let orderBy: any
       switch (sortField) {
         case 'title':
-          orderBy = { title: direction }
+          orderBy = [{ title: direction }, { addedAt: 'desc' as const }]
+          break
+        case 'originalTitle':
+          orderBy = [{ originalTitle: { sort: direction, nulls: 'last' } }, { addedAt: 'desc' as const }]
           break
         case 'userRating':
-          orderBy = { userRating: { sort: direction, nulls: 'last' } }
+          orderBy = [{ userRating: { sort: direction, nulls: 'last' } }, { addedAt: 'desc' as const }]
           break
         case 'addedAt':
         default:

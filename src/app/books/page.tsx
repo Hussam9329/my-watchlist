@@ -201,6 +201,7 @@ export default function BooksPage() {
       params.set('type', 'book')
       params.set('limit', '50')
       params.set('page', String(pageNum))
+      params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
@@ -226,7 +227,7 @@ export default function BooksPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, sortBy])
 
   useEffect(() => {
     if (!isAuthChecked) return
@@ -415,7 +416,8 @@ export default function BooksPage() {
   const allYears = useMemo(() => {
     const yearSet = new Set<string>()
     books.forEach(b => { if (b.year) yearSet.add(b.year) })
-    return Array.from(yearSet).sort((a, b) => b.localeCompare(a))
+    // Sort years numerically (not alphabetically) since year is a string
+    return Array.from(yearSet).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0))
   }, [books])
 
   // ==================== Stats ====================

@@ -8,6 +8,7 @@ export const WL_SORT_OPTIONS = [
   { value: 'year_desc', label: 'السنة (جديد)' },
   { value: 'year_asc', label: 'السنة (قديم)' },
   { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
+  { value: 'rating_asc', label: 'التقييم العام (أدنى)' },
 ]
 
 export const RT_SORT_OPTIONS = [
@@ -20,6 +21,7 @@ export const RT_SORT_OPTIONS = [
   { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
   { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
   { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
+  { value: 'rating_asc', label: 'التقييم العام (أدنى)' },
 ]
 
 export const SORT_OPTIONS = RT_SORT_OPTIONS

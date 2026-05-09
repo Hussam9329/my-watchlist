@@ -7,22 +7,29 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const hasRating = searchParams.get('hasRating')
 
-    const where: any = { year: { not: null } }
-    if (type) where.type = type
+    const conditions: string[] = ['"year" IS NOT NULL', '"year" != \'\'']
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (type) {
+      conditions.push(`"type" = $${paramIndex++}`)
+      params.push(type === 'tv' ? 'series' : type)
+    }
     if (hasRating === 'true') {
-      where.userRating = { not: null }
+      conditions.push(`"userRating" IS NOT NULL`)
     } else if (hasRating === 'false') {
-      where.userRating = null
+      conditions.push(`"userRating" IS NULL`)
     }
 
-    const result = await prisma.mediaItem.findMany({
-      where,
-      select: { year: true },
-      distinct: ['year'],
-      orderBy: { year: 'desc' }
-    })
+    const whereClause = `WHERE ${conditions.join(' AND ')}`
 
-    const years = result.map(r => r.year).filter(Boolean)
+    // Sort years numerically (not alphabetically) since year is a String field
+    const result = await prisma.$queryRawUnsafe(
+      `SELECT DISTINCT "year" FROM "MediaItem" ${whereClause} ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END DESC`,
+      ...params
+    )
+
+    const years = (result as any[]).map(r => r.year).filter(Boolean)
     return NextResponse.json({ years })
   } catch (error) {
     console.error('Years fetch error:', error)

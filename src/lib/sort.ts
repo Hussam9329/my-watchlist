@@ -24,8 +24,9 @@ export function sortMediaItems(items: MediaItem[], sortBy: string): MediaItem[] 
         bVal = b.title
         break
       case 'year':
-        aVal = a.year
-        bVal = b.year
+        // Parse year as integer for numeric comparison (not alphabetical)
+        aVal = a.year ? parseInt(a.year, 10) || 0 : 0
+        bVal = b.year ? parseInt(b.year, 10) || 0 : 0
         break
       case 'userRating':
         aVal = a.userRating ?? -1

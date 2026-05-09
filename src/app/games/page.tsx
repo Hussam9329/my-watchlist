@@ -222,6 +222,7 @@ export default function GamesPage() {
       params.set('type', 'game')
       params.set('limit', '50')
       params.set('page', String(pageNum))
+      params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
@@ -247,7 +248,7 @@ export default function GamesPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, sortBy])
 
   useEffect(() => {
     if (!isAuthChecked) return
@@ -431,7 +432,8 @@ export default function GamesPage() {
   const allYears = useMemo(() => {
     const yearSet = new Set<string>()
     games.forEach(g => { if (g.year) yearSet.add(g.year) })
-    return Array.from(yearSet).sort((a, b) => b.localeCompare(a))
+    // Sort years numerically (not alphabetically) since year is a string
+    return Array.from(yearSet).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0))
   }, [games])
 
   // ==================== Tab Counts ====================
