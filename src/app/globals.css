@@ -245,3 +245,81 @@ p, h1, h2, h3, h4, h5, h6, span:not([role="button"]) {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* ===================== Sort & Filter Panel Styles ===================== */
+
+/* Year chips horizontal scroll */
+@media (max-width: 768px) {
+  .year-chips-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .year-chips-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Active filter badge */
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 28px;
+}
+.filter-badge:active {
+  transform: scale(0.95);
+}
+
+/* Sort option buttons */
+.sort-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+}
+.sort-option-btn:active {
+  transform: scale(0.97);
+}
+
+/* Filter panel in drawer - better touch targets */
+[data-vaul-drawer] .sort-option-btn,
+[data-vaul-drawer] .filter-badge {
+  min-height: 44px;
+}
+
+/* View mode toggle */
+.view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+}
+.view-mode-btn:active {
+  transform: scale(0.97);
+}

@@ -15,8 +15,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, Star, X, Search, Loader2, Edit3, Grid3X3, List,
-  Filter, ArrowUpDown, Download, Upload as UploadIcon, BarChart3,
-  Trash2, ArrowRight, Gamepad2, Monitor, Smartphone
+  Download, Upload as UploadIcon, BarChart3,
+  Trash2, ArrowRight, Gamepad2, Monitor, Smartphone, SlidersHorizontal
 } from 'lucide-react'
 import { MediaItem, MetadataResult } from '@/lib/types'
 import { normalizeGenres, normalizeTags } from '@/lib/format'
@@ -176,7 +176,7 @@ export default function GamesPage() {
   const debouncedSearch = useDebouncedValue(searchQuery)
   const [sortBy, setSortBy] = useState('addedAt_desc')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showFilters, setShowFilters] = useState(false)
+  const [showSortFilter, setShowSortFilter] = useState(false)
   const [filterGenre, setFilterGenre] = useState('')
   const [filterYear, setFilterYear] = useState('')
 
@@ -435,6 +435,119 @@ export default function GamesPage() {
     // Sort years numerically (not alphabetically) since year is a string
     return Array.from(yearSet).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0))
   }, [games])
+
+  // ==================== Sort & Filter Content (shared between Drawer/Popover) ====================
+  const sortFilterContent = (
+    <div className="space-y-4 p-4" dir="rtl">
+      {/* Sort Section */}
+      <div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">ترتيب</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setSortBy(opt.value)}
+              className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-colors active:scale-[0.97] ${
+                sortBy === opt.value
+                  ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                  : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:text-[#ccc]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Year Filter as Chips */}
+      <div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">السنة</h4>
+        <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+          <button
+            onClick={() => setFilterYear('')}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              !filterYear
+                ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            الكل
+          </button>
+          {allYears.map(y => (
+            <button
+              key={y}
+              onClick={() => setFilterYear(y)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filterYear === y
+                  ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Genre Filter */}
+      <div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">التصنيف</h4>
+        <Select value={filterGenre || '__all__'} onValueChange={v => setFilterGenre(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
+            <SelectValue placeholder="كل التصنيفات" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectItem value="__all__">كل التصنيفات</SelectItem>
+            {allGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* View Mode */}
+      <div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">طريقة العرض</h4>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            <Grid3X3 className="w-3.5 h-3.5" />
+            شبكة
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            قائمة
+          </button>
+        </div>
+      </div>
+
+      {/* Clear All */}
+      {(filterGenre || filterYear) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => { setFilterGenre(''); setFilterYear('') }}
+          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+        >
+          <X className="w-3.5 h-3.5 ml-1" />
+          مسح الكل
+        </Button>
+      )}
+    </div>
+  )
 
   // ==================== Tab Counts ====================
   const tabCounts = useMemo(() => {
@@ -1070,15 +1183,6 @@ export default function GamesPage() {
               </Button>
               <input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} />
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
-                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform"
-                title={viewMode === 'grid' ? 'عرض قائمة' : 'عرض شبكة'}
-              >
-                {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-              </Button>
-              <Button
                 onClick={openAddForm}
                 size="sm"
                 className="bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white active:scale-[0.97] transition-transform"
@@ -1123,67 +1227,97 @@ export default function GamesPage() {
                 className="bg-[#111] border-[#2a2a2a] text-white placeholder:text-[#555] pr-9"
               />
             </div>
-            <Popover open={showFilters} onOpenChange={setShowFilters}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="border-[#2a2a2a] text-[#999] hover:text-white active:scale-[0.97] transition-transform shrink-0">
-                  <Filter className="w-4 h-4 ml-1" />
-                  {(filterGenre || filterYear) && <span className="w-2 h-2 rounded-full bg-teal-400" />}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="bg-[#1a1a1a] border-[#2a2a2a] w-64" align="end" dir="rtl">
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-[#999]">السنة</label>
-                    <Select value={filterYear} onValueChange={setFilterYear}>
-                      <SelectTrigger className="bg-[#111] border-[#333] text-white text-sm">
-                        <SelectValue placeholder="كل السنوات" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#1a1a1a] border-[#333]">
-                        <SelectItem value="all" className="text-white focus:bg-[#2a2a2a] focus:text-white">كل السنوات</SelectItem>
-                        {allYears.map(y => (
-                          <SelectItem key={y} value={y} className="text-white focus:bg-[#2a2a2a] focus:text-white">{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-[#999]">التصنيف</label>
-                    <Select value={filterGenre} onValueChange={setFilterGenre}>
-                      <SelectTrigger className="bg-[#111] border-[#333] text-white text-sm">
-                        <SelectValue placeholder="كل التصنيفات" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#1a1a1a] border-[#333]">
-                        <SelectItem value="all" className="text-white focus:bg-[#2a2a2a] focus:text-white">كل التصنيفات</SelectItem>
-                        {allGenres.map(g => (
-                          <SelectItem key={g} value={g} className="text-white focus:bg-[#2a2a2a] focus:text-white">{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+            {/* Unified Sort & Filter Button */}
+            {isMobile ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSortFilter(true)}
+                className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                  (filterGenre || filterYear)
+                    ? 'border-teal-500/50 text-teal-400'
+                    : 'text-[#999]'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                {(filterGenre || filterYear) && (
+                  <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                )}
+              </Button>
+            ) : (
+              <Popover open={showSortFilter} onOpenChange={setShowSortFilter}>
+                <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full border-[#333] text-[#999] hover:text-white text-xs"
-                    onClick={() => { setFilterGenre(''); setFilterYear(''); setShowFilters(false) }}
+                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                      (filterGenre || filterYear)
+                        ? 'border-teal-500/50 text-teal-400'
+                        : 'text-[#999]'
+                    }`}
                   >
-                    مسح الفلاتر
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                    {(filterGenre || filterYear) && (
+                      <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                    )}
                   </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="bg-[#111] border-[#2a2a2a] text-[#999] hover:text-white w-auto min-w-[40px] shrink-0">
-                <ArrowUpDown className="w-4 h-4" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1a1a1a] border-[#333]" dir="rtl">
-                {SORT_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-white focus:bg-[#2a2a2a] focus:text-white">{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 bg-[#1a1a1a] border-[#2a2a2a] p-0" align="end" dir="rtl">
+                  {sortFilterContent}
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
+
+          {/* Active filter badges */}
+          {(filterYear || filterGenre) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              {filterYear && (
+                <Badge
+                  className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
+                  onClick={() => setFilterYear('')}
+                >
+                  {filterYear}
+                  <X className="w-3 h-3" />
+                </Badge>
+              )}
+              {filterGenre && (
+                <Badge
+                  className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
+                  onClick={() => setFilterGenre('')}
+                >
+                  {filterGenre}
+                  <X className="w-3 h-3" />
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       </header>
+
+      {/* Mobile Sort & Filter Drawer */}
+      {isMobile && (
+        <Drawer open={showSortFilter} onOpenChange={setShowSortFilter}>
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
+            <DrawerHeader className="text-right pb-2">
+              <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-4 overflow-y-auto">
+              {sortFilterContent}
+            </div>
+            <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+              <Button
+                onClick={() => setShowSortFilter(false)}
+                className="bg-gradient-to-l from-teal-500 to-cyan-500 text-white font-bold"
+              >
+                تطبيق
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
 
       {/* Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">

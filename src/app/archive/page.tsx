@@ -16,7 +16,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   Plus, Film, Tv, Sparkles, Star, Check, X, Search, Loader2,
-  Edit3, Grid3X3, List, ArrowUpDown, Download, Upload as UploadIcon,
+  Edit3, Grid3X3, List, Download, Upload as UploadIcon,
   BarChart3, CalendarDays, Bookmark, Trash2,
   Dice5, Trophy, SlidersHorizontal
 } from 'lucide-react'
@@ -211,8 +211,8 @@ export default function ArchivePage() {
   // Separate sort & filter state per tab
   const [wlSortBy, setWlSortBy] = useState('addedAt_desc')
   const [rtSortBy, setRtSortBy] = useState('addedAt_desc')
-  const [wlShowFilters, setWlShowFilters] = useState(false)
-  const [rtShowFilters, setRtShowFilters] = useState(false)
+  const [wlShowSortFilter, setWlShowSortFilter] = useState(false)
+  const [rtShowSortFilter, setRtShowSortFilter] = useState(false)
   const [wlFilterGenre, setWlFilterGenre] = useState('')
   const [rtFilterGenre, setRtFilterGenre] = useState('')
   const [wlFilterYear, setWlFilterYear] = useState('')
@@ -724,6 +724,247 @@ export default function ArchivePage() {
   }
 
   // ==================== Unique genres/years from database ====================
+
+  // ==================== Watchlist Sort & Filter Content (shared between Drawer/Popover) ====================
+  const wlSortFilterContent = (
+    <div className="space-y-4 p-4" dir="rtl">
+      {/* Sort Section */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {WL_SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setWlSortBy(opt.value)}
+              className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-colors active:scale-[0.97] ${
+                wlSortBy === opt.value
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:text-[#ccc]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Year Filter as Chips */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+        <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+          <button
+            onClick={() => setWlFilterYear('')}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              !wlFilterYear
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            الكل
+          </button>
+          {dbYears.map(y => (
+            <button
+              key={y}
+              onClick={() => setWlFilterYear(y)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                wlFilterYear === y
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Genre Filter */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيف</h4>
+        <Select value={wlFilterGenre || '__all__'} onValueChange={v => setWlFilterGenre(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
+            <SelectValue placeholder="كل التصنيفات" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectItem value="__all__">كل التصنيفات</SelectItem>
+            {dbGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Rating Range */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">نطاق التقييم</h4>
+        <div className="flex items-center gap-2">
+          <Input
+            value={wlFilterRatingMin}
+            onChange={(e) => setWlFilterRatingMin(e.target.value)}
+            placeholder="من"
+            className="flex-1 bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+            type="number"
+          />
+          <span className="text-[#555] text-xs">—</span>
+          <Input
+            value={wlFilterRatingMax}
+            onChange={(e) => setWlFilterRatingMax(e.target.value)}
+            placeholder="إلى"
+            className="flex-1 bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+            type="number"
+          />
+        </div>
+      </div>
+
+      {/* View Mode */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">طريقة العرض</h4>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            <Grid3X3 className="w-3.5 h-3.5" />
+            شبكة
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            قائمة
+          </button>
+        </div>
+      </div>
+
+      {/* Clear All */}
+      {(wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
+          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+        >
+          <X className="w-3.5 h-3.5 ml-1" />
+          مسح الكل
+        </Button>
+      )}
+    </div>
+  )
+
+  // ==================== Ratings Sort & Filter Content (shared between Drawer/Popover) ====================
+  const rtSortFilterContent = (
+    <div className="space-y-4 p-4" dir="rtl">
+      {/* Sort Section */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {RT_SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setRtSortBy(opt.value)}
+              className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-colors active:scale-[0.97] ${
+                rtSortBy === opt.value
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:text-[#ccc]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Year Filter as Chips */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+        <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+          <button
+            onClick={() => setRtFilterYear('')}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              !rtFilterYear
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            الكل
+          </button>
+          {dbYears.map(y => (
+            <button
+              key={y}
+              onClick={() => setRtFilterYear(y)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                rtFilterYear === y
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Genre Filter */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيف</h4>
+        <Select value={rtFilterGenre || '__all__'} onValueChange={v => setRtFilterGenre(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
+            <SelectValue placeholder="كل التصنيفات" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectItem value="__all__">كل التصنيفات</SelectItem>
+            {dbGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Rating Range */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">نطاق التقييم</h4>
+        <div className="flex items-center gap-2">
+          <Input
+            value={rtFilterRatingMin}
+            onChange={(e) => setRtFilterRatingMin(e.target.value)}
+            placeholder="من"
+            className="flex-1 bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+            type="number"
+          />
+          <span className="text-[#555] text-xs">—</span>
+          <Input
+            value={rtFilterRatingMax}
+            onChange={(e) => setRtFilterRatingMax(e.target.value)}
+            placeholder="إلى"
+            className="flex-1 bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+            type="number"
+          />
+        </div>
+      </div>
+
+      {/* Clear All */}
+      {(rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
+          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+        >
+          <X className="w-3.5 h-3.5 ml-1" />
+          مسح الكل
+        </Button>
+      )}
+    </div>
+  )
 
   // ==================== Auth Loading ====================
   if (!isAuthChecked) {
@@ -1635,95 +1876,95 @@ export default function ArchivePage() {
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">إضافة</span>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setWlShowFilters(!wlShowFilters)}
-                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0">
-                      <ArrowUpDown className="w-4 h-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
-                    <div className="space-y-1">
-                      {WL_SORT_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => { setWlSortBy(opt.value); }}
-                          className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
-                            wlSortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
-                >
-                  {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-                </Button>
+                {/* Unified Sort & Filter Button */}
+                {isMobile ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWlShowSortFilter(true)}
+                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                      (wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax)
+                        ? 'border-[#d4af37]/50 text-[#d4af37]'
+                        : 'text-[#999]'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>{WL_SORT_OPTIONS.find(o => o.value === wlSortBy)?.label || 'ترتيب'}</span>
+                    {(wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax) && (
+                      <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                    )}
+                  </Button>
+                ) : (
+                  <Popover open={wlShowSortFilter} onOpenChange={setWlShowSortFilter}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                          (wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax)
+                            ? 'border-[#d4af37]/50 text-[#d4af37]'
+                            : 'text-[#999]'
+                        }`}
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>{WL_SORT_OPTIONS.find(o => o.value === wlSortBy)?.label || 'ترتيب'}</span>
+                        {(wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax) && (
+                          <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 bg-[#1a1a1a] border-[#2a2a2a] p-0" align="start" dir="rtl">
+                      {wlSortFilterContent}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
 
-            {/* Filters */}
-            {wlShowFilters && (
-              <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={wlFilterGenre || 'all'} onValueChange={v => setWlFilterGenre(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
-                    <SelectValue placeholder="التصنيف" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                    <SelectItem value="all">الكل</SelectItem>
-                    {dbGenres.map(g => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={wlFilterYear || 'all'} onValueChange={v => setWlFilterYear(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
-                    <SelectValue placeholder="السنة" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                    <SelectItem value="all">الكل</SelectItem>
-                    {dbYears.map(y => (
-                      <SelectItem key={y} value={y}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={wlFilterRatingMin}
-                  onChange={(e) => setWlFilterRatingMin(e.target.value)}
-                  placeholder="تقييم من"
-                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
-                  type="number"
-                />
-                <Input
-                  value={wlFilterRatingMax}
-                  onChange={(e) => setWlFilterRatingMax(e.target.value)}
-                  placeholder="تقييم إلى"
-                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
-                  type="number"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
-                  className="text-[#888] text-xs"
-                >
-                  مسح الفلاتر
-                </Button>
+            {/* Active filter badges */}
+            {(wlFilterYear || wlFilterGenre) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {wlFilterYear && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setWlFilterYear('')}
+                  >
+                    {wlFilterYear}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {wlFilterGenre && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setWlFilterGenre('')}
+                  >
+                    {wlFilterGenre}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
               </div>
+            )}
+
+            {/* Mobile Sort & Filter Drawer */}
+            {isMobile && (
+              <Drawer open={wlShowSortFilter} onOpenChange={setWlShowSortFilter}>
+                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
+                  <DrawerHeader className="text-right pb-2">
+                    <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
+                  </DrawerHeader>
+                  <div className="px-4 pb-4 overflow-y-auto">
+                    {wlSortFilterContent}
+                  </div>
+                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+                    <Button
+                      onClick={() => setWlShowSortFilter(false)}
+                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold"
+                    >
+                      تطبيق
+                    </Button>
+                  </DrawerFooter>
+                </DrawerContent>
+              </Drawer>
             )}
 
             {/* Loading state */}
@@ -1826,87 +2067,95 @@ export default function ArchivePage() {
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">إضافة</span>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRtShowFilters(!rtShowFilters)}
-                  className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0">
-                      <ArrowUpDown className="w-4 h-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 bg-[#1a1a1a] border-[#2a2a2a]" align="start">
-                    <div className="space-y-1">
-                      {RT_SORT_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => { setRtSortBy(opt.value) }}
-                          className={`w-full text-right px-3 py-2 rounded-lg text-sm transition-colors ${
-                            rtSortBy === opt.value ? 'bg-[#d4af37]/10 text-[#d4af37]' : 'text-[#ccc] hover:bg-[#2a2a2a]'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                {/* Unified Sort & Filter Button */}
+                {isMobile ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRtShowSortFilter(true)}
+                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                      (rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax)
+                        ? 'border-[#d4af37]/50 text-[#d4af37]'
+                        : 'text-[#999]'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>{RT_SORT_OPTIONS.find(o => o.value === rtSortBy)?.label || 'ترتيب'}</span>
+                    {(rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax) && (
+                      <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                    )}
+                  </Button>
+                ) : (
+                  <Popover open={rtShowSortFilter} onOpenChange={setRtShowSortFilter}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                          (rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax)
+                            ? 'border-[#d4af37]/50 text-[#d4af37]'
+                            : 'text-[#999]'
+                        }`}
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>{RT_SORT_OPTIONS.find(o => o.value === rtSortBy)?.label || 'ترتيب'}</span>
+                        {(rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax) && (
+                          <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 bg-[#1a1a1a] border-[#2a2a2a] p-0" align="start" dir="rtl">
+                      {rtSortFilterContent}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
 
-            {/* Filters */}
-            {rtShowFilters && (
-              <div className="flex flex-wrap gap-2 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                <Select value={rtFilterGenre || 'all'} onValueChange={v => setRtFilterGenre(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-32 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
-                    <SelectValue placeholder="التصنيف" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                    <SelectItem value="all">الكل</SelectItem>
-                    {dbGenres.map(g => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={rtFilterYear || 'all'} onValueChange={v => setRtFilterYear(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-24 bg-[#0a0a0a] border-[#2a2a2a] text-sm">
-                    <SelectValue placeholder="السنة" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-                    <SelectItem value="all">الكل</SelectItem>
-                    {dbYears.map(y => (
-                      <SelectItem key={y} value={y}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={rtFilterRatingMin}
-                  onChange={(e) => setRtFilterRatingMin(e.target.value)}
-                  placeholder="تقييم من"
-                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
-                  type="number"
-                />
-                <Input
-                  value={rtFilterRatingMax}
-                  onChange={(e) => setRtFilterRatingMax(e.target.value)}
-                  placeholder="تقييم إلى"
-                  className="w-20 bg-[#0a0a0a] border-[#2a2a2a] text-sm"
-                  type="number"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
-                  className="text-[#888] text-xs"
-                >
-                  مسح الفلاتر
-                </Button>
+            {/* Active filter badges */}
+            {(rtFilterYear || rtFilterGenre) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {rtFilterYear && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setRtFilterYear('')}
+                  >
+                    {rtFilterYear}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {rtFilterGenre && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setRtFilterGenre('')}
+                  >
+                    {rtFilterGenre}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
               </div>
+            )}
+
+            {/* Mobile Sort & Filter Drawer */}
+            {isMobile && (
+              <Drawer open={rtShowSortFilter} onOpenChange={setRtShowSortFilter}>
+                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
+                  <DrawerHeader className="text-right pb-2">
+                    <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
+                  </DrawerHeader>
+                  <div className="px-4 pb-4 overflow-y-auto">
+                    {rtSortFilterContent}
+                  </div>
+                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+                    <Button
+                      onClick={() => setRtShowSortFilter(false)}
+                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold"
+                    >
+                      تطبيق
+                    </Button>
+                  </DrawerFooter>
+                </DrawerContent>
+              </Drawer>
             )}
 
             {/* Items - Always list view for ratings, no posters */}
