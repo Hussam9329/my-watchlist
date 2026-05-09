@@ -21,19 +21,19 @@ import {
 import { MediaItem, MetadataResult } from '@/lib/types'
 import { normalizeGenres, normalizeTags } from '@/lib/format'
 import { compressImage } from '@/lib/image'
-import { getRatingColor, getRatingBg } from '@/lib/rating'
-import { SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
+import { getRatingColor } from '@/lib/rating'
+import { RT_SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
 import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, itemMatchesTab, getPlatformBadge } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { RatingStars } from '@/components/shared/RatingStars'
 
 // ==================== Tab Config ====================
-const TAB_CONFIG: Record<string, { icon: typeof Gamepad2; label: string; plural: string; color: string; bgColor: string; platform: string }> = {
-  all: { icon: Gamepad2, label: 'الكل', plural: 'جميع الألعاب', color: 'from-teal-500 to-cyan-500', bgColor: 'bg-teal-500/10', platform: '' },
-  pc: { icon: Monitor, label: 'PC', plural: 'ألعاب PC', color: 'from-blue-500 to-indigo-500', bgColor: 'bg-blue-500/10', platform: 'PC' },
-  console: { icon: Gamepad2, label: 'كونسول', plural: 'ألعاب كونسول', color: 'from-purple-500 to-violet-500', bgColor: 'bg-purple-500/10', platform: 'Console' },
-  mobile: { icon: Smartphone, label: 'موبايل', plural: 'ألعاب موبايل', color: 'from-orange-500 to-red-500', bgColor: 'bg-orange-500/10', platform: 'Mobile' },
+const TAB_CONFIG: Record<string, { icon: typeof Gamepad2; label: string; plural: string; color: string; platform: string }> = {
+  all: { icon: Gamepad2, label: 'الكل', plural: 'جميع الألعاب', color: 'from-teal-500 to-cyan-500', platform: '' },
+  pc: { icon: Monitor, label: 'PC', plural: 'ألعاب PC', color: 'from-blue-500 to-indigo-500', platform: 'PC' },
+  console: { icon: Gamepad2, label: 'كونسول', plural: 'ألعاب كونسول', color: 'from-purple-500 to-violet-500', platform: 'Console' },
+  mobile: { icon: Smartphone, label: 'موبايل', plural: 'ألعاب موبايل', color: 'from-orange-500 to-red-500', platform: 'Mobile' },
 }
 
 // ==================== Memoized Card ====================
@@ -443,7 +443,7 @@ export default function GamesPage() {
       <div>
         <h4 className="text-xs font-bold text-teal-400 mb-2">ترتيب</h4>
         <div className="grid grid-cols-2 gap-1.5">
-          {SORT_OPTIONS.map(opt => (
+          {RT_SORT_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setSortBy(opt.value)}
@@ -1240,7 +1240,7 @@ export default function GamesPage() {
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                 {(filterGenre || filterYear) && (
                   <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
                 )}
@@ -1258,7 +1258,7 @@ export default function GamesPage() {
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                    <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                     {(filterGenre || filterYear) && (
                       <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
                     )}

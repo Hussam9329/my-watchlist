@@ -21,7 +21,7 @@ import {
 import { MediaItem, MetadataResult } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { getRatingColor, getRatingBg } from '@/lib/rating'
-import { SORT_OPTIONS } from '@/lib/constants'
+import { RT_SORT_OPTIONS } from '@/lib/constants'
 import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, filterMediaItems } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
@@ -427,7 +427,7 @@ export default function BooksPage() {
       <div>
         <h4 className="text-xs font-bold text-emerald-400 mb-2">ترتيب</h4>
         <div className="grid grid-cols-2 gap-1.5">
-          {SORT_OPTIONS.map(opt => (
+          {RT_SORT_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setSortBy(opt.value)}
@@ -1075,7 +1075,7 @@ export default function BooksPage() {
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                 {(filterGenre || filterYear) && (
                   <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
                 )}
@@ -1093,7 +1093,7 @@ export default function BooksPage() {
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                    <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                     {(filterGenre || filterYear) && (
                       <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
                     )}

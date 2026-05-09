@@ -53,20 +53,6 @@ export async function fetchEnglishDetailsById(
 }
 
 /**
- * Fetch English poster URL for a TMDB movie/tv ID.
- * Convenience wrapper around fetchEnglishDetailsById.
- */
-export async function fetchEnglishPosterById(
-  tmdbId: number,
-  tmdbType: string
-): Promise<string | null> {
-  const details = await fetchEnglishDetailsById(tmdbId, tmdbType)
-  return details?.poster_path
-    ? `https://image.tmdb.org/t/p/w500${details.poster_path}`
-    : null
-}
-
-/**
  * Fetch English poster for a movie/tv/anime by searching its title on TMDB.
  * Used by the refresh-posters route.
  */

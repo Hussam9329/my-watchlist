@@ -1,11 +1,29 @@
 // ==================== Shared Formatting Utilities ====================
 
+/** Normalize type: 'tv' → 'series' to prevent mix-up between movies and series */
+export function normalizeType(type: string): string {
+  return type === 'tv' ? 'series' : type
+}
+
+/** Parse an optional integer from a value, returning null if invalid */
+export function parseOptionalInt(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const num = Number(value)
+  return !isNaN(num) && Number.isInteger(num) ? num : null
+}
+
+/** Normalize a comma-separated string or array field into a string (for DB storage) */
+export function normalizeListField(value: string[] | string): string {
+  if (Array.isArray(value)) return value.join(', ')
+  return value || ''
+}
+
 /** Format a MediaItem from DB (genres/tags as comma-separated string) to API response (genres/tags as array) */
 export function formatItem(item: any) {
   return {
     ...item,
-    genres: item.genres ? item.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : [],
-    tags: item.tags ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+    genres: normalizeGenres(item.genres),
+    tags: normalizeTags(item.tags),
   }
 }
 

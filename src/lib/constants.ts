@@ -12,19 +12,10 @@ export const WL_SORT_OPTIONS = [
 ]
 
 export const RT_SORT_OPTIONS = [
-  { value: 'addedAt_desc', label: 'أضيف مؤخراً' },
-  { value: 'addedAt_asc', label: 'أضيف أولاً' },
-  { value: 'title_asc', label: 'الاسم أ-ي' },
-  { value: 'title_desc', label: 'الاسم ي-أ' },
-  { value: 'year_desc', label: 'السنة (جديد)' },
-  { value: 'year_asc', label: 'السنة (قديم)' },
+  ...WL_SORT_OPTIONS,
   { value: 'userRating_desc', label: 'تقييمي (أعلى)' },
   { value: 'userRating_asc', label: 'تقييمي (أدنى)' },
-  { value: 'rating_desc', label: 'التقييم العام (أعلى)' },
-  { value: 'rating_asc', label: 'التقييم العام (أدنى)' },
 ]
-
-export const SORT_OPTIONS = RT_SORT_OPTIONS
 
 export const RATING_STATUSES = [
   { value: 'watched', label: 'تمت المشاهدة' },

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -29,11 +28,11 @@ import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
 // ==================== Constants ====================
-const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string; dotColor: string }> = {
-  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
-  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10', dotColor: 'bg-[#a855f7]' },
-  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10', dotColor: 'bg-[#3b82f6]' },
-  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10', dotColor: 'bg-[#d4af37]' },
+const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural: string; color: string; bgColor: string }> = {
+  all: { icon: Bookmark, label: 'الكل', plural: 'جميع الأعمال', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
+  anime: { icon: Sparkles, label: 'أنمي', plural: 'أنميات', color: 'from-[#a855f7] to-[#7c3aed]', bgColor: 'bg-[#a855f7]/10' },
+  series: { icon: Tv, label: 'مسلسل', plural: 'مسلسلات', color: 'from-[#3b82f6] to-[#1d4ed8]', bgColor: 'bg-[#3b82f6]/10' },
+  movie: { icon: Film, label: 'فيلم', plural: 'أفلام', color: 'from-[#d4af37] to-[#b8960f]', bgColor: 'bg-[#d4af37]/10' },
   // Note: books & games are NOT in the archive — they have their own dedicated pages
 }
 
@@ -169,8 +168,6 @@ export default function ArchivePage() {
   // Watchlist state — separate data per type to prevent mixing
   const [wlItems, setWlItems] = useState<MediaItem[]>([])
   const [wlLoading, setWlLoading] = useState(true)
-  const [wlPage, setWlPage] = useState(1)
-  const [wlHasMore, setWlHasMore] = useState(false)
   const [wlTotal, setWlTotal] = useState(0)
   // Separate counts per type (fetched in one pass, split client-side)
   const [wlMovies, setWlMovies] = useState<MediaItem[]>([])
@@ -191,8 +188,6 @@ export default function ArchivePage() {
   const [rtType, setRtType] = useState('movie')
   const [rtItems, setRtItems] = useState<MediaItem[]>([])
   const [rtLoading, setRtLoading] = useState(true)
-  const [rtPage, setRtPage] = useState(1)
-  const [rtHasMore, setRtHasMore] = useState(false)
   const [rtTotal, setRtTotal] = useState(0)
 
   // Stats
@@ -290,8 +285,6 @@ export default function ArchivePage() {
         })
       }
       setWlTotal(data.total || 0)
-      setWlHasMore(data.hasMore || false)
-      setWlPage(page)
       // Split items by type — this ensures movies/series/anime are always correctly separated
       const splitItems = (items: MediaItem[]) => {
         const movies = items.filter(i => i.type === 'movie')
@@ -349,8 +342,6 @@ export default function ArchivePage() {
         })
       }
       setRtTotal(data.total || 0)
-      setRtHasMore(data.hasMore || false)
-      setRtPage(page)
       // Auto-load next page if there are more items
       if (data.hasMore) {
         setTimeout(() => fetchRatings(page + 1), 100)
@@ -379,7 +370,6 @@ export default function ArchivePage() {
   // ==================== Effects ====================
   useEffect(() => {
     if (!isAuthChecked) return
-    setWlPage(1)
     fetchWatchlist(1, true)
   }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
@@ -404,7 +394,6 @@ export default function ArchivePage() {
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'ratings') return
-    setRtPage(1)
     fetchRatings(1, true)
   }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
 

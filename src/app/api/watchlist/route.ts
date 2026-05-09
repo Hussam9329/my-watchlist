@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { formatItem } from '@/lib/format'
+import { formatItem, normalizeType, normalizeGenres, normalizeListField, parseOptionalInt } from '@/lib/format'
 
+// Only allow explicit _asc/_desc sort directions — bare field names removed to prevent silent fallback
 const ALLOWED_SORT_FIELDS = new Set([
-  'title', 'title_asc', 'title_desc',
-  'year', 'year_asc', 'year_desc',
-  'addedAt', 'addedAt_asc', 'addedAt_desc',
-  'userRating', 'userRating_asc', 'userRating_desc',
-  'originalTitle', 'originalTitle_asc', 'originalTitle_desc',
-  'rating', 'rating_asc', 'rating_desc'
+  'title_asc', 'title_desc',
+  'year_asc', 'year_desc',
+  'addedAt_asc', 'addedAt_desc',
+  'userRating_asc', 'userRating_desc',
+  'originalTitle_asc', 'originalTitle_desc',
+  'rating_asc', 'rating_desc'
 ])
 
 export async function GET(request: NextRequest) {
@@ -30,17 +31,16 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     // Normalize type: 'tv' should match 'series' in the database
     if (type) {
-      where.type = type === 'tv' ? 'series' : type
+      where.type = normalizeType(type)
     }
     // Exclude specified types (e.g. books and games from archive page)
     if (excludeTypes) {
       const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
       if (excluded.length > 0) {
-        if (where.type) {
-          // Both type and excludeTypes: just use type (excludeTypes is irrelevant when type is specified)
-        } else {
+        if (!where.type) {
           where.type = { notIn: excluded }
         }
+        // If type is already specified, excludeTypes is irrelevant
       }
     }
     if (hasRating === 'true') {
@@ -60,11 +60,11 @@ export async function GET(request: NextRequest) {
     if (filterGenre) {
       where.genres = { contains: filterGenre }
     }
-    if (filterRatingMin || filterRatingMax) {
+    // Rating range filter — only applies when hasRating is not 'false'
+    if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
       const ratingFilter: any = {}
       if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)
       if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)
-      // If hasRating is already set, merge with it
       if (where.userRating && typeof where.userRating === 'object') {
         where.userRating = { ...where.userRating, ...ratingFilter }
       } else {
@@ -97,12 +97,10 @@ export async function GET(request: NextRequest) {
       let paramIndex = 1
 
       if (type) {
-        // Normalize type: 'tv' → 'series'
-        const normalizedTypeForQuery = type === 'tv' ? 'series' : type
+        const normalizedTypeForQuery = normalizeType(type)
         conditions.push(`"type" = $${paramIndex++}`)
         params.push(normalizedTypeForQuery)
       } else if (excludeTypes) {
-        // Exclude specified types (e.g. books and games)
         const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
         if (excluded.length > 0) {
           const placeholders = excluded.map(() => `$${paramIndex++}`).join(', ')
@@ -128,13 +126,16 @@ export async function GET(request: NextRequest) {
         conditions.push(`"genres" LIKE $${paramIndex++}`)
         params.push(`%${filterGenre}%`)
       }
-      if (filterRatingMin) {
-        conditions.push(`"userRating" >= $${paramIndex++}`)
-        params.push(parseFloat(filterRatingMin))
-      }
-      if (filterRatingMax) {
-        conditions.push(`"userRating" <= $${paramIndex++}`)
-        params.push(parseFloat(filterRatingMax))
+      // Rating range filter — only applies when hasRating is not 'false'
+      if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
+        if (filterRatingMin) {
+          conditions.push(`"userRating" >= $${paramIndex++}`)
+          params.push(parseFloat(filterRatingMin))
+        }
+        if (filterRatingMax) {
+          conditions.push(`"userRating" <= $${paramIndex++}`)
+          params.push(parseFloat(filterRatingMax))
+        }
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -142,10 +143,8 @@ export async function GET(request: NextRequest) {
       // Build ORDER BY with numeric cast for string fields that need numeric comparison
       let orderClause: string
       if (sortField === 'year') {
-        // Sort by year as integer, with secondary sort by addedAt for same-year items
         orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else if (sortField === 'rating') {
-        // Sort by TMDB rating as float, with secondary sort by addedAt
         orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else {
         orderClause = `ORDER BY "addedAt" DESC`
@@ -209,11 +208,6 @@ export async function GET(request: NextRequest) {
 
 const ALLOWED_TYPES = new Set(['movie', 'series', 'anime', 'book', 'game', 'tv'])
 
-/** Normalize type: 'tv' → 'series' to prevent mix-up between movies and series */
-function normalizeType(type: string): string {
-  return type === 'tv' ? 'series' : type
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -248,7 +242,6 @@ export async function POST(request: NextRequest) {
     ]
     if (body.originalTitle) {
       orConditions.push({ originalTitle: { equals: body.originalTitle, mode: 'insensitive' } })
-      // Also check if title matches originalTitle or vice versa
       orConditions.push({ title: { equals: body.originalTitle, mode: 'insensitive' } })
     }
 
@@ -281,26 +274,26 @@ export async function POST(request: NextRequest) {
     const item = await prisma.mediaItem.create({
       data: {
         title: body.title,
-        originalTitle: body.originalTitle,
-        year: body.year,
+        originalTitle: body.originalTitle || null,
+        year: body.year || '',
         type: normalizedType,
-        poster: body.poster,
+        poster: body.poster || null,
         rating: body.rating ? String(body.rating) : null,
-        overview: body.overview,
-        genres: Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || ''),
-        episodes: body.episodes && !isNaN(Number(body.episodes)) ? parseInt(String(body.episodes)) : null,
-        seasons: body.seasons && !isNaN(Number(body.seasons)) ? parseInt(String(body.seasons)) : null,
-        duration: body.duration,
-        status: body.status,
-        author: body.author,
-        pages: body.pages && !isNaN(Number(body.pages)) ? parseInt(String(body.pages)) : null,
-        tags: Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || ''),
+        overview: body.overview || null,
+        genres: normalizeListField(body.genres),
+        episodes: parseOptionalInt(body.episodes),
+        seasons: parseOptionalInt(body.seasons),
+        duration: body.duration || null,
+        status: body.status || null,
+        author: body.author || null,
+        pages: parseOptionalInt(body.pages),
+        tags: normalizeListField(body.tags),
         notes: body.notes || '',
         watched: body.watched || false,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
-        userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
+        userRating: body.userRating != null && !isNaN(Number(body.userRating)) ? parseFloat(String(body.userRating)) : null,
         rewatch: body.rewatch || false,
-        runtime: body.runtime && !isNaN(Number(body.runtime)) ? parseInt(String(body.runtime)) : null,
+        runtime: parseOptionalInt(body.runtime),
         ratingStatus: body.ratingStatus || 'watched',
       }
     })

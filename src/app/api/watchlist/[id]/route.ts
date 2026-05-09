@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { formatItem } from '@/lib/format'
+import { formatItem, normalizeType, normalizeListField, parseOptionalInt } from '@/lib/format'
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +16,15 @@ export async function GET(
   }
 }
 
+// Allowed fields for PUT and PATCH — prevents arbitrary field injection
+const ALLOWED_FIELDS = new Set([
+  'title', 'originalTitle', 'type', 'year', 'poster', 'genres',
+  'overview', 'userRating', 'notes', 'status', 'addedAt',
+  'rating', 'episodes', 'seasons', 'duration', 'author',
+  'pages', 'tags', 'watched', 'watchedAt', 'rewatch',
+  'runtime', 'ratingStatus'
+])
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,32 +33,48 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
+    // Filter to allowed fields only — prevents arbitrary field injection
+    const data: Record<string, any> = {}
+    for (const [key, value] of Object.entries(body)) {
+      if (ALLOWED_FIELDS.has(key)) {
+        data[key] = value
+      }
+    }
+
+    // Normalize type: 'tv' → 'series'
+    if (data.type) {
+      data.type = normalizeType(data.type)
+    }
+
+    // Normalize list fields
+    if (data.genres !== undefined) data.genres = normalizeListField(data.genres)
+    if (data.tags !== undefined) data.tags = normalizeListField(data.tags)
+
+    // Validate and parse numeric fields
+    if (data.episodes !== undefined) data.episodes = parseOptionalInt(data.episodes)
+    if (data.seasons !== undefined) data.seasons = parseOptionalInt(data.seasons)
+    if (data.pages !== undefined) data.pages = parseOptionalInt(data.pages)
+    if (data.runtime !== undefined) data.runtime = parseOptionalInt(data.runtime)
+
+    // Validate userRating — prevent NaN
+    if (data.userRating !== undefined) {
+      data.userRating = data.userRating != null && !isNaN(Number(data.userRating)) ? parseFloat(String(data.userRating)) : null
+    }
+
+    // Validate rating as string
+    if (data.rating !== undefined) {
+      data.rating = data.rating ? String(data.rating) : null
+    }
+
+    // Default values
+    if (data.notes !== undefined) data.notes = data.notes || ''
+    if (data.watchedAt !== undefined) data.watchedAt = data.watchedAt ? String(data.watchedAt) : null
+    if (data.rewatch !== undefined) data.rewatch = data.rewatch || false
+    if (data.ratingStatus !== undefined) data.ratingStatus = data.ratingStatus || 'watched'
+
     const item = await prisma.mediaItem.update({
       where: { id },
-      data: {
-        title: body.title,
-        originalTitle: body.originalTitle,
-        year: body.year,
-        type: body.type,
-        poster: body.poster,
-        rating: body.rating ? String(body.rating) : null,
-        overview: body.overview,
-        genres: Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || ''),
-        episodes: body.episodes && !isNaN(Number(body.episodes)) ? parseInt(String(body.episodes)) : null,
-        seasons: body.seasons && !isNaN(Number(body.seasons)) ? parseInt(String(body.seasons)) : null,
-        duration: body.duration,
-        status: body.status,
-        author: body.author,
-        pages: body.pages && !isNaN(Number(body.pages)) ? parseInt(String(body.pages)) : null,
-        tags: Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || ''),
-        notes: body.notes,
-        watched: body.watched,
-        watchedAt: body.watchedAt ? String(body.watchedAt) : null,
-        userRating: body.userRating != null ? parseFloat(String(body.userRating)) : null,
-        rewatch: body.rewatch || false,
-        runtime: body.runtime && !isNaN(Number(body.runtime)) ? parseInt(String(body.runtime)) : null,
-        ratingStatus: body.ratingStatus || 'watched',
-      }
+      data
     })
 
     return NextResponse.json(formatItem(item))
@@ -79,41 +104,43 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const ALLOWED_FIELDS = new Set([
-      'title', 'originalTitle', 'type', 'year', 'poster', 'genres',
-      'overview', 'userRating', 'notes', 'status', 'addedAt',
-      'rating', 'episodes', 'seasons', 'duration', 'author',
-      'pages', 'tags', 'watched', 'watchedAt', 'rewatch',
-      'runtime', 'ratingStatus'
-    ])
     const updateData: Record<string, any> = {}
     for (const [key, value] of Object.entries(body)) {
       if (ALLOWED_FIELDS.has(key)) {
         updateData[key] = value
       }
     }
-    if (body.watchedAt) updateData.watchedAt = String(body.watchedAt)
-    if (body.genres !== undefined) {
-      updateData.genres = Array.isArray(body.genres) ? body.genres.join(', ') : (body.genres || '')
+
+    // Normalize type: 'tv' → 'series'
+    if (updateData.type) {
+      updateData.type = normalizeType(updateData.type)
     }
-    if (body.userRating !== undefined) {
-      updateData.userRating = body.userRating != null && !isNaN(Number(body.userRating)) ? parseFloat(String(body.userRating)) : null
+
+    if (updateData.watchedAt) updateData.watchedAt = String(updateData.watchedAt)
+    if (updateData.genres !== undefined) {
+      updateData.genres = normalizeListField(updateData.genres)
+    }
+    if (updateData.tags !== undefined) {
+      updateData.tags = normalizeListField(updateData.tags)
+    }
+    if (updateData.userRating !== undefined) {
+      updateData.userRating = updateData.userRating != null && !isNaN(Number(updateData.userRating)) ? parseFloat(String(updateData.userRating)) : null
     }
     // Ensure numeric fields are properly validated
-    if (body.episodes !== undefined) {
-      updateData.episodes = body.episodes != null && !isNaN(Number(body.episodes)) ? parseInt(String(body.episodes)) : null
+    if (updateData.episodes !== undefined) {
+      updateData.episodes = parseOptionalInt(updateData.episodes)
     }
-    if (body.seasons !== undefined) {
-      updateData.seasons = body.seasons != null && !isNaN(Number(body.seasons)) ? parseInt(String(body.seasons)) : null
+    if (updateData.seasons !== undefined) {
+      updateData.seasons = parseOptionalInt(updateData.seasons)
     }
-    if (body.pages !== undefined) {
-      updateData.pages = body.pages != null && !isNaN(Number(body.pages)) ? parseInt(String(body.pages)) : null
+    if (updateData.pages !== undefined) {
+      updateData.pages = parseOptionalInt(updateData.pages)
     }
-    if (body.runtime !== undefined) {
-      updateData.runtime = body.runtime != null && !isNaN(Number(body.runtime)) ? parseInt(String(body.runtime)) : null
+    if (updateData.runtime !== undefined) {
+      updateData.runtime = parseOptionalInt(updateData.runtime)
     }
-    if (body.tags !== undefined) {
-      updateData.tags = Array.isArray(body.tags) ? body.tags.join(', ') : (body.tags || '')
+    if (updateData.rating !== undefined) {
+      updateData.rating = updateData.rating ? String(updateData.rating) : null
     }
 
     const item = await prisma.mediaItem.update({

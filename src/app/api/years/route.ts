@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { normalizeType } from '@/lib/format'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     if (type) {
       conditions.push(`"type" = $${paramIndex++}`)
-      params.push(type === 'tv' ? 'series' : type)
+      params.push(normalizeType(type))
     } else if (excludeTypes) {
       const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
       if (excluded.length > 0) {

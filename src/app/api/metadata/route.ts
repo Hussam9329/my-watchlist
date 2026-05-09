@@ -253,24 +253,17 @@ export async function POST(request: NextRequest) {
           displayOverview = arResult?.overview || englishData?.overview || result.overview || 'لا يوجد وصف'
           displayYear = (englishData?.release_date || englishData?.first_air_date || result.release_date || result.first_air_date || '').split('-')[0]
 
-          // Fetch detailed info for TV shows (seasons/episodes) and movies (runtime/genres)
-          try {
-            const detailRes = await fetch(
-              `${TMDB_BASE_URL}/${tmdbType}/${result.id}?language=en-US&api_key=${TMDB_API_KEY}`,
-              { cache: 'no-store' }
-            )
-            const detailData = await detailRes.json()
-
+          // Use the englishData we already fetched instead of making a duplicate API call
+          // fetchEnglishDetailsById already returns full details including seasons/episodes/runtime/genres
+          if (englishData) {
             if (tmdbType === 'tv') {
-              displaySeasons = detailData.number_of_seasons || null
-              displayEpisodes = detailData.number_of_episodes || null
-              displayGenres = (detailData.genres || []).map((g: any) => g.name)
+              displaySeasons = englishData.number_of_seasons || null
+              displayEpisodes = englishData.number_of_episodes || null
+              displayGenres = (englishData.genres || []).map((g: any) => g.name)
             } else {
-              displayRuntime = detailData.runtime || null
-              displayGenres = (detailData.genres || []).map((g: any) => g.name)
+              displayRuntime = englishData.runtime || null
+              displayGenres = (englishData.genres || []).map((g: any) => g.name)
             }
-          } catch {
-            // If detail fetch fails, continue without it
           }
         }
 

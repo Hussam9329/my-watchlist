@@ -1,11 +1,7 @@
 // ==================== Shared CRUD Helpers ====================
 
 import { MediaItem } from './types'
-
-/** Normalize type: 'tv' → 'series' to prevent mix-up between movies and series */
-function normalizeType(type: string): string {
-  return type === 'tv' ? 'series' : type
-}
+import { normalizeType, parseOptionalInt, normalizeListField } from './format'
 
 /** Build request body for create/update operations from form data */
 export function buildItemBody(
@@ -22,17 +18,17 @@ export function buildItemBody(
     rating: formData.rating || null,
     overview: formData.overview || null,
     genres: formData.genres,
-    episodes: formData.episodes && !isNaN(Number(formData.episodes)) ? parseInt(formData.episodes) : null,
-    seasons: formData.seasons && !isNaN(Number(formData.seasons)) ? parseInt(formData.seasons) : null,
+    episodes: parseOptionalInt(formData.episodes),
+    seasons: parseOptionalInt(formData.seasons),
     duration: formData.duration || null,
     status: formData.status || null,
     author: formData.author || null,
-    pages: formData.pages && !isNaN(Number(formData.pages)) ? parseInt(formData.pages) : null,
+    pages: parseOptionalInt(formData.pages),
     tags: formData.tags,
-    notes: formData.notes,
+    notes: formData.notes || '',
     userRating: formData.userRating && !isNaN(Number(formData.userRating)) ? parseFloat(formData.userRating) : null,
     rewatch: formData.rewatch === 'true',
-    runtime: formData.runtime && !isNaN(Number(formData.runtime)) ? parseInt(formData.runtime) : null,
+    runtime: parseOptionalInt(formData.runtime),
     ratingStatus: formData.ratingStatus || 'watched',
   }
 }
@@ -51,18 +47,18 @@ export function buildImportBody(
     poster: item.poster || null,
     rating: item.rating || null,
     overview: item.overview || null,
-    genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genres || ''),
-    episodes: item.episodes != null && !isNaN(Number(item.episodes)) ? Number(item.episodes) : null,
-    seasons: item.seasons != null && !isNaN(Number(item.seasons)) ? Number(item.seasons) : null,
+    genres: normalizeListField(item.genres),
+    episodes: parseOptionalInt(item.episodes),
+    seasons: parseOptionalInt(item.seasons),
     duration: item.duration || null,
     status: item.status || null,
     author: item.author || null,
-    pages: item.pages != null && !isNaN(Number(item.pages)) ? Number(item.pages) : null,
-    tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
+    pages: parseOptionalInt(item.pages),
+    tags: normalizeListField(item.tags),
     notes: item.notes || '',
-    userRating: item.userRating != null && !isNaN(Number(item.userRating)) ? Number(item.userRating) : null,
+    userRating: item.userRating != null && !isNaN(Number(item.userRating)) ? parseFloat(String(item.userRating)) : null,
     rewatch: item.rewatch || false,
-    runtime: item.runtime != null && !isNaN(Number(item.runtime)) ? Number(item.runtime) : null,
+    runtime: parseOptionalInt(item.runtime),
     ratingStatus: item.ratingStatus || 'watched',
   }
 }
