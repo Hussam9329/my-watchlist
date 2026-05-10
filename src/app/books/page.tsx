@@ -25,7 +25,7 @@ import { RT_SORT_OPTIONS } from '@/lib/constants'
 import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, filterMediaItems } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
-import { RatingStars } from '@/components/shared/RatingStars'
+
 
 // ==================== Memoized Card ====================
 interface BookCardProps {
@@ -1503,14 +1503,78 @@ export default function BooksPage() {
                 تقييم: {selectedItem?.title}
               </DrawerTitle>
             </DrawerHeader>
-            <div className="p-6 flex flex-col items-center gap-4">
-              <RatingStars
-                rating={selectedItem?.userRating ?? null}
-                onChange={(r) => handleQuickRate(r)}
-                size="lg"
-                colorTheme="emerald"
-              />
-              <p className="text-sm text-[#888]">اضغط على النجوم للتقييم من 10</p>
+            <div className="p-6 space-y-4">
+              {selectedItem && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-emerald-400 text-center block">التقييم (من 10)</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        placeholder="8.5"
+                        defaultValue={selectedItem.userRating != null ? selectedItem.userRating : ''}
+                        className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-emerald-400 flex-1 text-center text-lg font-bold"
+                        dir="ltr"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseFloat((e.target as HTMLInputElement).value)
+                            if (!isNaN(val) && val >= 0 && val <= 10) {
+                              handleQuickRate(val)
+                            } else {
+                              toast.error('أدخل قيمة بين 0 و 10')
+                            }
+                          }
+                        }}
+                        id="manual-rating-input-mobile"
+                      />
+                      <Button
+                        onClick={() => {
+                          const input = document.getElementById('manual-rating-input-mobile') as HTMLInputElement
+                          const val = parseFloat(input?.value || '')
+                          if (!isNaN(val) && val >= 0 && val <= 10) {
+                            handleQuickRate(val)
+                          } else {
+                            toast.error('أدخل قيمة بين 0 و 10')
+                          }
+                        }}
+                        className="bg-emerald-500 text-black hover:bg-emerald-600 shrink-0 min-h-[44px]"
+                      >
+                        <Star className="w-4 h-4 ml-1" />
+                        تقييم
+                      </Button>
+                    </div>
+                  </div>
+                  {selectedItem.userRating != null && (
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userRating: null }),
+                          })
+                          if (res.ok) {
+                            toast.success('تم إزالة التقييم')
+                            setShowQuickRate(false)
+                            setSelectedItem(prev => prev ? { ...prev, userRating: null } : null)
+                            setBooks(prev => prev.map(i => i.id === selectedItem.id ? { ...i, userRating: null } : i))
+                          }
+                        } catch {
+                          toast.error('خطأ')
+                        }
+                      }}
+                      className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    >
+                      <X className="w-4 h-4 ml-1" />
+                      إزالة التقييم
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
             <DrawerFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
@@ -1531,14 +1595,78 @@ export default function BooksPage() {
                 تقييم: {selectedItem?.title}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-4">
-              <RatingStars
-                rating={selectedItem?.userRating ?? null}
-                onChange={(r) => handleQuickRate(r)}
-                size="lg"
-                colorTheme="emerald"
-              />
-              <p className="text-sm text-[#888]">اضغط على النجوم للتقييم من 10</p>
+            <div className="py-4 space-y-4">
+              {selectedItem && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-emerald-400 text-center block">التقييم (من 10)</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        placeholder="8.5"
+                        defaultValue={selectedItem.userRating != null ? selectedItem.userRating : ''}
+                        className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-emerald-400 flex-1 text-center text-lg font-bold"
+                        dir="ltr"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = parseFloat((e.target as HTMLInputElement).value)
+                            if (!isNaN(val) && val >= 0 && val <= 10) {
+                              handleQuickRate(val)
+                            } else {
+                              toast.error('أدخل قيمة بين 0 و 10')
+                            }
+                          }
+                        }}
+                        id="manual-rating-input-desktop"
+                      />
+                      <Button
+                        onClick={() => {
+                          const input = document.getElementById('manual-rating-input-desktop') as HTMLInputElement
+                          const val = parseFloat(input?.value || '')
+                          if (!isNaN(val) && val >= 0 && val <= 10) {
+                            handleQuickRate(val)
+                          } else {
+                            toast.error('أدخل قيمة بين 0 و 10')
+                          }
+                        }}
+                        className="bg-emerald-500 text-black hover:bg-emerald-600 shrink-0 min-h-[44px]"
+                      >
+                        <Star className="w-4 h-4 ml-1" />
+                        تقييم
+                      </Button>
+                    </div>
+                  </div>
+                  {selectedItem.userRating != null && (
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userRating: null }),
+                          })
+                          if (res.ok) {
+                            toast.success('تم إزالة التقييم')
+                            setShowQuickRate(false)
+                            setSelectedItem(prev => prev ? { ...prev, userRating: null } : null)
+                            setBooks(prev => prev.map(i => i.id === selectedItem.id ? { ...i, userRating: null } : i))
+                          }
+                        } catch {
+                          toast.error('خطأ')
+                        }
+                      }}
+                      className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    >
+                      <X className="w-4 h-4 ml-1" />
+                      إزالة التقييم
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </DialogContent>
         </Dialog>

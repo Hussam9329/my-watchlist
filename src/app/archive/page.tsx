@@ -1514,62 +1514,9 @@ export default function ArchivePage() {
         )}
       </div>
 
-      {/* Rating Scale */}
-      <div className="space-y-3">
-        <div className="grid grid-cols-5 gap-2">
-          {Array.from({ length: 10 }).map((_, decade) => {
-            const base = decade * 10
-            return (
-              <div key={decade} className="text-center">
-                <div className="text-[10px] text-[#666] mb-1">{base}s</div>
-                <div className="space-y-1">
-                  {Array.from({ length: 10 }).map((__, unit) => {
-                    const val = base + unit
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => quickRate(val)}
-                        className={`w-full py-1 rounded text-xs font-bold transition-all active:scale-95 ${
-                          selectedItem.userRating === val
-                            ? 'bg-[#d4af37] text-black'
-                            : val >= 70
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : val >= 40
-                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Quick presets */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        {[100, 90, 85, 80, 75, 70, 60, 50, 40, 30, 20, 10, 0].map(val => (
-          <button
-            key={val}
-            onClick={() => quickRate(val)}
-            className={`px-3 py-3 rounded-lg text-sm font-bold transition-all active:scale-95 min-h-[44px] ${
-              selectedItem.userRating === val
-                ? 'bg-[#d4af37] text-black'
-                : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#ccc] hover:border-[#d4af37]/50'
-            }`}
-          >
-            {val}
-          </button>
-        ))}
-      </div>
-
       {/* Manual decimal input */}
       <div className="space-y-2">
-        <label className="text-sm font-bold text-[#d4af37] text-center block">تقييم يدوي (رقم عشري)</label>
+        <label className="text-sm font-bold text-[#d4af37] text-center block">التقييم (من 100)</label>
         <div className="flex gap-2">
           <Input
             type="number"
@@ -1577,7 +1524,8 @@ export default function ArchivePage() {
             min="0"
             max="100"
             placeholder="88.33"
-            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] flex-1"
+            defaultValue={selectedItem.userRating != null ? selectedItem.userRating : ''}
+            className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] flex-1 text-center text-lg font-bold"
             dir="ltr"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -1601,7 +1549,7 @@ export default function ArchivePage() {
                 toast.error('أدخل قيمة بين 0 و 100')
               }
             }}
-            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0"
+            className="bg-[#d4af37] text-black hover:bg-[#c9a227] shrink-0 min-h-[44px]"
           >
             <Star className="w-4 h-4 ml-1" />
             تقييم
@@ -1614,7 +1562,6 @@ export default function ArchivePage() {
           variant="outline"
           onClick={async () => {
             await quickRate(-1) // will set to null
-            // Actually, let's handle removing rating differently
             try {
               const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
                 method: 'PATCH',
