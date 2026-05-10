@@ -580,6 +580,10 @@ export default function ArchivePage() {
       setShowQuickRate(false)
       setShowDetails(false)
       setSelectedItem(prev => prev ? { ...prev, userRating: rating, watched: true } : null)
+      // Switch to ratings tab with the correct type so the rated item is visible
+      const itemType = selectedItem.type === 'tv' ? 'series' : selectedItem.type
+      setRtType(itemType || 'movie')
+      setMainTab('ratings')
       fetchWatchlist(1, true)
       fetchRatings(1, true)
     } catch {
@@ -1561,7 +1565,6 @@ export default function ArchivePage() {
         <Button
           variant="outline"
           onClick={async () => {
-            await quickRate(-1) // will set to null
             try {
               const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
                 method: 'PATCH',
@@ -1572,6 +1575,8 @@ export default function ArchivePage() {
                 toast.success('تم إزالة التقييم')
                 setShowQuickRate(false)
                 setSelectedItem(prev => prev ? { ...prev, userRating: null } : null)
+                // Move back to watchlist since item no longer has a rating
+                setMainTab('watchlist')
                 fetchWatchlist(1, true)
                 fetchRatings(1, true)
               }
