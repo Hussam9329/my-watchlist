@@ -16,7 +16,7 @@ export function SkeletonGrid({ count = 6, aspectRatio = '2/3', variant = 'shimme
 
   return (
     <div
-      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5"
+      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 max-w-[1800px]"
       style={{ '--aspect': aspectRatio } as React.CSSProperties}
     >
       {Array.from({ length: count }).map((_, i) => (

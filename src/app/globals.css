@@ -287,6 +287,29 @@ html {
   }
 }
 
+/* Line clamp support for card titles */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* منع تمدد البطاقات على الشاشات الكبيرة */
+@media (min-width: 1800px) {
+  .max-w-\[1800px\] {
+    max-width: 1800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* تحسين عرض البطاقات - منع التمدد المفرط للصور */
+.poster-card img {
+  image-rendering: auto;
+}
+
 /* Smooth scroll for entire page */
 html {
   scroll-behavior: smooth;

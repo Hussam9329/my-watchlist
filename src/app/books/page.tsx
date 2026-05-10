@@ -157,7 +157,7 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
       </div>
       {/* Info */}
       <div className="p-2.5">
-        <h3 className="font-bold text-sm text-white truncate">{item.title}</h3>
+        <h3 className="font-bold text-sm text-white leading-tight line-clamp-2 min-h-[2.5em]">{item.title}</h3>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           {item.author && <span className="text-[10px] text-[#999] truncate max-w-[100px]">{item.author}</span>}
           <span className="text-xs text-[#666]">{item.year}</span>
@@ -1301,7 +1301,7 @@ export default function BooksPage() {
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 max-w-[1800px]">
             {processedItems.map(item => (
               <BookCard
                 key={item.id}

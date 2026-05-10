@@ -176,7 +176,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
       </div>
       {/* Info */}
       <div className="p-2.5">
-        <h3 className="font-bold text-sm text-white truncate leading-tight">{item.title}</h3>
+        <h3 className="font-bold text-sm text-white leading-tight line-clamp-2 min-h-[2.5em]">{item.title}</h3>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-[#888]">{item.year}</span>
           {item.genres && item.genres.length > 0 && (
@@ -1988,7 +1988,7 @@ export default function ArchivePage() {
               <>
                 {/* Items Grid/List — filtered by selected type */}
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 max-w-[1800px]">
                     {wlFilteredItems.map(item => (
                       <MediaCard
                         key={item.id}
