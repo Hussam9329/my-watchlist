@@ -22,6 +22,7 @@ import {
 import { MediaItem, MetadataResult, StatsData } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { formatRating, getRatingColor, getRatingBg } from '@/lib/rating'
+import { normalizeGenres } from '@/lib/format'
 import { WL_SORT_OPTIONS, RT_SORT_OPTIONS, RATING_STATUSES } from '@/lib/constants'
 import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
@@ -567,22 +568,31 @@ export default function ArchivePage() {
     }
   }
 
-  const quickRate = async (rating: number) => {
+  const quickRate = async (rating: number, genres?: string[]) => {
     if (!selectedItem) return
     try {
+      const body: Record<string, any> = { userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }
+      // If genres were selected in the rating modal, include them
+      if (genres && genres.length > 0) {
+        body.genres = genres.join(', ')
+      }
       const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('خطأ في التقييم')
       toast.success(`تم التقييم: ${rating}/100`)
       setShowQuickRate(false)
       setShowDetails(false)
-      setSelectedItem(prev => prev ? { ...prev, userRating: rating, watched: true } : null)
+      setSelectedItem(prev => prev ? { ...prev, userRating: rating, watched: true, ...(genres && genres.length > 0 ? { genres } : {}) } : null)
       // Switch to ratings tab with the correct type so the rated item is visible
       const itemType = selectedItem.type === 'tv' ? 'series' : selectedItem.type
       setRtType(itemType || 'movie')
+      // If a genre was selected, set it as filter so the item is visible
+      if (genres && genres.length > 0) {
+        setRtFilterGenre(genres[0])
+      }
       setMainTab('ratings')
       fetchWatchlist(1, true)
       fetchRatings(1, true)
@@ -1518,6 +1528,28 @@ export default function ArchivePage() {
         )}
       </div>
 
+      {/* Genre Selector */}
+      <div className="space-y-2">
+        <label className="text-sm font-bold text-[#d4af37] text-center block">التصنيف (النوع)</label>
+        <Select
+          value={(() => { const g = normalizeGenres(selectedItem.genres); return g.length > 0 ? g[0] : '__none__' })()}
+          onValueChange={(val) => {
+            const newGenres = val === '__none__' ? [] : [val]
+            setSelectedItem(prev => prev ? { ...prev, genres: newGenres } : null)
+          }}
+        >
+          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-[#d4af37] text-sm h-11">
+            <SelectValue placeholder="اختر التصنيف" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
+            <SelectItem value="__none__">بدون تصنيف</SelectItem>
+            {dbGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Manual decimal input */}
       <div className="space-y-2">
         <label className="text-sm font-bold text-[#d4af37] text-center block">التقييم (من 100)</label>
@@ -1535,7 +1567,7 @@ export default function ArchivePage() {
               if (e.key === 'Enter') {
                 const val = parseFloat((e.target as HTMLInputElement).value)
                 if (!isNaN(val) && val >= 0 && val <= 100) {
-                  quickRate(val)
+                  quickRate(val, normalizeGenres(selectedItem.genres))
                 } else {
                   toast.error('أدخل قيمة بين 0 و 100')
                 }
@@ -1548,7 +1580,7 @@ export default function ArchivePage() {
               const input = document.getElementById('manual-rating-input') as HTMLInputElement
               const val = parseFloat(input?.value || '')
               if (!isNaN(val) && val >= 0 && val <= 100) {
-                quickRate(val)
+                quickRate(val, normalizeGenres(selectedItem.genres))
               } else {
                 toast.error('أدخل قيمة بين 0 و 100')
               }

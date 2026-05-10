@@ -21,6 +21,7 @@ import {
 import { MediaItem, MetadataResult } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { getRatingColor, getRatingBg } from '@/lib/rating'
+import { normalizeGenres } from '@/lib/format'
 import { RT_SORT_OPTIONS } from '@/lib/constants'
 import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
 import { sortMediaItems, filterMediaItems } from '@/lib/sort'
@@ -629,17 +630,21 @@ export default function BooksPage() {
   }
 
   // ==================== Quick Rate ====================
-  const handleQuickRate = async (rating: number) => {
+  const handleQuickRate = async (rating: number, genres?: string[]) => {
     if (!selectedItem) return
     try {
+      const body: Record<string, any> = { userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }
+      if (genres && genres.length > 0) {
+        body.genres = genres.join(', ')
+      }
       const res = await fetch(`/api/watchlist/${selectedItem.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRating: rating, watched: true, watchedAt: new Date().toISOString().split('T')[0] }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('خطأ')
       const updated = await res.json()
-      setBooks(prev => prev.map(i => i.id === selectedItem.id ? { ...i, userRating: rating, watched: true } : i))
+      setBooks(prev => prev.map(i => i.id === selectedItem.id ? { ...i, userRating: rating, watched: true, ...(genres && genres.length > 0 ? { genres } : {}) } : i))
       setSelectedItem(updated)
       toast.success(`تم التقييم: ${rating}/10`)
       setShowQuickRate(false)
@@ -1506,6 +1511,27 @@ export default function BooksPage() {
             <div className="p-6 space-y-4">
               {selectedItem && (
                 <>
+                  {/* Genre Selector */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-emerald-400 text-center block">التصنيف (النوع)</label>
+                    <Select
+                      value={(() => { const g = normalizeGenres(selectedItem.genres); return g.length > 0 ? g[0] : '__none__' })()}
+                      onValueChange={(val) => {
+                        const newGenres = val === '__none__' ? [] : [val]
+                        setSelectedItem(prev => prev ? { ...prev, genres: newGenres } : null)
+                      }}
+                    >
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-emerald-400 text-sm h-11">
+                        <SelectValue placeholder="اختر التصنيف" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
+                        <SelectItem value="__none__">بدون تصنيف</SelectItem>
+                        {allGenres.map(g => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-emerald-400 text-center block">التقييم (من 10)</label>
                     <div className="flex gap-2">
@@ -1522,7 +1548,7 @@ export default function BooksPage() {
                           if (e.key === 'Enter') {
                             const val = parseFloat((e.target as HTMLInputElement).value)
                             if (!isNaN(val) && val >= 0 && val <= 10) {
-                              handleQuickRate(val)
+                              handleQuickRate(val, normalizeGenres(selectedItem.genres))
                             } else {
                               toast.error('أدخل قيمة بين 0 و 10')
                             }
@@ -1535,7 +1561,7 @@ export default function BooksPage() {
                           const input = document.getElementById('manual-rating-input-mobile') as HTMLInputElement
                           const val = parseFloat(input?.value || '')
                           if (!isNaN(val) && val >= 0 && val <= 10) {
-                            handleQuickRate(val)
+                            handleQuickRate(val, normalizeGenres(selectedItem.genres))
                           } else {
                             toast.error('أدخل قيمة بين 0 و 10')
                           }
@@ -1598,6 +1624,27 @@ export default function BooksPage() {
             <div className="py-4 space-y-4">
               {selectedItem && (
                 <>
+                  {/* Genre Selector */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-emerald-400 text-center block">التصنيف (النوع)</label>
+                    <Select
+                      value={(() => { const g = normalizeGenres(selectedItem.genres); return g.length > 0 ? g[0] : '__none__' })()}
+                      onValueChange={(val) => {
+                        const newGenres = val === '__none__' ? [] : [val]
+                        setSelectedItem(prev => prev ? { ...prev, genres: newGenres } : null)
+                      }}
+                    >
+                      <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] focus:border-emerald-400 text-sm h-11">
+                        <SelectValue placeholder="اختر التصنيف" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[200px]">
+                        <SelectItem value="__none__">بدون تصنيف</SelectItem>
+                        {allGenres.map(g => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-emerald-400 text-center block">التقييم (من 10)</label>
                     <div className="flex gap-2">
@@ -1614,7 +1661,7 @@ export default function BooksPage() {
                           if (e.key === 'Enter') {
                             const val = parseFloat((e.target as HTMLInputElement).value)
                             if (!isNaN(val) && val >= 0 && val <= 10) {
-                              handleQuickRate(val)
+                              handleQuickRate(val, normalizeGenres(selectedItem.genres))
                             } else {
                               toast.error('أدخل قيمة بين 0 و 10')
                             }
@@ -1627,7 +1674,7 @@ export default function BooksPage() {
                           const input = document.getElementById('manual-rating-input-desktop') as HTMLInputElement
                           const val = parseFloat(input?.value || '')
                           if (!isNaN(val) && val >= 0 && val <= 10) {
-                            handleQuickRate(val)
+                            handleQuickRate(val, normalizeGenres(selectedItem.genres))
                           } else {
                             toast.error('أدخل قيمة بين 0 و 10')
                           }
