@@ -126,8 +126,10 @@ html {
     min-width: 44px;
   }
 
-  /* تحسين مساحة اللمس لعناصر القائمة القابلة للنقر */
-  .cursor-pointer {
+  /* تحسين مساحة اللمس لعناصر القائمة القابلة للنقر - فقط للعناصر التفاعلية الفعلية */
+  .cursor-pointer[role="button"],
+  .cursor-pointer[onclick],
+  a.cursor-pointer {
     min-height: 44px;
   }
 
@@ -205,9 +207,9 @@ html {
 
   /* تحسين أزرار الفلاتر وال chips */
   .filter-chip, .year-chip {
-    min-height: 36px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    min-height: 44px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 }
 
@@ -237,6 +239,32 @@ html {
 
 [data-vaul-drawer] {
   border-radius: 16px 16px 0 0 !important;
+}
+
+/* تحسين Drawer للموبايل - منع تمرير الخلفية وإصلاح الكيبورد */
+@media (max-width: 768px) {
+  [data-vaul-drawer] {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* تثبيت أزرار الإجراءات أسفل الدروَر */
+  [data-vaul-drawer] [data-slot="drawer-footer"] {
+    position: sticky;
+    bottom: 0;
+    background: #0f0f0f;
+    z-index: 1;
+  }
+
+  /* تحسين إغلاق الدروَر بالسحب */
+  [data-vaul-drawer] [data-slot="drawer-content"] {
+    touch-action: pan-y;
+  }
+
+  /* منع تمرير الصفحة الرئيسية عند فتح الدروَر */
+  html[data-vaul-no-scroll] {
+    overflow: hidden !important;
+  }
 }
 
 /* تحسينات البطاقات على التابلت */

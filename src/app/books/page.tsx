@@ -122,17 +122,17 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
 
         </div>
         {/* Mobile quick actions - always visible on touch devices */}
-        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+        <div className="absolute bottom-2 right-2 flex items-center gap-2.5 md:hidden" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-emerald-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="تقييم"
           >
             <Star className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="حذف"
           >
             <Trash2 className="w-4 h-4" />
@@ -1155,17 +1155,17 @@ export default function BooksPage() {
       {/* Mobile Sort & Filter Drawer */}
       {isMobile && (
         <Drawer open={showSortFilter} onOpenChange={setShowSortFilter}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
-            <DrawerHeader className="text-right pb-2">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+            <DrawerHeader className="text-right pb-2 shrink-0">
               <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 pb-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
               {sortFilterContent}
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+            <DrawerFooter className="border-t border-[#2a2a2a] pt-2 shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 onClick={() => setShowSortFilter(false)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px]"
               >
                 تطبيق
               </Button>
@@ -1247,13 +1247,14 @@ export default function BooksPage() {
       {/* Details - Drawer (mobile) / Dialog (desktop) */}
       {isMobile ? (
         <Drawer open={showDetails} onOpenChange={setShowDetails}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
-            <DrawerHeader className="border-b border-[#2a2a2a]">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+            <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
               <DrawerTitle className="text-white text-right">تفاصيل الكتاب</DrawerTitle>
             </DrawerHeader>
-            <div className="p-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {renderDetails()}
             </div>
+            <div className="shrink-0 h-[env(safe-area-inset-bottom,0px)]" />
           </DrawerContent>
         </Drawer>
       ) : (
@@ -1270,18 +1271,18 @@ export default function BooksPage() {
       {/* Add Form - Drawer (mobile) / Dialog (desktop) */}
       {isMobile ? (
         <Drawer open={showAddForm} onOpenChange={setShowAddForm}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[90vh]">
-            <DrawerHeader className="border-b border-[#2a2a2a]">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+            <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
               <DrawerTitle className="text-white text-right">إضافة كتاب جديد</DrawerTitle>
             </DrawerHeader>
-            <div className="p-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {renderForm(false)}
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 onClick={createItem}
                 disabled={formSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}
                 إضافة الكتاب
@@ -1289,7 +1290,7 @@ export default function BooksPage() {
               <Button
                 variant="outline"
                 onClick={() => { setShowAddForm(false); resetForm() }}
-                className="border-[#333] text-[#999] hover:text-white w-full"
+                className="border-[#333] text-[#999] hover:text-white w-full min-h-[44px]"
               >
                 إلغاء
               </Button>
@@ -1298,16 +1299,18 @@ export default function BooksPage() {
         </Drawer>
       ) : (
         <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <DialogHeader className="shrink-0">
               <DialogTitle className="text-white text-right">إضافة كتاب جديد</DialogTitle>
             </DialogHeader>
-            {renderForm(false)}
-            <div className="flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {renderForm(false)}
+            </div>
+            <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Button
                 onClick={createItem}
                 disabled={formSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}
                 إضافة الكتاب
@@ -1315,7 +1318,7 @@ export default function BooksPage() {
               <Button
                 variant="outline"
                 onClick={() => { setShowAddForm(false); resetForm() }}
-                className="border-[#333] text-[#999] hover:text-white"
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
               >
                 إلغاء
               </Button>
@@ -1327,18 +1330,18 @@ export default function BooksPage() {
       {/* Edit Form - Drawer (mobile) / Dialog (desktop) */}
       {isMobile ? (
         <Drawer open={showEditForm} onOpenChange={setShowEditForm}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[90vh]">
-            <DrawerHeader className="border-b border-[#2a2a2a]">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+            <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
               <DrawerTitle className="text-white text-right">تعديل الكتاب</DrawerTitle>
             </DrawerHeader>
-            <div className="p-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {renderForm(true)}
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 onClick={updateItem}
                 disabled={formSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}
                 حفظ التعديلات
@@ -1346,7 +1349,7 @@ export default function BooksPage() {
               <Button
                 variant="outline"
                 onClick={() => { setShowEditForm(false); setSelectedItem(null) }}
-                className="border-[#333] text-[#999] hover:text-white w-full"
+                className="border-[#333] text-[#999] hover:text-white w-full min-h-[44px]"
               >
                 إلغاء
               </Button>
@@ -1355,16 +1358,18 @@ export default function BooksPage() {
         </Drawer>
       ) : (
         <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
-          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <DialogHeader className="shrink-0">
               <DialogTitle className="text-white text-right">تعديل الكتاب</DialogTitle>
             </DialogHeader>
-            {renderForm(true)}
-            <div className="flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {renderForm(true)}
+            </div>
+            <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Button
                 onClick={updateItem}
                 disabled={formSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}
                 حفظ التعديلات
@@ -1372,7 +1377,7 @@ export default function BooksPage() {
               <Button
                 variant="outline"
                 onClick={() => { setShowEditForm(false); setSelectedItem(null) }}
-                className="border-[#333] text-[#999] hover:text-white"
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
               >
                 إلغاء
               </Button>
@@ -1399,11 +1404,11 @@ export default function BooksPage() {
               />
               <p className="text-sm text-[#888]">اضغط على النجوم للتقييم من 10</p>
             </div>
-            <DrawerFooter>
+            <DrawerFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 variant="outline"
                 onClick={() => setShowQuickRate(false)}
-                className="border-[#333] text-[#999] hover:text-white w-full"
+                className="border-[#333] text-[#999] hover:text-white w-full min-h-[44px]"
               >
                 إلغاء
               </Button>
@@ -1441,14 +1446,14 @@ export default function BooksPage() {
                 إحصائيات الكتب
               </DrawerTitle>
             </DrawerHeader>
-            <div className="p-4">
+            <div className="overflow-y-auto p-4">
               {renderStats()}
             </div>
-            <DrawerFooter>
+            <DrawerFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 variant="outline"
                 onClick={() => setShowStats(false)}
-                className="border-[#333] text-[#999] hover:text-white w-full"
+                className="border-[#333] text-[#999] hover:text-white w-full min-h-[44px]"
               >
                 إغلاق
               </Button>
@@ -1481,10 +1486,10 @@ export default function BooksPage() {
               <p className="text-[#ccc] mb-1">هل أنت متأكد من حذف هذا الكتاب؟</p>
               <p className="text-sm text-[#888]">"{selectedItem?.title}"</p>
             </div>
-            <DrawerFooter>
+            <DrawerFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 onClick={deleteItem}
-                className="bg-red-600 hover:bg-red-700 text-white w-full"
+                className="bg-red-600 hover:bg-red-700 text-white w-full min-h-[44px]"
               >
                 <Trash2 className="w-4 h-4 ml-2" />
                 حذف
@@ -1492,7 +1497,7 @@ export default function BooksPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="border-[#333] text-[#999] hover:text-white w-full"
+                className="border-[#333] text-[#999] hover:text-white w-full min-h-[44px]"
               >
                 إلغاء
               </Button>

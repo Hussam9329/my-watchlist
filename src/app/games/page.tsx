@@ -142,17 +142,17 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
 
         </div>
         {/* Mobile quick actions - always visible on touch devices */}
-        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+        <div className="absolute bottom-2 right-2 flex items-center gap-2.5 md:hidden" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-teal-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-teal-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="تقييم"
           >
             <Star className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="حذف"
           >
             <Trash2 className="w-4 h-4" />
@@ -639,8 +639,8 @@ export default function GamesPage() {
   }
 
   // ==================== Form Component ====================
-  const renderForm = (isEdit: boolean) => (
-    <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1" dir="rtl">
+  const renderForm = (_isEdit: boolean) => (
+    <div className="space-y-4 p-1" dir="rtl">
       {/* Metadata Search */}
       <div className="space-y-2">
         <label className="text-sm font-bold text-teal-400">البحث عن لعبة (Steam)</label>
@@ -875,24 +875,7 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {/* Submit */}
-      <div className="flex gap-2 pt-2">
-        <Button
-          onClick={isEdit ? updateItem : createItem}
-          disabled={formSubmitting}
-          className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold"
-        >
-          {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-          {isEdit ? 'تحديث اللعبة' : 'إضافة اللعبة'}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => { setShowAddForm(false); setShowEditForm(false) }}
-          className="border-[#333] text-[#999] hover:text-white"
-        >
-          <X className="w-4 h-4" />
-        </Button>
-      </div>
+
     </div>
   )
 
@@ -1012,15 +995,16 @@ export default function GamesPage() {
     if (isMobile) {
       return (
         <Drawer open={showDetails} onOpenChange={setShowDetails}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh]">
             <DrawerHeader className="text-right">
               <DrawerTitle className="text-white text-right">تفاصيل اللعبة</DrawerTitle>
             </DrawerHeader>
             <div className="px-4 pb-4 overflow-y-auto">
               {content}
+              <div className="h-[env(safe-area-inset-bottom,0px)] shrink-0" />
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
-              <Button variant="outline" onClick={() => setShowDetails(false)} className="border-[#333] text-[#999]">إغلاق</Button>
+            <DrawerFooter className="border-t border-[#2a2a2a] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+              <Button variant="outline" onClick={() => setShowDetails(false)} className="border-[#333] text-[#999] min-h-[44px]">إغلاق</Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -1102,7 +1086,7 @@ export default function GamesPage() {
     if (isMobile) {
       return (
         <Drawer open={showStats} onOpenChange={setShowStats}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh]">
             <DrawerHeader className="text-right">
               <DrawerTitle className="text-white text-right flex items-center gap-2 justify-end">
                 <BarChart3 className="w-5 h-5 text-teal-400" />
@@ -1111,9 +1095,10 @@ export default function GamesPage() {
             </DrawerHeader>
             <div className="px-4 pb-4 overflow-y-auto">
               {content}
+              <div className="h-[env(safe-area-inset-bottom,0px)] shrink-0" />
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
-              <Button variant="outline" onClick={() => setShowStats(false)} className="border-[#333] text-[#999]">إغلاق</Button>
+            <DrawerFooter className="border-t border-[#2a2a2a] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+              <Button variant="outline" onClick={() => setShowStats(false)} className="border-[#333] text-[#999] min-h-[44px]">إغلاق</Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -1317,17 +1302,18 @@ export default function GamesPage() {
       {/* Mobile Sort & Filter Drawer */}
       {isMobile && (
         <Drawer open={showSortFilter} onOpenChange={setShowSortFilter}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
-            <DrawerHeader className="text-right pb-2">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+            <DrawerHeader className="text-right pb-2 shrink-0">
               <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 pb-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
               {sortFilterContent}
+              <div className="h-[env(safe-area-inset-bottom,0px)] shrink-0" />
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+            <DrawerFooter className="border-t border-[#2a2a2a] pt-2 shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
                 onClick={() => setShowSortFilter(false)}
-                className="bg-gradient-to-l from-teal-500 to-cyan-500 text-white font-bold"
+                className="bg-gradient-to-l from-teal-500 to-cyan-500 text-white font-bold min-h-[44px]"
               >
                 تطبيق
               </Button>
@@ -1393,28 +1379,64 @@ export default function GamesPage() {
       {/* Add Form - Drawer/Dialog */}
       {isMobile ? (
         <Drawer open={showAddForm} onOpenChange={setShowAddForm}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[90vh]">
-            <DrawerHeader className="text-right">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] flex flex-col max-h-[92dvh]">
+            <DrawerHeader className="text-right shrink-0">
               <DrawerTitle className="text-white text-right flex items-center gap-2 justify-end">
                 <Plus className="w-5 h-5 text-teal-400" />
                 إضافة لعبة جديدة
               </DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 pb-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {renderForm(false)}
             </div>
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+              <Button
+                onClick={createItem}
+                disabled={formSubmitting}
+                className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
+              >
+                {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                إضافة اللعبة
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowAddForm(false)}
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-white text-right flex items-center gap-2 justify-end">
                 <Plus className="w-5 h-5 text-teal-400" />
                 إضافة لعبة جديدة
               </DialogTitle>
             </DialogHeader>
-            {renderForm(false)}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {renderForm(false)}
+            </div>
+            <div className="shrink-0 flex gap-2 pt-2">
+              <Button
+                onClick={createItem}
+                disabled={formSubmitting}
+                className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
+              >
+                {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                إضافة اللعبة
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowAddForm(false)}
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -1422,28 +1444,64 @@ export default function GamesPage() {
       {/* Edit Form - Drawer/Dialog */}
       {isMobile ? (
         <Drawer open={showEditForm} onOpenChange={setShowEditForm}>
-          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[90vh]">
-            <DrawerHeader className="text-right">
+          <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] flex flex-col max-h-[92dvh]">
+            <DrawerHeader className="text-right shrink-0">
               <DrawerTitle className="text-white text-right flex items-center gap-2 justify-end">
                 <Edit3 className="w-5 h-5 text-teal-400" />
                 تعديل اللعبة
               </DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 pb-4 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {renderForm(true)}
             </div>
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+              <Button
+                onClick={updateItem}
+                disabled={formSubmitting}
+                className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
+              >
+                {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                تحديث اللعبة
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowEditForm(false)}
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
-          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogContent className="bg-[#1a1a1a] border-[#2a2a2a] text-white max-w-lg flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-white text-right flex items-center gap-2 justify-end">
                 <Edit3 className="w-5 h-5 text-teal-400" />
                 تعديل اللعبة
               </DialogTitle>
             </DialogHeader>
-            {renderForm(true)}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {renderForm(true)}
+            </div>
+            <div className="shrink-0 flex gap-2 pt-2">
+              <Button
+                onClick={updateItem}
+                disabled={formSubmitting}
+                className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
+              >
+                {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                تحديث اللعبة
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowEditForm(false)}
+                className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -1466,8 +1524,8 @@ export default function GamesPage() {
                 </>
               )}
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
-              <Button variant="outline" onClick={() => setShowQuickRate(false)} className="border-[#333] text-[#999]">إلغاء</Button>
+            <DrawerFooter className="border-t border-[#2a2a2a] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+              <Button variant="outline" onClick={() => setShowQuickRate(false)} className="border-[#333] text-[#999] min-h-[44px]">إلغاء</Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -1502,11 +1560,11 @@ export default function GamesPage() {
             <div className="px-4 py-4">
               <p className="text-[#ccc] text-center">هل أنت متأكد من حذف &quot;{selectedItem?.title}&quot;؟ لا يمكن التراجع عن هذا الإجراء.</p>
             </div>
-            <DrawerFooter className="border-t border-[#2a2a2a]">
+            <DrawerFooter className="border-t border-[#2a2a2a] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <div className="flex gap-2 w-full">
                 <Button
                   onClick={deleteItem}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white min-h-[44px]"
                 >
                   <Trash2 className="w-4 h-4 ml-1" />
                   حذف
@@ -1514,7 +1572,7 @@ export default function GamesPage() {
                 <Button
                   variant="outline"
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 border-[#333] text-[#999]"
+                  className="flex-1 border-[#333] text-[#999] min-h-[44px]"
                 >
                   إلغاء
                 </Button>
@@ -1532,7 +1590,7 @@ export default function GamesPage() {
             <div className="flex gap-2">
               <Button
                 onClick={deleteItem}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white min-h-[44px]"
               >
                 <Trash2 className="w-4 h-4 ml-1" />
                 حذف
@@ -1540,7 +1598,7 @@ export default function GamesPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 border-[#333] text-[#999]"
+                className="flex-1 border-[#333] text-[#999] min-h-[44px]"
               >
                 إلغاء
               </Button>

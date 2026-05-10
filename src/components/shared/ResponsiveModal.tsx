@@ -28,17 +28,21 @@ export function ResponsiveModal({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92vh]">
-          <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3">
+        <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+          <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3 shrink-0">
             <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
           </DrawerHeader>
-          <div className="px-4 py-3" data-vaul-no-drag>
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3" data-vaul-no-drag>
             {children}
           </div>
           {footerContent && (
-            <DrawerFooter className="border-t border-[#2a2a2a]">
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               {footerContent}
             </DrawerFooter>
+          )}
+          {/* Safe area spacer when no footer */}
+          {!footerContent && (
+            <div className="shrink-0 h-[env(safe-area-inset-bottom,0px)]" />
           )}
         </DrawerContent>
       </Drawer>
@@ -47,13 +51,20 @@ export function ResponsiveModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] flex flex-col overflow-hidden ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-[#d4af37] font-bold text-base">{title}</DialogTitle>
         </DialogHeader>
-        {children}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
+        {footerContent && (
+          <div className="shrink-0 border-t border-[#2a2a2a] pt-3 mt-2">
+            {footerContent}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

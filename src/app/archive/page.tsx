@@ -141,17 +141,17 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
 
         </div>
         {/* Mobile quick actions - always visible on touch devices */}
-        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+        <div className="absolute bottom-2 right-2 flex items-center gap-2.5 md:hidden" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-[#d4af37]/90 text-black flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-[#d4af37]/90 text-black flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="تقييم"
           >
             <Star className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            className="w-11 h-11 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
             title="حذف"
           >
             <Trash2 className="w-4 h-4" />
@@ -1021,7 +1021,7 @@ export default function ArchivePage() {
 
   // ==================== Form Content (shared between Dialog and Drawer) ====================
   const formContent = (isEdit: boolean) => (
-    <div className="space-y-5 overflow-y-auto p-1 max-h-[70vh]">
+    <div className="space-y-5 p-1">
       {/* Metadata Search */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-[#d4af37] flex items-center gap-1.5">
@@ -1355,15 +1355,6 @@ export default function ArchivePage() {
         </>
       )}
       {/* === End of edit-only fields === */}
-
-      {/* Submit */}
-      <Button
-        onClick={isEdit ? updateItem : createItem}
-        disabled={formSubmitting}
-        className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base rounded-xl"
-      >
-        {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : isEdit ? 'حفظ التعديلات' : 'إضافة'}
-      </Button>
     </div>
   )
 
@@ -1878,17 +1869,17 @@ export default function ArchivePage() {
             {/* Mobile Sort & Filter Drawer */}
             {isMobile && (
               <Drawer open={wlShowSortFilter} onOpenChange={setWlShowSortFilter}>
-                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
-                  <DrawerHeader className="text-right pb-2">
+                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+                  <DrawerHeader className="text-right pb-2 shrink-0">
                     <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
                   </DrawerHeader>
-                  <div className="px-4 pb-4 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
                     {wlSortFilterContent}
                   </div>
-                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2 shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
                     <Button
                       onClick={() => setWlShowSortFilter(false)}
-                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold"
+                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold min-h-[44px]"
                     >
                       تطبيق
                     </Button>
@@ -2088,17 +2079,17 @@ export default function ArchivePage() {
             {/* Mobile Sort & Filter Drawer */}
             {isMobile && (
               <Drawer open={rtShowSortFilter} onOpenChange={setRtShowSortFilter}>
-                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[85vh]">
-                  <DrawerHeader className="text-right pb-2">
+                <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+                  <DrawerHeader className="text-right pb-2 shrink-0">
                     <DrawerTitle className="text-white text-right text-sm">ترتيب وتصفية</DrawerTitle>
                   </DrawerHeader>
-                  <div className="px-4 pb-4 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
                     {rtSortFilterContent}
                   </div>
-                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2">
+                  <DrawerFooter className="border-t border-[#2a2a2a] pt-2 shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
                     <Button
                       onClick={() => setRtShowSortFilter(false)}
-                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold"
+                      className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold min-h-[44px]"
                     >
                       تطبيق
                     </Button>
@@ -2223,6 +2214,15 @@ export default function ArchivePage() {
         title="إضافة عمل جديد"
         wide
         isMobile={isMobile}
+        footerContent={
+          <Button
+            onClick={createItem}
+            disabled={formSubmitting}
+            className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base rounded-xl min-h-[44px]"
+          >
+            {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'إضافة'}
+          </Button>
+        }
       >
         {formContent(false)}
       </ResponsiveModal>
@@ -2234,6 +2234,15 @@ export default function ArchivePage() {
         title="تعديل العمل"
         wide
         isMobile={isMobile}
+        footerContent={
+          <Button
+            onClick={updateItem}
+            disabled={formSubmitting}
+            className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base rounded-xl min-h-[44px]"
+          >
+            {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'حفظ التعديلات'}
+          </Button>
+        }
       >
         {formContent(true)}
       </ResponsiveModal>
