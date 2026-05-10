@@ -480,6 +480,8 @@ export default function BooksPage() {
   }, [books])
 
   // ==================== Sort & Filter Content (shared between Drawer/Popover) ====================
+  const activeFilterCount = [filterGenre, filterYear].filter(Boolean).length
+
   const sortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
       {/* Sort Section */}
@@ -578,15 +580,15 @@ export default function BooksPage() {
       </div>
 
       {/* Clear All */}
-      {(filterGenre || filterYear) && (
+      {activeFilterCount > 0 && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => { setFilterGenre(''); setFilterYear('') }}
-          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
-          مسح الكل
+          مسح الفلاتر ({activeFilterCount})
         </Button>
       )}
     </div>
@@ -1190,16 +1192,13 @@ export default function BooksPage() {
                 size="sm"
                 onClick={() => setShowSortFilter(true)}
                 className={`border-[#333] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
-                  (filterGenre || filterYear)
-                    ? 'border-emerald-500/50 text-emerald-400'
+                  activeFilterCount > 0
+                    ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/5'
                     : 'text-[#999]'
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
-                {(filterGenre || filterYear) && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                )}
+                <span>فلاتر{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
               </Button>
             ) : (
               <Popover open={showSortFilter} onOpenChange={setShowSortFilter}>
@@ -1208,15 +1207,15 @@ export default function BooksPage() {
                     variant="outline"
                     size="sm"
                     className={`border-[#333] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
-                      (filterGenre || filterYear)
+                      activeFilterCount > 0
                         ? 'border-emerald-500/50 text-emerald-400'
                         : 'text-[#999]'
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                     <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
-                    {(filterGenre || filterYear) && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    {activeFilterCount > 0 && (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold shrink-0">{activeFilterCount}</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -1228,7 +1227,7 @@ export default function BooksPage() {
           </div>
 
           {/* Active filter badges */}
-          {(filterYear || filterGenre) && (
+          {activeFilterCount > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
               {filterYear && (
                 <Badge
@@ -1247,6 +1246,14 @@ export default function BooksPage() {
                   {filterGenre}
                   <X className="w-3 h-3" />
                 </Badge>
+              )}
+              {isMobile && activeFilterCount > 1 && (
+                <button
+                  onClick={() => { setFilterGenre(''); setFilterYear('') }}
+                  className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                >
+                  مسح الكل
+                </button>
               )}
             </div>
           )}

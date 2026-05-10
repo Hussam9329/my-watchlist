@@ -770,6 +770,8 @@ export default function ArchivePage() {
   // ==================== Unique genres/years from database ====================
 
   // ==================== Watchlist Sort & Filter Content (shared between Drawer/Popover) ====================
+  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
+
   const wlSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
       {/* Sort Section */}
@@ -791,6 +793,38 @@ export default function ArchivePage() {
           ))}
         </div>
       </div>
+
+      {/* Year Filter */}
+      {dbYears.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+          <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+            <button
+              onClick={() => setWlFilterYear('')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                !wlFilterYear
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              الكل
+            </button>
+            {dbYears.map(y => (
+              <button
+                key={y}
+                onClick={() => setWlFilterYear(y === wlFilterYear ? '' : y)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  y === wlFilterYear
+                    ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                    : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Genre Filter */}
       <div>
@@ -838,21 +872,23 @@ export default function ArchivePage() {
       </div>
 
       {/* Clear All */}
-      {(wlFilterGenre || wlFilterYear || wlFilterRatingMin || wlFilterRatingMax) && (
+      {wlActiveFilterCount > 0 && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
-          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
-          مسح الكل
+          مسح الفلاتر ({wlActiveFilterCount})
         </Button>
       )}
     </div>
   )
 
   // ==================== Ratings Sort & Filter Content (shared between Drawer/Popover) ====================
+  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length
+
   const rtSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
       {/* Sort Section */}
@@ -875,6 +911,38 @@ export default function ArchivePage() {
         </div>
       </div>
 
+      {/* Year Filter */}
+      {dbYears.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+          <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+            <button
+              onClick={() => setRtFilterYear('')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                !rtFilterYear
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              الكل
+            </button>
+            {dbYears.map(y => (
+              <button
+                key={y}
+                onClick={() => setRtFilterYear(y === rtFilterYear ? '' : y)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  y === rtFilterYear
+                    ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                    : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Genre Filter */}
       <div>
         <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيف</h4>
@@ -892,15 +960,15 @@ export default function ArchivePage() {
       </div>
 
       {/* Clear All */}
-      {(rtFilterGenre || rtFilterYear || rtFilterRatingMin || rtFilterRatingMax) && (
+      {rtActiveFilterCount > 0 && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
-          className="w-full text-[#888] text-xs hover:text-red-400 hover:bg-red-500/10"
+          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
-          مسح الكل
+          مسح الفلاتر ({rtActiveFilterCount})
         </Button>
       )}
     </div>
@@ -1842,9 +1910,9 @@ export default function ArchivePage() {
               <div className="flex-1 min-w-2" />
             </div>
 
-            {/* Year Filter Bar — prominent horizontal scrollable chips */}
+            {/* Year Filter Bar — prominent horizontal scrollable chips (desktop only) */}
             {dbYears.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
+              <div className="hidden md:flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
                 <button
                   onClick={() => setWlFilterYear('')}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
@@ -1892,16 +1960,13 @@ export default function ArchivePage() {
                     size="sm"
                     onClick={() => setWlShowSortFilter(true)}
                     className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
-                      (wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax)
-                        ? 'border-[#d4af37]/50 text-[#d4af37]'
+                      wlActiveFilterCount > 0
+                        ? 'border-[#d4af37]/50 text-[#d4af37] bg-[#d4af37]/5'
                         : 'text-[#999]'
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{WL_SORT_OPTIONS.find(o => o.value === wlSortBy)?.label || 'ترتيب'}</span>
-                    {(wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax) && (
-                      <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
-                    )}
+                    <span>فلاتر{wlActiveFilterCount > 0 ? ` (${wlActiveFilterCount})` : ''}</span>
                   </Button>
                 ) : (
                   <Popover open={wlShowSortFilter} onOpenChange={setWlShowSortFilter}>
@@ -1910,15 +1975,15 @@ export default function ArchivePage() {
                         variant="outline"
                         size="sm"
                         className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
-                          (wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax)
+                          wlActiveFilterCount > 0
                             ? 'border-[#d4af37]/50 text-[#d4af37]'
                             : 'text-[#999]'
                         }`}
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                         <span>{WL_SORT_OPTIONS.find(o => o.value === wlSortBy)?.label || 'ترتيب'}</span>
-                        {(wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax) && (
-                          <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                        {wlActiveFilterCount > 0 && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#d4af37] text-black text-[10px] font-bold shrink-0">{wlActiveFilterCount}</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -1931,15 +1996,35 @@ export default function ArchivePage() {
             </div>
 
             {/* Active filter badges */}
-            {wlFilterGenre && (
+            {wlActiveFilterCount > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge
-                  className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                  onClick={() => setWlFilterGenre('')}
-                >
-                  {wlFilterGenre}
-                  <X className="w-3 h-3" />
-                </Badge>
+                {wlFilterYear && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setWlFilterYear('')}
+                  >
+                    <CalendarDays className="w-3 h-3" />
+                    {wlFilterYear}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {wlFilterGenre && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setWlFilterGenre('')}
+                  >
+                    {wlFilterGenre}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {isMobile && wlActiveFilterCount > 1 && (
+                  <button
+                    onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
+                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    مسح الكل
+                  </button>
+                )}
               </div>
             )}
 
@@ -2052,9 +2137,9 @@ export default function ArchivePage() {
               <div className="flex-1 min-w-2" />
             </div>
 
-            {/* Year Filter Bar — prominent horizontal scrollable chips */}
+            {/* Year Filter Bar — prominent horizontal scrollable chips (desktop only) */}
             {dbYears.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
+              <div className="hidden md:flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
                 <button
                   onClick={() => setRtFilterYear('')}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
@@ -2102,16 +2187,13 @@ export default function ArchivePage() {
                     size="sm"
                     onClick={() => setRtShowSortFilter(true)}
                     className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
-                      (rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax)
-                        ? 'border-[#d4af37]/50 text-[#d4af37]'
+                      rtActiveFilterCount > 0
+                        ? 'border-[#d4af37]/50 text-[#d4af37] bg-[#d4af37]/5'
                         : 'text-[#999]'
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{RT_SORT_OPTIONS.find(o => o.value === rtSortBy)?.label || 'ترتيب'}</span>
-                    {(rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax) && (
-                      <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
-                    )}
+                    <span>فلاتر{rtActiveFilterCount > 0 ? ` (${rtActiveFilterCount})` : ''}</span>
                   </Button>
                 ) : (
                   <Popover open={rtShowSortFilter} onOpenChange={setRtShowSortFilter}>
@@ -2120,15 +2202,15 @@ export default function ArchivePage() {
                         variant="outline"
                         size="sm"
                         className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
-                          (rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax)
+                          rtActiveFilterCount > 0
                             ? 'border-[#d4af37]/50 text-[#d4af37]'
                             : 'text-[#999]'
                         }`}
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                         <span>{RT_SORT_OPTIONS.find(o => o.value === rtSortBy)?.label || 'ترتيب'}</span>
-                        {(rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax) && (
-                          <span className="w-2 h-2 rounded-full bg-[#d4af37] shrink-0" />
+                        {rtActiveFilterCount > 0 && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#d4af37] text-black text-[10px] font-bold shrink-0">{rtActiveFilterCount}</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -2141,15 +2223,35 @@ export default function ArchivePage() {
             </div>
 
             {/* Active filter badges */}
-            {rtFilterGenre && (
+            {rtActiveFilterCount > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge
-                  className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                  onClick={() => setRtFilterGenre('')}
-                >
-                  {rtFilterGenre}
-                  <X className="w-3 h-3" />
-                </Badge>
+                {rtFilterYear && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setRtFilterYear('')}
+                  >
+                    <CalendarDays className="w-3 h-3" />
+                    {rtFilterYear}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {rtFilterGenre && (
+                  <Badge
+                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
+                    onClick={() => setRtFilterGenre('')}
+                  >
+                    {rtFilterGenre}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                )}
+                {isMobile && rtActiveFilterCount > 1 && (
+                  <button
+                    onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
+                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    مسح الكل
+                  </button>
+                )}
               </div>
             )}
 
