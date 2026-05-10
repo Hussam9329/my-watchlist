@@ -253,7 +253,7 @@ html {
     position: sticky;
     bottom: 0;
     background: #0f0f0f;
-    z-index: 1;
+    z-index: 10;
   }
 
   /* تحسين إغلاق الدروَر بالسحب */
@@ -264,6 +264,19 @@ html {
   /* منع تمرير الصفحة الرئيسية عند فتح الدروَر */
   html[data-vaul-no-scroll] {
     overflow: hidden !important;
+  }
+
+  /* تحسين التعامل مع الكيبورد على الآيفون */
+  /* When the virtual keyboard is open, resize the drawer to fit */
+  @supports (keyboard-inset-height: 0px) {
+    [data-vaul-drawer] {
+      max-height: calc(92dvh - env(keyboard-inset-height, 0px)) !important;
+    }
+  }
+
+  /* Fallback for iOS: use visual viewport */
+  [data-vaul-drawer] {
+    transition: max-height 0.2s ease;
   }
 }
 

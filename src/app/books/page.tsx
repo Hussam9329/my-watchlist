@@ -64,7 +64,23 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
             )}
           </div>
         </div>
-
+        {/* List view quick actions */}
+        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onQuickRate}
+            className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center active:scale-90 transition-transform"
+            title="تقييم"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center active:scale-90 transition-transform"
+            title="حذف"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     )
   }
@@ -198,6 +214,10 @@ export default function BooksPage() {
   const [metaQuery, setMetaQuery] = useState('')
   const [metaResults, setMetaResults] = useState<MetadataResult[]>([])
   const [metaLoading, setMetaLoading] = useState(false)
+  const [metaError, setMetaError] = useState(false)
+  const metaInputRef = useRef<HTMLInputElement>(null)
+  const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const MIN_SEARCH_CHARS = 2
 
   // Image upload
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -328,9 +348,14 @@ export default function BooksPage() {
   }
 
   // ==================== Metadata Search ====================
-  const searchMetadata = async () => {
-    if (!metaQuery.trim()) return
+  const searchMetadata = useCallback(async () => {
+    if (!metaQuery.trim() || metaQuery.trim().length < MIN_SEARCH_CHARS) {
+      setMetaResults([])
+      setMetaLoading(false)
+      return
+    }
     setMetaLoading(true)
+    setMetaError(false)
     try {
       const res = await fetch('/api/metadata', {
         method: 'POST',
@@ -340,11 +365,27 @@ export default function BooksPage() {
       const data = await res.json()
       setMetaResults(data.results || [])
     } catch {
-      toast.error('خطأ في البحث')
+      setMetaError(true)
+      setMetaResults([])
     } finally {
       setMetaLoading(false)
+      setTimeout(() => metaInputRef.current?.focus(), 50)
     }
-  }
+  }, [metaQuery, MIN_SEARCH_CHARS])
+
+  // Debounced auto-search: triggers 600ms after user stops typing (only if 2+ chars)
+  useEffect(() => {
+    if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current)
+    if (!metaQuery.trim() || metaQuery.trim().length < MIN_SEARCH_CHARS) {
+      setMetaResults([])
+      setMetaLoading(false)
+      return
+    }
+    metaSearchTimerRef.current = setTimeout(() => {
+      searchMetadata()
+    }, 600)
+    return () => { if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current) }
+  }, [metaQuery, searchMetadata, MIN_SEARCH_CHARS])
 
   const selectMetadata = (result: MetadataResult) => {
     setFormData(prev => ({
@@ -390,6 +431,7 @@ export default function BooksPage() {
     })
     setMetaResults([])
     setMetaQuery('')
+    setMetaError(false)
   }
 
   const openAddForm = () => {
@@ -609,23 +651,82 @@ export default function BooksPage() {
     <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1" dir="rtl">
       {/* Metadata Search */}
       <div className="space-y-2">
-        <label className="text-sm font-bold text-emerald-400">البحث عن كتاب</label>
-        <div className="flex gap-2">
+        <label className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+          البحث عن كتاب
+          {metaLoading && (
+            <span className="flex items-center gap-1 text-emerald-400/80">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span className="text-[10px]">جاري البحث...</span>
+            </span>
+          )}
+        </label>
+        <div className="relative">
           <Input
+            ref={metaInputRef}
             value={metaQuery}
-            onChange={e => setMetaQuery(e.target.value)}
-            placeholder="ابحث عن كتاب..."
-            className="bg-[#111] border-[#333] text-white placeholder:text-[#555]"
-            onKeyDown={e => e.key === 'Enter' && searchMetadata()}
+            onChange={e => { setMetaQuery(e.target.value); setMetaError(false) }}
+            placeholder={`اكتب ${MIN_SEARCH_CHARS} أحرف على الأقل للبحث...`}
+            className="bg-[#111] border-[#333] text-white placeholder:text-[#555] h-11 pl-10"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
           />
-          <Button
-            onClick={searchMetadata}
-            disabled={metaLoading}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-          >
-            {metaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          </Button>
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {metaLoading && <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />}
+            {metaQuery && !metaLoading && (
+              <button
+                type="button"
+                onClick={() => { setMetaQuery(''); setMetaResults([]); setMetaError(false); metaInputRef.current?.focus() }}
+                className="text-[#666] hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
+        {/* Loading skeleton */}
+        {metaLoading && (
+          <div className="space-y-2">
+            {[1, 2].map(i => (
+              <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-[#111] border border-[#333]">
+                <div className="w-10 h-14 rounded bg-[#2a2a2a] skeleton-shimmer shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-3/4 rounded bg-[#2a2a2a] skeleton-shimmer" />
+                  <div className="h-2.5 w-1/2 rounded bg-[#2a2a2a] skeleton-shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Error state */}
+        {metaError && !metaLoading && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            <X className="w-4 h-4 shrink-0" />
+            <span>حدث خطأ في البحث، حاول مرة أخرى</span>
+            <button
+              type="button"
+              onClick={() => searchMetadata()}
+              className="mr-auto px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[10px] font-bold"
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+        {/* No results state */}
+        {!metaLoading && !metaError && metaQuery.trim().length >= MIN_SEARCH_CHARS && metaResults.length === 0 && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[#111] border border-[#333] text-[#888] text-xs">
+            <Search className="w-4 h-4 shrink-0 text-[#555]" />
+            <span>لا توجد نتائج لـ &quot;{metaQuery}&quot;</span>
+          </div>
+        )}
+        {/* Minimum chars hint */}
+        {metaQuery.trim().length > 0 && metaQuery.trim().length < MIN_SEARCH_CHARS && (
+          <div className="text-[10px] text-[#666] px-1">
+            اكتب حرفًا إضافيًا للبدء بالبحث...
+          </div>
+        )}
+        {/* Search results */}
         {metaResults.length > 0 && (
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {metaResults.map((result, i) => (
