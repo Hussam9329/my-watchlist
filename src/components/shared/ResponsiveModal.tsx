@@ -6,6 +6,7 @@ import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { X } from 'lucide-react'
+import type { DeviceType } from '@/hooks/use-device-type'
 
 interface ResponsiveModalProps {
   open: boolean
@@ -15,6 +16,8 @@ interface ResponsiveModalProps {
   footerContent?: React.ReactNode
   wide?: boolean
   isMobile: boolean
+  /** 'mobile' → Drawer, 'tablet' → Wide touch-friendly Dialog, 'desktop' → standard Dialog */
+  deviceType?: DeviceType
 }
 
 export function ResponsiveModal({
@@ -25,8 +28,13 @@ export function ResponsiveModal({
   footerContent,
   wide = false,
   isMobile,
+  deviceType,
 }: ResponsiveModalProps) {
-  if (isMobile) {
+  // Resolve effective device type (fallback for backward compat)
+  const effective: DeviceType = deviceType || (isMobile ? 'mobile' : 'desktop')
+
+  // Mobile: Drawer (full-width bottom sheet)
+  if (effective === 'mobile') {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
@@ -55,6 +63,32 @@ export function ResponsiveModal({
       </Drawer>
     )
   }
+
+  // Tablet: Wide Dialog with touch-friendly sizing (larger tap targets, bigger text)
+  if (effective === 'tablet') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className={`bg-[#0f0f0f] border-[#2a2a2a] max-h-[85vh] flex flex-col overflow-hidden ${wide ? 'max-w-xl' : 'max-w-md'}`}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-[#d4af37] font-bold text-lg">{title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 text-base">
+            {children}
+          </div>
+          {footerContent && (
+            <div className="shrink-0 border-t border-[#2a2a2a] pt-3 mt-2">
+              {footerContent}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Desktop: Standard Dialog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent

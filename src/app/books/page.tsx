@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useDeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
@@ -172,8 +173,8 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
 // ==================== Main Component ====================
 export default function BooksPage() {
   const isMobile = useIsMobile()
-
-  // Auth
+  const deviceType = useDeviceType()
+  const useDrawer = deviceType === 'mobile'
   const isAuthChecked = useAuth()
 
   // Data
@@ -1191,7 +1192,7 @@ export default function BooksPage() {
               />
             </div>
             {/* Unified Sort & Filter Button */}
-            {isMobile ? (
+            {useDrawer ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -1252,7 +1253,7 @@ export default function BooksPage() {
                   <X className="w-3 h-3" />
                 </Badge>
               )}
-              {isMobile && activeFilterCount > 1 && (
+              {useDrawer && activeFilterCount > 1 && (
                 <button
                   onClick={() => { setFilterGenre(''); setFilterYear('') }}
                   className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
@@ -1266,7 +1267,7 @@ export default function BooksPage() {
       </header>
 
       {/* Mobile Sort & Filter Drawer */}
-      {isMobile && (
+      {useDrawer && (
         <Drawer open={showSortFilter} onOpenChange={setShowSortFilter}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
             <DrawerHeader className="text-right pb-2 shrink-0">
@@ -1358,7 +1359,7 @@ export default function BooksPage() {
       {/* ==================== Modals ==================== */}
 
       {/* Details - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showDetails} onOpenChange={setShowDetails}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
             <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
@@ -1382,7 +1383,7 @@ export default function BooksPage() {
       )}
 
       {/* Add Form - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showAddForm} onOpenChange={setShowAddForm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
             <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
@@ -1441,7 +1442,7 @@ export default function BooksPage() {
       )}
 
       {/* Edit Form - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showEditForm} onOpenChange={setShowEditForm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
             <DrawerHeader className="border-b border-[#2a2a2a] shrink-0">
@@ -1500,7 +1501,7 @@ export default function BooksPage() {
       )}
 
       {/* Quick Rate - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showQuickRate} onOpenChange={setShowQuickRate}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a]">
             <DrawerHeader className="border-b border-[#2a2a2a]">
@@ -1720,7 +1721,7 @@ export default function BooksPage() {
       )}
 
       {/* Stats - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showStats} onOpenChange={setShowStats}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a]">
             <DrawerHeader className="border-b border-[#2a2a2a]">
@@ -1758,7 +1759,7 @@ export default function BooksPage() {
       )}
 
       {/* Delete Confirm - Drawer (mobile) / Dialog (desktop) */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a]">
             <DrawerHeader className="border-b border-[#2a2a2a]">

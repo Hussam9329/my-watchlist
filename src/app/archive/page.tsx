@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useDeviceType, type DeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
@@ -192,6 +193,7 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
 // ==================== Main Component ====================
 export default function ArchivePage() {
   const isMobile = useIsMobile()
+  const deviceType = useDeviceType()
 
   // Auth
   const isAuthChecked = useAuth()
@@ -1938,7 +1940,7 @@ export default function ArchivePage() {
                   <span className="hidden sm:inline">إضافة</span>
                 </Button>
                 {/* Unified Sort & Filter Button */}
-                {isMobile ? (
+                {deviceType === 'mobile' ? (
                   <Button
                     variant="outline"
                     size="sm"
@@ -2165,7 +2167,7 @@ export default function ArchivePage() {
                   <span className="hidden sm:inline">إضافة</span>
                 </Button>
                 {/* Unified Sort & Filter Button */}
-                {isMobile ? (
+                {deviceType === 'mobile' ? (
                   <Button
                     variant="outline"
                     size="sm"
@@ -2366,6 +2368,7 @@ export default function ArchivePage() {
         onOpenChange={setShowDetails}
         title="تفاصيل العمل"
         isMobile={isMobile}
+        deviceType={deviceType}
       >
         {detailContent}
       </ResponsiveModal>
@@ -2377,6 +2380,7 @@ export default function ArchivePage() {
         title="إضافة عمل جديد"
         wide
         isMobile={isMobile}
+        deviceType={deviceType}
         footerContent={
           <Button
             onClick={createItem}
@@ -2397,6 +2401,7 @@ export default function ArchivePage() {
         title="تعديل العمل"
         wide
         isMobile={isMobile}
+        deviceType={deviceType}
         footerContent={
           <Button
             onClick={updateItem}
@@ -2416,6 +2421,7 @@ export default function ArchivePage() {
         onOpenChange={setShowQuickRate}
         title="تقييم العمل"
         isMobile={isMobile}
+        deviceType={deviceType}
       >
         {quickRateContent}
       </ResponsiveModal>
@@ -2426,6 +2432,7 @@ export default function ArchivePage() {
         onOpenChange={setShowDeleteConfirm}
         title="تأكيد الحذف"
         isMobile={isMobile}
+        deviceType={deviceType}
       >
         {deleteConfirmContent}
       </ResponsiveModal>
@@ -2436,6 +2443,7 @@ export default function ArchivePage() {
         onOpenChange={setShowMovieNight}
         title="ليلة الأفلام"
         isMobile={isMobile}
+        deviceType={deviceType}
       >
         {movieNightContent}
       </ResponsiveModal>

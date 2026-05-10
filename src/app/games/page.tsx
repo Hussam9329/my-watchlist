@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useDeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
@@ -191,8 +192,8 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
 // ==================== Main Component ====================
 export default function GamesPage() {
   const isMobile = useIsMobile()
-
-  // Auth
+  const deviceType = useDeviceType()
+  const useDrawer = deviceType === 'mobile'
   const isAuthChecked = useAuth()
 
   // Data
@@ -1099,7 +1100,7 @@ export default function GamesPage() {
       </div>
     )
 
-    if (isMobile) {
+    if (useDrawer) {
       return (
         <Drawer open={showDetails} onOpenChange={setShowDetails}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh]">
@@ -1190,7 +1191,7 @@ export default function GamesPage() {
       </div>
     )
 
-    if (isMobile) {
+    if (useDrawer) {
       return (
         <Drawer open={showStats} onOpenChange={setShowStats}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh]">
@@ -1337,7 +1338,7 @@ export default function GamesPage() {
               />
             </div>
             {/* Unified Sort & Filter Button */}
-            {isMobile ? (
+            {useDrawer ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -1398,7 +1399,7 @@ export default function GamesPage() {
                   <X className="w-3 h-3" />
                 </Badge>
               )}
-              {isMobile && activeFilterCount > 1 && (
+              {useDrawer && activeFilterCount > 1 && (
                 <button
                   onClick={() => { setFilterGenre(''); setFilterYear('') }}
                   className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
@@ -1412,7 +1413,7 @@ export default function GamesPage() {
       </header>
 
       {/* Mobile Sort & Filter Drawer */}
-      {isMobile && (
+      {useDrawer && (
         <Drawer open={showSortFilter} onOpenChange={setShowSortFilter}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
             <DrawerHeader className="text-right pb-2 shrink-0">
@@ -1489,7 +1490,7 @@ export default function GamesPage() {
       </main>
 
       {/* Add Form - Drawer/Dialog */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showAddForm} onOpenChange={setShowAddForm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] flex flex-col max-h-[92dvh]">
             <DrawerHeader className="text-right shrink-0">
@@ -1554,7 +1555,7 @@ export default function GamesPage() {
       )}
 
       {/* Edit Form - Drawer/Dialog */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showEditForm} onOpenChange={setShowEditForm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a] flex flex-col max-h-[92dvh]">
             <DrawerHeader className="text-right shrink-0">
@@ -1619,7 +1620,7 @@ export default function GamesPage() {
       )}
 
       {/* Quick Rate - Drawer/Dialog */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showQuickRate} onOpenChange={setShowQuickRate}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a]">
             <DrawerHeader className="text-right">
@@ -1837,7 +1838,7 @@ export default function GamesPage() {
       )}
 
       {/* Delete Confirm - Drawer/Dialog */}
-      {isMobile ? (
+      {useDrawer ? (
         <Drawer open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DrawerContent className="bg-[#1a1a1a] border-[#2a2a2a]">
             <DrawerHeader className="text-right">
