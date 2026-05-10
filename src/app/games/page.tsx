@@ -124,22 +124,39 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
           </div>
         )}
         {/* Quick actions on hover (desktop) */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-teal-500 text-white flex items-center justify-center hover:scale-110 transition-transform"
             title="تقييم"
           >
             <Star className="w-5 h-5" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
             title="حذف"
           >
             <Trash2 className="w-5 h-5" />
           </button>
 
+        </div>
+        {/* Mobile quick actions - always visible on touch devices */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onQuickRate}
+            className="w-10 h-10 rounded-full bg-teal-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="تقييم"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="حذف"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
       {/* Info */}
@@ -966,7 +983,7 @@ export default function GamesPage() {
         <div className="flex gap-2 flex-wrap pt-2">
           <Button
             onClick={() => { setShowDetails(false); openEditForm(selectedItem) }}
-            className="bg-teal-600 hover:bg-teal-700 text-white text-sm"
+            className="bg-teal-600 hover:bg-teal-700 text-white text-sm min-h-[44px]"
           >
             <Edit3 className="w-4 h-4 ml-1" />
             تعديل
@@ -975,7 +992,7 @@ export default function GamesPage() {
           <Button
             variant="outline"
             onClick={() => { openQuickRate(selectedItem); setShowDetails(false) }}
-            className="border-[#333] text-[#999] text-sm"
+            className="border-[#333] text-[#999] text-sm min-h-[44px]"
           >
             <Star className="w-4 h-4 ml-1" />
             تقييم
@@ -983,7 +1000,7 @@ export default function GamesPage() {
           <Button
             variant="outline"
             onClick={() => setShowDeleteConfirm(true)}
-            className="border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm"
+            className="border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm min-h-[44px]"
           >
             <Trash2 className="w-4 h-4 ml-1" />
             حذف
@@ -1140,7 +1157,7 @@ export default function GamesPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => window.location.href = '/'}
-                className="text-[#999] hover:text-white shrink-0 active:scale-[0.97] transition-transform"
+                className="text-[#999] hover:text-white shrink-0 active:scale-[0.97] transition-transform min-w-[44px] min-h-[44px]"
               >
                 <ArrowRight className="w-5 h-5" />
               </Button>
@@ -1158,34 +1175,34 @@ export default function GamesPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowStats(true)}
-                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform"
+                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform min-w-[44px] min-h-[44px]"
                 title="إحصائيات"
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-5 h-5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={exportData}
-                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform"
+                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform min-w-[44px] min-h-[44px]"
                 title="تصدير"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-5 h-5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => importInputRef.current?.click()}
-                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform"
+                className="text-[#999] hover:text-teal-400 active:scale-[0.97] transition-transform min-w-[44px] min-h-[44px]"
                 title="استيراد"
               >
-                <UploadIcon className="w-4 h-4" />
+                <UploadIcon className="w-5 h-5" />
               </Button>
               <input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={importData} />
               <Button
                 onClick={openAddForm}
                 size="sm"
-                className="bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white active:scale-[0.97] transition-transform"
+                className="bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white active:scale-[0.97] transition-transform min-h-[44px]"
               >
                 <Plus className="w-4 h-4 ml-1" />
                 <span className="hidden sm:inline">إضافة</span>
@@ -1233,7 +1250,7 @@ export default function GamesPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSortFilter(true)}
-                className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
                   (filterGenre || filterYear)
                     ? 'border-teal-500/50 text-teal-400'
                     : 'text-[#999]'
@@ -1251,7 +1268,7 @@ export default function GamesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                    className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
                       (filterGenre || filterYear)
                         ? 'border-teal-500/50 text-teal-400'
                         : 'text-[#999]'

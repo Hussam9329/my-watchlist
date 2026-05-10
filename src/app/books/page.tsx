@@ -104,22 +104,39 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
           </div>
         )}
         {/* Quick actions on hover (desktop) */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:scale-110 transition-transform"
             title="تقييم"
           >
             <Star className="w-5 h-5" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
             title="حذف"
           >
             <Trash2 className="w-5 h-5" />
           </button>
 
+        </div>
+        {/* Mobile quick actions - always visible on touch devices */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onQuickRate}
+            className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="تقييم"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="حذف"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
       {/* Info */}
@@ -902,23 +919,26 @@ export default function BooksPage() {
           <Button
             onClick={() => { openQuickRate(selectedItem) }}
             variant="outline"
-            className="border-[#333] text-[#999] hover:text-white"
+            className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
           >
             <Star className="w-4 h-4" />
+            <span className="mr-1">تقييم</span>
           </Button>
           <Button
             onClick={() => { setShowDetails(false); openEditForm(selectedItem) }}
             variant="outline"
-            className="border-[#333] text-[#999] hover:text-white"
+            className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
           >
             <Edit3 className="w-4 h-4" />
+            <span className="mr-1">تعديل</span>
           </Button>
           <Button
             onClick={() => setShowDeleteConfirm(true)}
             variant="outline"
-            className="border-[#333] text-red-400 hover:text-red-300 hover:border-red-400/30"
+            className="border-[#333] text-red-400 hover:text-red-300 hover:border-red-400/30 min-h-[44px]"
           >
             <Trash2 className="w-4 h-4" />
+            <span className="mr-1">حذف</span>
           </Button>
         </div>
       </div>
@@ -988,7 +1008,7 @@ export default function BooksPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="text-[#999] hover:text-white hover:bg-[#1a1a1a] shrink-0"
+              className="text-[#999] hover:text-white hover:bg-[#1a1a1a] shrink-0 min-w-[44px] min-h-[44px]"
               onClick={() => window.location.href = '/'}
             >
               <ArrowRight className="w-5 h-5" />
@@ -1008,14 +1028,14 @@ export default function BooksPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-[#999] hover:text-white hover:bg-[#1a1a1a]"
+                className="text-[#999] hover:text-white hover:bg-[#1a1a1a] min-w-[44px] min-h-[44px]"
                 onClick={() => setShowStats(true)}
               >
                 <BarChart3 className="w-5 h-5" />
               </Button>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-[#999] hover:text-white hover:bg-[#1a1a1a]">
+                  <Button variant="ghost" size="icon" className="text-[#999] hover:text-white hover:bg-[#1a1a1a] min-w-[44px] min-h-[44px]">
                     <Settings className="w-5 h-5" />
                   </Button>
                 </PopoverTrigger>
@@ -1043,7 +1063,7 @@ export default function BooksPage() {
               </Popover>
               <Button
                 onClick={openAddForm}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[44px] min-h-[44px]"
                 size="icon"
               >
                 <Plus className="w-5 h-5" />
@@ -1068,7 +1088,7 @@ export default function BooksPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSortFilter(true)}
-                className={`border-[#333] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                className={`border-[#333] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
                   (filterGenre || filterYear)
                     ? 'border-emerald-500/50 text-emerald-400'
                     : 'text-[#999]'
@@ -1086,7 +1106,7 @@ export default function BooksPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`border-[#333] h-9 px-3 text-xs gap-1.5 shrink-0 ${
+                    className={`border-[#333] h-11 min-h-[44px] px-3 text-xs gap-1.5 shrink-0 ${
                       (filterGenre || filterYear)
                         ? 'border-emerald-500/50 text-emerald-400'
                         : 'text-[#999]'

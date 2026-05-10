@@ -123,22 +123,39 @@ const MediaCard = React.memo(function MediaCard({ item, onClick, onQuickRate, on
           </div>
         )}
         {/* Quick actions on hover (desktop) */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-3" onClick={e => e.stopPropagation()}>
           <button
             onClick={onQuickRate}
-            className="w-10 h-10 rounded-full bg-[#d4af37] text-black flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-[#d4af37] text-black flex items-center justify-center hover:scale-110 transition-transform"
             title="تقييم"
           >
             <Star className="w-5 h-5" />
           </button>
           <button
             onClick={onDelete}
-            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-11 h-11 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform"
             title="حذف"
           >
             <Trash2 className="w-5 h-5" />
           </button>
 
+        </div>
+        {/* Mobile quick actions - always visible on touch devices */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:hidden" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onQuickRate}
+            className="w-10 h-10 rounded-full bg-[#d4af37]/90 text-black flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="تقييم"
+          >
+            <Star className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-10 h-10 rounded-full bg-red-500/70 text-white flex items-center justify-center active:scale-90 transition-transform backdrop-blur-sm"
+            title="حذف"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
       {/* Info */}
@@ -975,28 +992,25 @@ export default function ArchivePage() {
       {/* Actions */}
       <div className="flex flex-wrap gap-2 pt-2 border-t border-[#2a2a2a]">
         <Button
-          size="sm"
           onClick={() => openQuickRate(selectedItem)}
-          className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black"
+          className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black min-h-[44px]"
         >
           <Star className="w-4 h-4 ml-1" />
           {selectedItem.userRating != null ? 'تعديل التقييم' : 'تقييم'}
         </Button>
 
         <Button
-          size="sm"
           variant="outline"
           onClick={() => { openEditForm(selectedItem); setShowDetails(false) }}
-          className="border-[#2a2a2a] text-[#888]"
+          className="border-[#2a2a2a] text-[#888] min-h-[44px]"
         >
           <Edit3 className="w-4 h-4 ml-1" />
           تعديل
         </Button>
         <Button
-          size="sm"
           variant="outline"
           onClick={() => setShowDeleteConfirm(true)}
-          className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+          className="border-red-500/30 text-red-400 hover:bg-red-500/10 min-h-[44px]"
         >
           <Trash2 className="w-4 h-4 ml-1" />
           حذف
@@ -1366,7 +1380,7 @@ export default function ArchivePage() {
 
       {/* Rating Scale */}
       <div className="space-y-3">
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-5 gap-2">
           {Array.from({ length: 10 }).map((_, decade) => {
             const base = decade * 10
             return (
@@ -1406,7 +1420,7 @@ export default function ArchivePage() {
           <button
             key={val}
             onClick={() => quickRate(val)}
-            className={`px-3 py-2 rounded-lg text-sm font-bold transition-all active:scale-95 ${
+            className={`px-3 py-3 rounded-lg text-sm font-bold transition-all active:scale-95 min-h-[44px] ${
               selectedItem.userRating === val
                 ? 'bg-[#d4af37] text-black'
                 : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#ccc] hover:border-[#d4af37]/50'
@@ -1650,24 +1664,24 @@ export default function ArchivePage() {
                 variant="ghost"
                 size="sm"
                 onClick={pickRandomMovie}
-                className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                className="text-[#888] hover:text-[#d4af37] h-11 w-11 p-0 min-w-[44px] min-h-[44px]"
                 title="ليلة الأفلام"
               >
-                <Film className="w-4 h-4" />
+                <Film className="w-5 h-5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={exportData}
-                className="text-[#888] hover:text-[#d4af37] h-9 w-9 p-0"
+                className="text-[#888] hover:text-[#d4af37] h-11 w-11 p-0 min-w-[44px] min-h-[44px]"
                 title="تصدير"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-5 h-5" />
               </Button>
               <label className="cursor-pointer">
                 <input type="file" accept=".json" onChange={importData} className="hidden" />
-                <div className="flex items-center justify-center h-9 w-9 rounded-md text-[#888] hover:text-[#d4af37] hover:bg-[#1a1a1a] transition-colors" title="استيراد">
-                  <UploadIcon className="w-4 h-4" />
+                <div className="flex items-center justify-center h-11 w-11 rounded-md text-[#888] hover:text-[#d4af37] hover:bg-[#1a1a1a] transition-colors min-w-[44px] min-h-[44px]" title="استيراد">
+                  <UploadIcon className="w-5 h-5" />
                 </div>
               </label>
               <Button
@@ -1677,7 +1691,7 @@ export default function ArchivePage() {
                   localStorage.removeItem('hussamvision_auth')
                   window.location.href = '/'
                 }}
-                className="text-[#888] hover:text-red-400 h-9 px-2 text-xs"
+                className="text-[#888] hover:text-red-400 h-11 min-h-[44px] px-3 text-xs"
               >
                 خروج
               </Button>
@@ -1798,7 +1812,7 @@ export default function ArchivePage() {
               <div className="flex items-center gap-1.5">
                 <Button
                   onClick={() => openAddForm(wlType !== 'all' ? wlType : 'movie')}
-                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
+                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-11 min-h-[44px] px-4 text-xs font-bold gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">إضافة</span>
@@ -1809,7 +1823,7 @@ export default function ArchivePage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setWlShowSortFilter(true)}
-                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                    className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
                       (wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax)
                         ? 'border-[#d4af37]/50 text-[#d4af37]'
                         : 'text-[#999]'
@@ -1827,7 +1841,7 @@ export default function ArchivePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                        className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
                           (wlFilterGenre || wlFilterRatingMin || wlFilterRatingMax)
                             ? 'border-[#d4af37]/50 text-[#d4af37]'
                             : 'text-[#999]'
@@ -2008,7 +2022,7 @@ export default function ArchivePage() {
               <div className="flex items-center gap-1.5">
                 <Button
                   onClick={() => openAddForm(rtType !== 'all' ? rtType : 'movie')}
-                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-9 px-3 text-xs font-bold gap-1.5"
+                  className="bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black h-11 min-h-[44px] px-4 text-xs font-bold gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">إضافة</span>
@@ -2019,7 +2033,7 @@ export default function ArchivePage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setRtShowSortFilter(true)}
-                    className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                    className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
                       (rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax)
                         ? 'border-[#d4af37]/50 text-[#d4af37]'
                         : 'text-[#999]'
@@ -2037,7 +2051,7 @@ export default function ArchivePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className={`border-[#2a2a2a] h-9 px-3 text-xs gap-1.5 ${
+                        className={`border-[#2a2a2a] h-11 min-h-[44px] px-3 text-xs gap-1.5 ${
                           (rtFilterGenre || rtFilterRatingMin || rtFilterRatingMax)
                             ? 'border-[#d4af37]/50 text-[#d4af37]'
                             : 'text-[#999]'
@@ -2149,10 +2163,10 @@ export default function ArchivePage() {
                         {/* Delete button - external */}
                         <button
                           onClick={() => { setSelectedItem(item); setShowDeleteConfirm(true) }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all"
+                          className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all min-w-[44px] min-h-[44px]"
                           title="حذف"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     )

@@ -113,8 +113,21 @@ html {
     font-size: 16px !important;
   }
 
-  button, [role="button"] {
+  /* الحد الأدنى لمساحة اللمس لجميع الأزرار والعناصر التفاعلية */
+  button, [role="button"], a {
     -webkit-tap-highlight-color: transparent;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* تحسين مساحة اللمس لأزرار الأيقونات فقط */
+  button[title], [role="button"][title] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* تحسين مساحة اللمس لعناصر القائمة القابلة للنقر */
+  .cursor-pointer {
     min-height: 44px;
   }
 
@@ -179,6 +192,22 @@ html {
   }
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* تحسين مساحة اللمس لأزرار التقييم (النجوم) */
+  .rating-star-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* تحسين أزرار الفلاتر وال chips */
+  .filter-chip, .year-chip {
+    min-height: 36px;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 }
 

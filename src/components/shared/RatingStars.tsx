@@ -15,6 +15,8 @@ interface RatingStarsProps {
 
 export function RatingStars({ rating, onChange, size = 'sm', colorTheme = 'emerald' }: RatingStarsProps) {
   const sizeClass = size === 'lg' ? 'w-6 h-6' : size === 'md' ? 'w-5 h-5' : 'w-4 h-4'
+  // Touch target size: minimum 44px for mobile tap targets
+  const touchClass = onChange ? 'min-w-[44px] min-h-[44px] flex items-center justify-center' : ''
   const maxRating = 10
   const displayRating = rating ?? 0
 
@@ -35,7 +37,7 @@ export function RatingStars({ rating, onChange, size = 'sm', colorTheme = 'emera
 
   if (!onChange) {
     return (
-      <div className="flex items-center gap-0.5" dir="ltr">
+      <div className="flex items-center gap-1" dir="ltr">
         {Array.from({ length: maxRating }).map((_, i) => (
           <Star
             key={i}
@@ -47,13 +49,13 @@ export function RatingStars({ rating, onChange, size = 'sm', colorTheme = 'emera
   }
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap" dir="ltr">
+    <div className="flex items-center gap-0 flex-wrap" dir="ltr">
       {Array.from({ length: maxRating }).map((_, i) => (
         <button
           key={i}
           type="button"
           onClick={() => onChange(i + 1 === rating ? 0 : i + 1)}
-          className="active:scale-[0.9] transition-transform"
+          className={`active:scale-[0.9] transition-transform ${touchClass}`}
         >
           <Star
             className={`${sizeClass} ${i < (rating ?? 0) ? activeColor : `text-[#333] ${hoverColor}`} transition-colors`}
