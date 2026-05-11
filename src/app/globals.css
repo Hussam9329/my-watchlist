@@ -439,3 +439,39 @@ p, h1, h2, h3, h4, h5, h6, span:not([role="button"]) {
 .view-mode-btn:active {
   transform: scale(0.97);
 }
+/* ===================== Mobile Polish ===================== */
+
+/* تحسين تجربة التمرير العام داخل الصفحات */
+@media (max-width: 1024px) {
+  .touch-active, [data-slot="card"], a.group {
+    touch-action: manipulation;
+  }
+  .touch-active, a.group {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input, textarea, select {
+    max-width: 100%;
+  }
+}
+
+/* تحسين Drawer Footer ليكون فوق home indicator على iOS */
+@media (max-width: 768px) {
+  [data-vaul-drawer] [data-slot="drawer-footer"] {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* منع الـ overflow الأفقي العرضي على الموبايل */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* تحسين Toaster على الموبايل ليكون قابلاً للقراءة فوق النوتش */
+@media (max-width: 768px) {
+  [data-sonner-toaster][data-y-position="top"] {
+    top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+  }
+}
