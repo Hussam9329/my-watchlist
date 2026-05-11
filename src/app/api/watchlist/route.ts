@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { formatItem, normalizeType, normalizeGenres, normalizeListField, parseOptionalInt } from '@/lib/format'
+import { formatItem, normalizeType, normalizeListField, parseOptionalInt } from '@/lib/format'
 
 // Only allow explicit _asc/_desc sort directions — bare field names removed to prevent silent fallback
 const ALLOWED_SORT_FIELDS = new Set([
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
-    const excludeTypes = searchParams.get('excludeTypes') // comma-separated types to exclude e.g. "book,game"
+    const excludeTypes = searchParams.get('excludeTypes')
     const search = searchParams.get('search')
     const hasRating = searchParams.get('hasRating')
     let sortBy = searchParams.get('sortBy') || 'addedAt_desc'
@@ -29,38 +29,39 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where: any = {}
-    // Normalize type: 'tv' should match 'series' in the database
+
     if (type) {
       where.type = normalizeType(type)
     }
-    // Exclude specified types (e.g. books and games from archive page)
+
     if (excludeTypes) {
       const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
-      if (excluded.length > 0) {
-        if (!where.type) {
-          where.type = { notIn: excluded }
-        }
-        // If type is already specified, excludeTypes is irrelevant
+      if (excluded.length > 0 && !where.type) {
+        where.type = { notIn: excluded }
       }
     }
+
     if (hasRating === 'true') {
       where.userRating = { not: null }
     } else if (hasRating === 'false') {
       where.userRating = null
     }
+
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { originalTitle: { contains: search, mode: 'insensitive' } }
       ]
     }
+
     if (filterYear) {
       where.year = filterYear
     }
+
     if (filterGenre) {
       where.genres = { contains: filterGenre }
     }
-    // Rating range filter — only applies when hasRating is not 'false'
+
     if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
       const ratingFilter: any = {}
       if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)
@@ -72,34 +73,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Validate sortBy against allowlist
     if (!ALLOWED_SORT_FIELDS.has(sortBy)) {
       sortBy = 'addedAt_desc'
     }
 
-    // Parse sort - handle multi-underscore field names like userRating
     const lastUnderscore = sortBy.lastIndexOf('_')
     const sortField = sortBy.substring(0, lastUnderscore)
     const sortDir = sortBy.substring(lastUnderscore + 1)
     const direction = sortDir === 'asc' ? 'asc' : 'desc'
 
-    // For year and rating sorting, we need raw SQL because they are String fields
-    // that need numeric comparison, not alphabetical
     const needsRawSort = sortField === 'year' || sortField === 'rating'
 
     let items: any[]
     let total: number
 
     if (needsRawSort) {
-      // Build WHERE clauses for raw SQL
       const conditions: string[] = []
       const params: any[] = []
       let paramIndex = 1
 
       if (type) {
-        const normalizedTypeForQuery = normalizeType(type)
         conditions.push(`"type" = $${paramIndex++}`)
-        params.push(normalizedTypeForQuery)
+        params.push(normalizeType(type))
       } else if (excludeTypes) {
         const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
         if (excluded.length > 0) {
@@ -108,25 +103,28 @@ export async function GET(request: NextRequest) {
           params.push(...excluded)
         }
       }
+
       if (hasRating === 'true') {
         conditions.push(`"userRating" IS NOT NULL`)
       } else if (hasRating === 'false') {
         conditions.push(`"userRating" IS NULL`)
       }
+
       if (search) {
         conditions.push(`("title" ILIKE $${paramIndex++} OR "originalTitle" ILIKE $${paramIndex++})`)
-        params.push(`%${search}%`)
-        params.push(`%${search}%`)
+        params.push(`%${search}%`, `%${search}%`)
       }
+
       if (filterYear) {
         conditions.push(`"year" = $${paramIndex++}`)
         params.push(filterYear)
       }
+
       if (filterGenre) {
         conditions.push(`"genres" LIKE $${paramIndex++}`)
         params.push(`%${filterGenre}%`)
       }
-      // Rating range filter — only applies when hasRating is not 'false'
+
       if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
         if (filterRatingMin) {
           conditions.push(`"userRating" >= $${paramIndex++}`)
@@ -140,31 +138,35 @@ export async function GET(request: NextRequest) {
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-      // Build ORDER BY with numeric cast for string fields that need numeric comparison
       let orderClause: string
       if (sortField === 'year') {
         orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else if (sortField === 'rating') {
-        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
+        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else {
         orderClause = `ORDER BY "addedAt" DESC`
       }
 
-      // Count query
-      const countResult = await prisma.$queryRawUnsafe(
-        `SELECT COUNT(*) as count FROM "MediaItem" ${whereClause}`,
-        ...params
-      )
-      total = Number((countResult as any[])[0]?.count || 0)
-
-      // Data query
+      // ✅ دمج count + data في Promise.all — طلب واحد بدل اثنين متسلسلين
+      const limitIndex = paramIndex++
+      const skipIndex = paramIndex++
       const dataParams = [...params, limit, skip]
-      items = await prisma.$queryRawUnsafe(
-        `SELECT * FROM "MediaItem" ${whereClause} ${orderClause} LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
-        ...dataParams
-      )
+
+      const [countResult, rawItems] = await Promise.all([
+        prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) as count FROM "MediaItem" ${whereClause}`,
+          ...params
+        ) as Promise<any[]>,
+        prisma.$queryRawUnsafe(
+          `SELECT * FROM "MediaItem" ${whereClause} ${orderClause} LIMIT $${limitIndex} OFFSET $${skipIndex}`,
+          ...dataParams
+        ) as Promise<any[]>,
+      ])
+
+      total = Number(countResult[0]?.count || 0)
+      items = rawItems
+
     } else {
-      // Use Prisma ORM for other sort fields
       let orderBy: any
       switch (sortField) {
         case 'title':
@@ -182,6 +184,7 @@ export async function GET(request: NextRequest) {
           break
       }
 
+      // ✅ هذا كان موجود وصح — يشتغلان بالتوازي
       ;[items, total] = await Promise.all([
         prisma.mediaItem.findMany({
           where,
@@ -200,6 +203,7 @@ export async function GET(request: NextRequest) {
       limit,
       hasMore: skip + items.length < total
     })
+
   } catch (error) {
     console.error('Fetch error:', error)
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 })
@@ -212,7 +216,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Basic input validation
     if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
       return NextResponse.json({ error: 'title must be a non-empty string' }, { status: 400 })
     }
@@ -232,11 +235,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userRating must be a number or null' }, { status: 400 })
     }
 
-    // Normalize type: 'tv' → 'series'
     const normalizedType = normalizeType(body.type)
 
-    // Check duplicates: same type + same year + (same title OR same originalTitle)
-    // Case-insensitive comparison to prevent duplicates with different casing
     const orConditions: any[] = [
       { title: { equals: body.title, mode: 'insensitive' } }
     ]
@@ -245,13 +245,11 @@ export async function POST(request: NextRequest) {
       orConditions.push({ title: { equals: body.originalTitle, mode: 'insensitive' } })
     }
 
-    // Build the where clause for duplicate detection
     const duplicateWhere: any = {
       type: normalizedType,
       OR: orConditions
     }
-    // Only match year if it's non-empty; skip year matching for empty strings
-    // to avoid false positives when year is unknown
+
     if (body.year && body.year.trim() !== '') {
       duplicateWhere.year = body.year
     }
@@ -299,6 +297,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(formatItem(item))
+
   } catch (error) {
     console.error('Create error:', error)
     return NextResponse.json({ error: 'خطأ في إضافة العنصر' }, { status: 500 })
