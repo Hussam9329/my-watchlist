@@ -6,7 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 const tajawal = Tajawal({
   variable: "--font-tajawal",
   subsets: ["arabic"],
-  weight: ["300", "400", "500", "700", "800"],
+  weight: ["400", "700"],  // ✅ بدل 5 أوزان، اثنين يكفون
+  display: "swap",          // ✅ يمنع FOIT (وميض النص)
 });
 
 export const metadata: Metadata = {
