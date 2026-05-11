@@ -2,7 +2,7 @@
 
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { X } from 'lucide-react'
@@ -33,7 +33,31 @@ export function ResponsiveModal({
   // Resolve effective device type (fallback for backward compat)
   const effective: DeviceType = deviceType || (isMobile ? 'mobile' : 'desktop')
 
-  // Mobile: Drawer (full-width bottom sheet)
+  // Ref for the scrollable content container inside the Drawer
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Fix: when keyboard appears on mobile, scroll the focused input into view
+  useEffect(() => {
+    if (effective !== 'mobile' || !open) return
+
+    const handleResize = () => {
+      if (document.activeElement && scrollRef.current) {
+        setTimeout(() => {
+          document.activeElement?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          })
+        }, 100)
+      }
+    }
+
+    // visualViewport is more accurate than window resize —
+    // it fires specifically when the keyboard appears/disappears
+    window.visualViewport?.addEventListener('resize', handleResize)
+    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+  }, [effective, open])
+
+  // ── Mobile: Drawer (full-width bottom sheet) ──────────────────────────────
   if (effective === 'mobile') {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
@@ -44,12 +68,15 @@ export function ResponsiveModal({
               <X className="w-4 h-4" />
             </DrawerClose>
           </DrawerHeader>
+
           <div
+            ref={scrollRef}
             className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 min-h-0"
             data-vaul-no-drag
           >
             {children}
           </div>
+
           {footerContent && (
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 sticky bottom-0 bg-[#0f0f0f] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-10">
               {footerContent}
@@ -64,7 +91,7 @@ export function ResponsiveModal({
     )
   }
 
-  // Tablet: Wide Dialog with touch-friendly sizing (larger tap targets, bigger text)
+  // ── Tablet: Wide Dialog with touch-friendly sizing ────────────────────────
   if (effective === 'tablet') {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,7 +115,7 @@ export function ResponsiveModal({
     )
   }
 
-  // Desktop: Standard Dialog
+  // ── Desktop: Standard Dialog ──────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
