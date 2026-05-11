@@ -20,7 +20,7 @@ import {
   BarChart3, CalendarDays, Bookmark, Trash2,
   Trophy, SlidersHorizontal
 } from 'lucide-react'
-import { MediaItem, MetadataResult, StatsData } from '@/lib/types'
+import { MediaItem, MetadataResult, StatsData, WatchlistStatsData } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { formatRating, getRatingColor, getRatingBg } from '@/lib/rating'
 import { normalizeGenres } from '@/lib/format'
@@ -228,6 +228,10 @@ export default function ArchivePage() {
 
   // Stats
   const [stats, setStats] = useState<StatsData | null>(null)
+  const [wlStats, setWlStats] = useState<WatchlistStatsData | null>(null)
+  const [wlStatsLoading, setWlStatsLoading] = useState(false)
+  const [showWlStats, setShowWlStats] = useState(false)
+  const [showRtStats, setShowRtStats] = useState(false)
   const [statsLoading, setStatsLoading] = useState(false)
 
   // All years/genres from database
@@ -288,69 +292,66 @@ export default function ArchivePage() {
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ==================== Fetch Watchlist ====================
-  const fetchWatchlist = useCallback(async (page: number, reset = false) => {
-    setWlLoading(true)
-    try {
-      const params = new URLSearchParams()
-      // Fetch only media types (movie, series, anime) — exclude books & games which have their own pages
-      params.set('hasRating', 'false')
-      // If a specific type is selected, pass it to the API for server-side filtering
-      // This ensures proper pagination and filtering per type
-      if (wlType !== 'all') {
-        params.set('type', wlType)
-      } else {
-        params.set('excludeTypes', 'book,game')
-      }
-      if (debouncedSearch) params.set('search', debouncedSearch)
-      params.set('sortBy', wlSortBy)
-      if (wlFilterGenre) params.set('genre', wlFilterGenre)
-      if (wlFilterYear) params.set('year', wlFilterYear)
-      if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
-      if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
-      params.set('page', String(page))
-      params.set('limit', '200')
-      const res = await fetch(`/api/watchlist?${params}`)
-      const data = await res.json()
-      let allItems: MediaItem[] = []
-      if (reset || page === 1) {
-        allItems = data.items || []
-        setWlItems(allItems)
-      } else {
-        setWlItems(prev => {
-          const existingIds = new Set(prev.map(i => i.id))
-          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
-          allItems = [...prev, ...newItems]
-          return allItems
-        })
-      }
-      setWlTotal(data.total || 0)
-      // Split items by type — this ensures movies/series/anime are always correctly separated
-      const splitItems = (items: MediaItem[]) => {
-        const movies = items.filter(i => i.type === 'movie')
-        const series = items.filter(i => i.type === 'series' || i.type === 'tv')
-        const anime = items.filter(i => i.type === 'anime')
-        return { movies, series, anime }
-      }
-      if (reset || page === 1) {
-        const { movies, series, anime } = splitItems(data.items || [])
-        setWlMovies(movies)
-        setWlSeries(series)
-        setWlAnime(anime)
-      } else {
-        setWlMovies(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'movie' && !prev.some(p => p.id === i.id))])
-        setWlSeries(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => (i.type === 'series' || i.type === 'tv') && !prev.some(p => p.id === i.id))])
-        setWlAnime(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'anime' && !prev.some(p => p.id === i.id))])
-      }
-      // Auto-load next page if there are more items
-      if (data.hasMore) {
-        setTimeout(() => fetchWatchlist(page + 1), 100)
-      }
-    } catch {
-      toast.error('خطأ في جلب البيانات')
-    } finally {
-      setWlLoading(false)
+const fetchWatchlist = useCallback(async (page: number, reset = false) => {
+  setWlLoading(true)
+  try {
+    const params = new URLSearchParams()
+    params.set('hasRating', 'false')
+    // دائماً نستثني الكتب والألعاب
+    params.set('excludeTypes', 'book,game')
+    // فلتر النوع يعمل بالتوازي مع فلتر السنة
+    // المشكلة القديمة: لما نختار نوع كان يحذف excludeTypes
+    // الحل: نرسل النوع كـ param منفصل والـ API يتعامل معهم معاً
+    if (wlType !== 'all') {
+      params.set('type', wlType)
     }
-  }, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    params.set('sortBy', wlSortBy)
+    if (wlFilterGenre) params.set('genre', wlFilterGenre)
+    if (wlFilterYear) params.set('year', wlFilterYear)
+    if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
+    if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
+    params.set('page', String(page))
+    params.set('limit', '200')
+    const res = await fetch(`/api/watchlist?${params}`)
+    const data = await res.json()
+    let allItems: MediaItem[] = []
+    if (reset || page === 1) {
+      allItems = data.items || []
+      setWlItems(allItems)
+    } else {
+      setWlItems(prev => {
+        const existingIds = new Set(prev.map(i => i.id))
+        const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
+        allItems = [...prev, ...newItems]
+        return allItems
+      })
+    }
+    setWlTotal(data.total || 0)
+    const splitItems = (items: MediaItem[]) => ({
+      movies: items.filter(i => i.type === 'movie'),
+      series: items.filter(i => i.type === 'series' || i.type === 'tv'),
+      anime: items.filter(i => i.type === 'anime'),
+    })
+    if (reset || page === 1) {
+      const { movies, series, anime } = splitItems(data.items || [])
+      setWlMovies(movies)
+      setWlSeries(series)
+      setWlAnime(anime)
+    } else {
+      setWlMovies(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'movie' && !prev.some(p => p.id === i.id))])
+      setWlSeries(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => (i.type === 'series' || i.type === 'tv') && !prev.some(p => p.id === i.id))])
+      setWlAnime(prev => [...prev, ...(data.items || []).filter((i: MediaItem) => i.type === 'anime' && !prev.some(p => p.id === i.id))])
+    }
+    if (data.hasMore) {
+      setTimeout(() => fetchWatchlist(page + 1), 100)
+    }
+  } catch {
+    toast.error('خطأ في جلب البيانات')
+  } finally {
+    setWlLoading(false)
+  }
+}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
   const fetchRatings = useCallback(async (page: number, reset = false) => {
@@ -405,6 +406,19 @@ export default function ArchivePage() {
       setStatsLoading(false)
     }
   }, [])
+
+  const fetchWatchlistStats = useCallback(async () => {
+  setWlStatsLoading(true)
+  try {
+    const res = await fetch('/api/ratings-stats?tab=watchlist')
+    const data = await res.json()
+    setWlStats(data)
+  } catch {
+    toast.error('خطأ في جلب الإحصائيات')
+  } finally {
+    setWlStatsLoading(false)
+  }
+}, [])
 
   // ==================== Effects ====================
   useEffect(() => {
