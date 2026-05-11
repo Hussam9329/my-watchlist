@@ -354,44 +354,48 @@ const fetchWatchlist = useCallback(async (page: number, reset = false) => {
 }, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
-  const fetchRatings = useCallback(async (page: number, reset = false) => {
-    setRtLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (rtType !== 'all') params.set('type', rtType)
-      params.set('hasRating', 'true')
-      // Exclude books & games — they have their own pages
-      if (rtType === 'all') params.set('excludeTypes', 'book,game')
-      if (debouncedSearch) params.set('search', debouncedSearch)
-      params.set('sortBy', rtSortBy)
-      if (rtFilterGenre) params.set('genre', rtFilterGenre)
-      if (rtFilterYear) params.set('year', rtFilterYear)
-      if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
-      if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
-      params.set('page', String(page))
-      params.set('limit', '50')
-      const res = await fetch(`/api/watchlist?${params}`)
-      const data = await res.json()
-      if (reset || page === 1) {
-        setRtItems(data.items || [])
-      } else {
-        setRtItems(prev => {
-          const existingIds = new Set(prev.map(i => i.id))
-          const newItems = (data.items || []).filter((i: MediaItem) => !existingIds.has(i.id))
-          return [...prev, ...newItems]
-        })
-      }
-      setRtTotal(data.total || 0)
-      // Auto-load next page if there are more items
-      if (data.hasMore) {
-        setTimeout(() => fetchRatings(page + 1), 100)
-      }
-    } catch {
-      toast.error('خطأ في جلب البيانات')
-    } finally {
-      setRtLoading(false)
+const fetchRatings = useCallback(async (page: number, reset = false) => {
+  if (page === 1) setRtLoading(true)
+  try {
+    const params = new URLSearchParams()
+    if (rtType !== 'all') params.set('type', rtType)
+    params.set('hasRating', 'true')
+    if (rtType === 'all') params.set('excludeTypes', 'book,game')
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    params.set('sortBy', rtSortBy)
+    if (rtFilterGenre) params.set('genre', rtFilterGenre)
+    if (rtFilterYear) params.set('year', rtFilterYear)
+    if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
+    if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
+    params.set('page', String(page))
+    params.set('limit', '50')
+    const res = await fetch(`/api/watchlist?${params}`)
+    const data = await res.json()
+    const incoming: MediaItem[] = data.items || []
+
+    if (reset || page === 1) {
+      // Reset كامل — نستبدل كل شيء بالنتائج الجديدة فقط
+      setRtItems(incoming)
+    } else {
+      setRtItems(prev => {
+        const existingIds = new Set(prev.map(i => i.id))
+        const newItems = incoming.filter(i => !existingIds.has(i.id))
+        return [...prev, ...newItems]
+      })
     }
-  }, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])
+
+    setRtTotal(data.total || 0)
+
+    if (data.hasMore) {
+      // نمرر reset=false لأن الصفحات التالية تضاف فوق بعض
+      setTimeout(() => fetchRatings(page + 1, false), 100)
+    }
+  } catch {
+    toast.error('خطأ في جلب البيانات')
+  } finally {
+    if (page === 1) setRtLoading(false)
+  }
+}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])
 
   // ==================== Fetch Stats ====================
   const fetchStats = useCallback(async () => {
