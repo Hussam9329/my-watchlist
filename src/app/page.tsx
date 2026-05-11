@@ -56,7 +56,11 @@ export default function HussamVisionHome() {
               onChange={(e) => setPasswordInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               placeholder="كلمة المرور"
+              autoFocus
+              autoComplete="current-password"
+              enterKeyHint="go"
               className="bg-[#1a1a2a] border-[#2a2a3a] focus:border-indigo-500 h-14 text-center text-lg rounded-xl"
+
             />
             <Button
               onClick={handleLogin}
