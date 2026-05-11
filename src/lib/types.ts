@@ -36,8 +36,8 @@ export interface MetadataResult {
   overview?: string
   rating?: string | null
   type?: string
-  mediaType?: string // 'movie' or 'tv' — the actual TMDB type
-  typeMismatch?: boolean // true if this result is from a different type endpoint (fallback)
+  mediaType?: string
+  typeMismatch?: boolean
   genres?: string[]
   author?: string
   pages?: number | null
@@ -65,4 +65,16 @@ export interface StatsData {
   genreCount: number
   maxRating: number
   maxRatingTitle: string
+}
+
+export interface WatchlistStatsData {
+  total: number
+  movieCount: number
+  seriesCount: number
+  animeCount: number
+  thisMonth: number
+  topGenre: string
+  topYear: string
+  oldestTitle: string
+  oldestDate: string
 }
