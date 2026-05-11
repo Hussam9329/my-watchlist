@@ -2,7 +2,7 @@
 
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { X } from 'lucide-react'
@@ -16,7 +16,6 @@ interface ResponsiveModalProps {
   footerContent?: React.ReactNode
   wide?: boolean
   isMobile: boolean
-  /** 'mobile' → Drawer, 'tablet' → Wide touch-friendly Dialog, 'desktop' → standard Dialog */
   deviceType?: DeviceType
 }
 
@@ -30,38 +29,65 @@ export function ResponsiveModal({
   isMobile,
   deviceType,
 }: ResponsiveModalProps) {
-  // Resolve effective device type (fallback for backward compat)
   const effective: DeviceType = deviceType || (isMobile ? 'mobile' : 'desktop')
-
-  // Ref for the scrollable content container inside the Drawer
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [drawerHeight, setDrawerHeight] = useState<number | null>(null)
 
-  // Fix: when keyboard appears on mobile, scroll the focused input into view
+  // ✅ الحل الجذري: نتابع visualViewport ونحسب الارتفاع الحقيقي المتاح
   useEffect(() => {
-    if (effective !== 'mobile' || !open) return
+    if (effective !== 'mobile' || !open) {
+      setDrawerHeight(null)
+      return
+    }
 
-    const handleResize = () => {
-      if (document.activeElement && scrollRef.current) {
-        setTimeout(() => {
-          document.activeElement?.scrollIntoView({
+    const updateHeight = () => {
+      const vv = window.visualViewport
+      if (!vv) return
+
+      // الارتفاع الحقيقي المتاح = ارتفاع الـ viewport بعد ظهور الكيبورد
+      const availableHeight = vv.height
+      setDrawerHeight(availableHeight)
+
+      // اسكرول للعنصر المفعّل بعد تحديث الارتفاع
+      setTimeout(() => {
+        if (document.activeElement && document.activeElement !== document.body) {
+          document.activeElement.scrollIntoView({
             behavior: 'smooth',
             block: 'center',
           })
-        }, 100)
-      }
+        }
+      }, 150)
     }
 
-    // visualViewport is more accurate than window resize —
-    // it fires specifically when the keyboard appears/disappears
-    window.visualViewport?.addEventListener('resize', handleResize)
-    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+    updateHeight()
+    window.visualViewport?.addEventListener('resize', updateHeight)
+    window.visualViewport?.addEventListener('scroll', updateHeight)
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateHeight)
+      window.visualViewport?.removeEventListener('scroll', updateHeight)
+      setDrawerHeight(null)
+    }
   }, [effective, open])
 
-  // ── Mobile: Drawer (full-width bottom sheet) ──────────────────────────────
+  // ── Mobile: Drawer ──────────────────────────────────────────────
   if (effective === 'mobile') {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="bg-[#0f0f0f] border-[#2a2a2a] max-h-[92dvh] flex flex-col">
+        <DrawerContent
+          className="bg-[#0f0f0f] border-[#2a2a2a] flex flex-col"
+          style={{
+            // ✅ ارتفاع ثابت مبني على visualViewport وليس dvh
+            height: drawerHeight ? `${drawerHeight * 0.92}px` : '92dvh',
+            maxHeight: drawerHeight ? `${drawerHeight * 0.92}px` : '92dvh',
+            // ✅ نمنع الـ transform الذي يسبب الطيران لفوق
+            transform: 'none !important',
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+          }}
+        >
           <DrawerHeader className="border-b border-[#2a2a2a] px-4 py-3 shrink-0 flex-row items-center justify-between">
             <DrawerTitle className="text-[#d4af37] font-bold text-base">{title}</DrawerTitle>
             <DrawerClose className="w-9 h-9 rounded-full bg-[#2a2a2a]/50 flex items-center justify-center text-[#888] hover:text-white hover:bg-[#2a2a2a] transition-colors">
@@ -78,11 +104,10 @@ export function ResponsiveModal({
           </div>
 
           {footerContent && (
-            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 sticky bottom-0 bg-[#0f0f0f] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-10">
+            <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 bg-[#0f0f0f] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-10">
               {footerContent}
             </DrawerFooter>
           )}
-          {/* Safe area spacer when no footer */}
           {!footerContent && (
             <div className="shrink-0 pb-[env(safe-area-inset-bottom,0px)]" />
           )}
@@ -91,7 +116,7 @@ export function ResponsiveModal({
     )
   }
 
-  // ── Tablet: Wide Dialog with touch-friendly sizing ────────────────────────
+  // ── Tablet ───────────────────────────────────────────────────────
   if (effective === 'tablet') {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,7 +140,7 @@ export function ResponsiveModal({
     )
   }
 
-  // ── Desktop: Standard Dialog ──────────────────────────────────────────────
+  // ── Desktop ──────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
