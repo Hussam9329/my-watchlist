@@ -89,27 +89,34 @@ export async function importDataFromFile(
   const items = JSON.parse(text)
   if (!Array.isArray(items)) throw new Error('Invalid format')
 
+  // ✅ إرسال 5 طلبات بالتوازي بدل واحد واحد
+  const BATCH_SIZE = 5
   let imported = 0
   let duplicates = 0
 
-  for (const item of items) {
-    try {
-      const resolvedType = itemType || item.type || 'movie'
-      const body = buildImportBody(item, resolvedType)
-      const res = await fetch('/api/watchlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map(async (item) => {
+        const resolvedType = itemType || item.type || 'movie'
+        const body = buildImportBody(item, resolvedType)
+        const res = await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error('failed')
       })
-      if (res.ok) imported++
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') imported++
       else duplicates++
-    } catch {
-      duplicates++
     }
   }
 
   return { imported, duplicates }
 }
+
 
 /** Convert MediaItem to form data for editing */
 export function itemToFormData(item: Partial<MediaItem>): Record<string, string> {
