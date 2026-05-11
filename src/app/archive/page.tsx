@@ -211,14 +211,6 @@ export default function ArchivePage() {
   const [wlAnime, setWlAnime] = useState<MediaItem[]>([])
   // Watchlist type filter: 'all' | 'movie' | 'series' | 'anime'
   const [wlType, setWlType] = useState<string>('all')
-  // Computed filtered items based on selected type
-  const wlFilteredItems = wlType === 'all'
-    ? wlItems
-    : wlType === 'movie'
-    ? wlMovies
-    : wlType === 'series'
-    ? wlSeries
-    : wlAnime
 
   // Ratings state
   const [rtType, setRtType] = useState('movie')
@@ -238,9 +230,46 @@ export default function ArchivePage() {
   const [dbYears, setDbYears] = useState<string[]>([])
   const [dbGenres, setDbGenres] = useState<string[]>([])
 
-  // UI state
+  // UI state — يجب أن يكون قبل القيم المحسوبة التي تستخدمه
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearch = useDebouncedValue(searchQuery)
+
+  // ⬇️ الآن يمكن استخدام debouncedSearch بأمان لأنه معرّف أعلاه
+  // Computed filtered items based on selected type + search
+  const wlFilteredItems = (() => {
+    let items = wlType === 'all'
+      ? wlItems
+      : wlType === 'movie'
+      ? wlMovies
+      : wlType === 'series'
+      ? wlSeries
+      : wlAnime
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase().trim()
+      items = items.filter(item =>
+        item.title?.toLowerCase().includes(q) ||
+        item.originalTitle?.toLowerCase().includes(q) ||
+        item.year?.toString().includes(q) ||
+        item.genres?.some(g => g.toLowerCase().includes(q))
+      )
+    }
+
+    return items
+  })()
+
+  // فلترة التقييمات بالبحث من جانب العميل
+  const rtFilteredItems = (() => {
+    if (!debouncedSearch) return rtItems
+    const q = debouncedSearch.toLowerCase().trim()
+    return rtItems.filter(item =>
+      item.title?.toLowerCase().includes(q) ||
+      item.originalTitle?.toLowerCase().includes(q) ||
+      item.year?.toString().includes(q) ||
+      item.genres?.some(g => g.toLowerCase().includes(q))
+    )
+  })()
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   // Separate sort & filter state per tab
   const [wlSortBy, setWlSortBy] = useState('addedAt_desc')
@@ -255,7 +284,6 @@ export default function ArchivePage() {
   const [rtFilterRatingMin, setRtFilterRatingMin] = useState('')
   const [wlFilterRatingMax, setWlFilterRatingMax] = useState('')
   const [rtFilterRatingMax, setRtFilterRatingMax] = useState('')
-
   // Modals
   const [showDetails, setShowDetails] = useState(false)
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
@@ -2173,9 +2201,10 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
 
             {/* Controls row */}
             <div className="flex items-center gap-2">
-              <div className="flex-1 text-sm text-[#888]">
-                {rtTotal} عمل مقيّم
-              </div>
+
+            <div className="flex-1 text-sm text-[#888]">
+            {debouncedSearch ? rtFilteredItems.length : rtTotal} عمل مقيّم
+            </div>
               <div className="flex items-center gap-1.5">
                 <Button
                   onClick={() => openAddForm(rtType !== 'all' ? rtType : 'movie')}
@@ -2282,13 +2311,13 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             )}
 
             {/* Items - Always list view for ratings, no posters */}
-            {rtLoading && rtItems.length === 0 ? (
+            {rtLoading && rtFilteredItems.length === 0 ? (
               <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="h-16 rounded-xl skeleton-shimmer" />
                 ))}
               </div>
-            ) : rtItems.length === 0 ? (
+            ) : rtFilteredItems.length === 0 ? (
               <div className="text-center py-16">
                 <Trophy className="w-12 h-12 text-[#333] mx-auto mb-4" />
                 <p className="text-[#888] text-lg mb-2">لا توجد تقييمات</p>
@@ -2297,7 +2326,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             ) : (
               <>
                 <div className="space-y-1.5">
-                  {rtItems.map((item, idx) => {
+                  {rtFilteredItems.map((item, idx) => {
                     const typeConf = TYPE_CONFIG[item.type] || TYPE_CONFIG.movie
                     const TypeIcon = typeConf.icon
                     return (
@@ -2347,7 +2376,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
                   })}
                 </div>
                 <div className="h-4" />
-                {rtLoading && rtItems.length > 0 && (
+                {rtLoading && rtFilteredItems.length > 0 && (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-6 h-6 text-[#d4af37] animate-spin" />
                   </div>
