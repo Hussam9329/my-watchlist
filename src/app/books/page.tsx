@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { useDeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -172,7 +171,6 @@ const BookCard = React.memo(function BookCard({ item, onClick, onDelete, onQuick
 
 // ==================== Main Component ====================
 export default function BooksPage() {
-  const isMobile = useIsMobile()
   const deviceType = useDeviceType()
   const useDrawer = deviceType === 'mobile'
   const isAuthChecked = useAuth()
@@ -180,8 +178,6 @@ export default function BooksPage() {
   // Data
   const [books, setBooks] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
   const [totalBooks, setTotalBooks] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
 
@@ -238,7 +234,7 @@ export default function BooksPage() {
     try {
       const params = new URLSearchParams()
       params.set('type', 'book')
-      params.set('limit', '50')
+      params.set('limit', '200')
       params.set('page', String(pageNum))
       params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
@@ -254,8 +250,6 @@ export default function BooksPage() {
         })
       }
       setTotalBooks(data.total || 0)
-      setHasMore(data.hasMore || false)
-      setPage(pageNum)
       // Auto-load next page if there are more items
       if (data.hasMore) {
         setTimeout(() => fetchBooks(pageNum + 1), 100)
@@ -270,7 +264,6 @@ export default function BooksPage() {
 
   useEffect(() => {
     if (!isAuthChecked) return
-    setPage(1)
     fetchBooks(1, true)
   }, [isAuthChecked, fetchBooks])
 
@@ -621,8 +614,8 @@ export default function BooksPage() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const { imported, duplicates } = await importDataFromFile(file, 'book')
-      toast.success(`تم استيراد ${imported} كتاب (${duplicates} مكرر)`)
+      const { imported, duplicates, skipped } = await importDataFromFile(file, 'book')
+      toast.success(`تم استيراد ${imported} كتاب (${duplicates} مكرر، ${skipped} غير صالح)`)
       fetchBooks(1, true)
     } catch {
       toast.error('خطأ في استيراد الملف')
@@ -655,7 +648,7 @@ export default function BooksPage() {
   }
 
   // ==================== Form Component ====================
-  const renderForm = (isEdit: boolean) => (
+  const renderForm = () => (
     <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1" dir="rtl">
       {/* Metadata Search */}
       <div className="space-y-2">
@@ -1390,7 +1383,7 @@ export default function BooksPage() {
               <DrawerTitle className="text-white text-right">إضافة كتاب جديد</DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-              {renderForm(false)}
+              {renderForm()}
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
@@ -1418,7 +1411,7 @@ export default function BooksPage() {
               <DialogTitle className="text-white text-right">إضافة كتاب جديد</DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {renderForm(false)}
+              {renderForm()}
             </div>
             <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Button
@@ -1449,7 +1442,7 @@ export default function BooksPage() {
               <DrawerTitle className="text-white text-right">تعديل الكتاب</DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-              {renderForm(true)}
+              {renderForm()}
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
@@ -1477,7 +1470,7 @@ export default function BooksPage() {
               <DialogTitle className="text-white text-right">تعديل الكتاب</DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {renderForm(true)}
+              {renderForm()}
             </div>
             <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Button

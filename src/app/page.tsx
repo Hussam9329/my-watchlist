@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { ArrowLeft, BookOpen, Gamepad2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,9 +76,9 @@ export default function HussamVisionHome() {
   }
 
   const cards = [
-    { href: '/archive', icon: BookOpen, title: 'أرشيف حسام', desc: 'أرشيفك الشامل: أفلام، مسلسلات، أنمي وتقييمات', color: 'amber', border: 'border-indigo-500/20', gradient: 'from-amber-500/15 to-amber-700/10', iconBorder: 'border-amber-500/25', iconShadow: 'shadow-amber-500/10', textGradient: 'from-amber-300 via-yellow-400 to-amber-500', textColor: 'text-blue-400' },
-    { href: '/books', icon: BookOpen, title: 'أريد قرائته', desc: 'تتبع كتبك ومؤلفاتك المفضلة', color: 'emerald', border: 'border-emerald-500/20', gradient: 'from-emerald-500/15 to-emerald-700/10', iconBorder: 'border-emerald-500/25', iconShadow: 'shadow-emerald-500/10', textGradient: 'from-emerald-300 via-green-400 to-emerald-500', textColor: 'text-emerald-400' },
-    { href: '/games', icon: Gamepad2, title: 'أريد لعبها', desc: 'تتبع ألعابك المفضلة على كل المنصات', color: 'teal', border: 'border-teal-500/20', gradient: 'from-teal-500/15 to-cyan-700/10', iconBorder: 'border-teal-500/25', iconShadow: 'shadow-teal-500/10', textGradient: 'from-teal-300 via-emerald-400 to-teal-500', textColor: 'text-teal-400' },
+    { href: '/archive', icon: BookOpen, title: 'أرشيف حسام', desc: 'أرشيفك الشامل: أفلام، مسلسلات، أنمي وتقييمات', gradient: 'from-amber-500/15 to-amber-700/10', iconBorder: 'border-amber-500/25', iconShadow: 'shadow-amber-500/10', iconColor: 'text-amber-400', textGradient: 'from-amber-300 via-yellow-400 to-amber-500', textColor: 'text-blue-400' },
+    { href: '/books', icon: BookOpen, title: 'أريد قرائته', desc: 'تتبع كتبك ومؤلفاتك المفضلة', gradient: 'from-emerald-500/15 to-emerald-700/10', iconBorder: 'border-emerald-500/25', iconShadow: 'shadow-emerald-500/10', iconColor: 'text-emerald-400', textGradient: 'from-emerald-300 via-green-400 to-emerald-500', textColor: 'text-emerald-400' },
+    { href: '/games', icon: Gamepad2, title: 'أريد لعبها', desc: 'تتبع ألعابك المفضلة على كل المنصات', gradient: 'from-teal-500/15 to-cyan-700/10', iconBorder: 'border-teal-500/25', iconShadow: 'shadow-teal-500/10', iconColor: 'text-teal-400', textGradient: 'from-teal-300 via-emerald-400 to-teal-500', textColor: 'text-teal-400' },
   ]
 
   return (
@@ -103,15 +104,16 @@ export default function HussamVisionHome() {
           {cards.map((card) => {
             const Icon = card.icon
             return (
-              <a
+              <Link
                 key={card.href}
                 href={card.href}
+                prefetch
                 className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer border bg-gradient-to-b from-[#0f1629] to-[#0a0f1e] p-4 sm:p-6 text-center transition-all duration-150 touch-active active:scale-[0.97]"
                 style={{ borderColor: `var(--card-border, rgba(99,102,241,0.2))` }}
               >
                 <div className="relative z-10">
                   <div className={`w-14 h-14 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-5 rounded-xl sm:rounded-2xl flex items-center justify-center bg-gradient-to-br ${card.gradient} border ${card.iconBorder} shadow-lg ${card.iconShadow}`}>
-                    <Icon className={`w-7 h-7 sm:w-11 sm:h-11 text-${card.color}-400`} />
+                    <Icon className={`w-7 h-7 sm:w-11 sm:h-11 ${card.iconColor}`} />
                   </div>
                   <h3 className={`text-base sm:text-2xl font-bold mb-1 sm:mb-2 bg-gradient-to-l ${card.textGradient} bg-clip-text text-transparent`}>
                     {card.title}
@@ -124,7 +126,7 @@ export default function HussamVisionHome() {
                     <ArrowLeft className="w-4 h-4 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-              </a>
+              </Link>
             )
           })}
         </div>

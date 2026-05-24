@@ -11,12 +11,11 @@
  * 6. Quick rate is the only way to move items from watchlist to ratings
  */
 
-import React, { useState, useCallback } from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import React, { useState } from 'react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 
 // Mock IntersectionObserver
 class MockIntersectionObserver {
@@ -239,7 +238,7 @@ describe('Tab Logic - Rating Determines Tab', () => {
   })
 
   it('rating an item moves it from watchlist to ratings', () => {
-    let item = { id: '1', title: 'Inception', year: '2010', userRating: null as number | null }
+    let item: { id: string; title: string; year: string; userRating: number | null; watched?: boolean } = { id: '1', title: 'Inception', year: '2010', userRating: null }
 
     // Before rating: watchlist
     expect(item.userRating).toBeNull()

@@ -35,7 +35,7 @@ export function buildItemBody(
 
 /** Build request body for import operations from raw item data */
 export function buildImportBody(
-  item: any,
+  item: Partial<MediaItem> & Record<string, unknown>,
   itemType: string,
 ): Record<string, unknown> {
   const normalizedType = normalizeType(itemType)
@@ -63,60 +63,68 @@ export function buildImportBody(
   }
 }
 
-/** Export data to JSON file */
+/** Export all matching data to JSON file, not just the first API page. */
 export async function exportDataToFile(type?: string, fileNamePrefix = 'hussamvision-backup') {
-  const params = new URLSearchParams()
-  if (type) params.set('type', type)
-  params.set('limit', '1000')
-  const res = await fetch(`/api/watchlist?${params}`)
-  const data = await res.json()
-  const items = data.items || []
-  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
+  const allItems: MediaItem[] = []
+  let page = 1
+  const limit = 500
+  let hasMore = true
+
+  while (hasMore) {
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    params.set('limit', String(limit))
+    params.set('page', String(page))
+
+    const res = await fetch(`/api/watchlist?${params}`)
+    if (!res.ok) throw new Error('تعذر تصدير البيانات')
+
+    const data = await res.json()
+    const items: MediaItem[] = data.items || []
+    allItems.push(...items)
+
+    hasMore = Boolean(data.hasMore) && items.length > 0
+    page += 1
+  }
+
+  const blob = new Blob([JSON.stringify(allItems, null, 2)], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = `${fileNamePrefix}-${new Date().toISOString().split('T')[0]}.json`
+  document.body.appendChild(a)
   a.click()
+  a.remove()
   URL.revokeObjectURL(url)
 }
 
-/** Import data from JSON file */
+/** Import data from JSON file using the bulk endpoint for instant, low-network import. */
 export async function importDataFromFile(
   file: File,
   itemType?: string,
-): Promise<{ imported: number; duplicates: number }> {
+): Promise<{ imported: number; duplicates: number; skipped: number }> {
   const text = await file.text()
   const items = JSON.parse(text)
-  if (!Array.isArray(items)) throw new Error('Invalid format')
+  if (!Array.isArray(items)) throw new Error('ملف JSON غير صالح')
 
-  // ✅ إرسال 5 طلبات بالتوازي بدل واحد واحد
-  const BATCH_SIZE = 5
-  let imported = 0
-  let duplicates = 0
+  const res = await fetch('/api/watchlist/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, type: itemType }),
+  })
 
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE)
-    const results = await Promise.allSettled(
-      batch.map(async (item) => {
-        const resolvedType = itemType || item.type || 'movie'
-        const body = buildImportBody(item, resolvedType)
-        const res = await fetch('/api/watchlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        if (!res.ok) throw new Error('failed')
-      })
-    )
-    for (const r of results) {
-      if (r.status === 'fulfilled') imported++
-      else duplicates++
-    }
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null)
+    throw new Error(errorData?.error || 'تعذر استيراد البيانات')
   }
 
-  return { imported, duplicates }
+  const data = await res.json()
+  return {
+    imported: Number(data.imported || 0),
+    duplicates: Number(data.duplicates || 0),
+    skipped: Number(data.skipped || 0),
+  }
 }
-
 
 /** Convert MediaItem to form data for editing */
 export function itemToFormData(item: Partial<MediaItem>): Record<string, string> {

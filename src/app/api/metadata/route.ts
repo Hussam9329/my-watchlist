@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Search the PRIMARY endpoint first
-    let primaryResults = await searchEndpoint(primaryEndpoint)
+    const primaryResults = await searchEndpoint(primaryEndpoint)
 
     // Step 2: Collect results from primary endpoint
     const seenIds = new Set<number>()

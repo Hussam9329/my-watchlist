@@ -10,11 +10,9 @@
  */
 
 import React, { useState } from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 
 // Mock IntersectionObserver
 class MockIntersectionObserver {
@@ -52,8 +50,8 @@ function TestDetailView({
   onEdit = () => {},
 }: {
   item?: { id: string; title: string; year: string }
-  onDelete?: () => {}
-  onEdit?: () => {}
+  onDelete?: () => void
+  onEdit?: () => void
 }) {
   return (
     <Dialog open={true} onOpenChange={() => {}}>

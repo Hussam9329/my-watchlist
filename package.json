@@ -6,8 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "prisma generate && prisma db push --accept-data-loss"
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "test": "jest --runInBand",
+    "typecheck": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:push:force": "prisma db push --accept-data-loss"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

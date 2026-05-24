@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { useDeviceType, type DeviceType } from '@/hooks/use-device-type'
+import { useDeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
@@ -221,9 +221,6 @@ export default function ArchivePage() {
   // Stats
   const [stats, setStats] = useState<StatsData | null>(null)
   const [wlStats, setWlStats] = useState<WatchlistStatsData | null>(null)
-  const [wlStatsLoading, setWlStatsLoading] = useState(false)
-  const [showWlStats, setShowWlStats] = useState(false)
-  const [showRtStats, setShowRtStats] = useState(false)
   const [statsLoading, setStatsLoading] = useState(false)
 
   // All years/genres from database
@@ -251,7 +248,7 @@ export default function ArchivePage() {
         item.title?.toLowerCase().includes(q) ||
         item.originalTitle?.toLowerCase().includes(q) ||
         item.year?.toString().includes(q) ||
-        item.genres?.some(g => g.toLowerCase().includes(q))
+        normalizeGenres(item.genres).some((g) => g.toLowerCase().includes(q))
       )
     }
 
@@ -266,7 +263,7 @@ export default function ArchivePage() {
       item.title?.toLowerCase().includes(q) ||
       item.originalTitle?.toLowerCase().includes(q) ||
       item.year?.toString().includes(q) ||
-      item.genres?.some(g => g.toLowerCase().includes(q))
+      normalizeGenres(item.genres).some((g) => g.toLowerCase().includes(q))
     )
   })()
 
@@ -396,7 +393,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
     if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
     params.set('page', String(page))
-    params.set('limit', '50')
+    params.set('limit', '200')
     const res = await fetch(`/api/watchlist?${params}`)
     const data = await res.json()
     const incoming: MediaItem[] = data.items || []
@@ -429,28 +426,22 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   const fetchStats = useCallback(async () => {
     setStatsLoading(true)
     try {
-      const res = await fetch('/api/ratings-stats')
-      const data = await res.json()
-      setStats(data)
+      const [ratingsRes, watchlistRes] = await Promise.all([
+        fetch('/api/ratings-stats'),
+        fetch('/api/ratings-stats?tab=watchlist'),
+      ])
+      const [ratingsData, watchlistData] = await Promise.all([
+        ratingsRes.json(),
+        watchlistRes.json(),
+      ])
+      setStats(ratingsData)
+      setWlStats(watchlistData)
     } catch {
       toast.error('خطأ في جلب الإحصائيات')
     } finally {
       setStatsLoading(false)
     }
   }, [])
-
-  const fetchWatchlistStats = useCallback(async () => {
-  setWlStatsLoading(true)
-  try {
-    const res = await fetch('/api/ratings-stats?tab=watchlist')
-    const data = await res.json()
-    setWlStats(data)
-  } catch {
-    toast.error('خطأ في جلب الإحصائيات')
-  } finally {
-    setWlStatsLoading(false)
-  }
-}, [])
 
   // ==================== Effects ====================
   useEffect(() => {
@@ -808,8 +799,8 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const { imported, duplicates } = await importDataFromFile(file)
-      toast.success(`تم استيراد ${imported} عنصر (${duplicates} مكرر)`)
+      const { imported, duplicates, skipped } = await importDataFromFile(file)
+      toast.success(`تم استيراد ${imported} عنصر (${duplicates} مكرر، ${skipped} غير صالح)`)
       fetchWatchlist(1, true)
       fetchRatings(1, true)
     } catch {
@@ -1762,6 +1753,30 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
           <div className="text-xs text-[#888]">تصنيف مختلف</div>
         </div>
       </div>
+
+      {wlStats && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 space-y-3">
+          <h3 className="font-bold text-[#d4af37]">قائمة المشاهدة</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-[#0f0f0f] border border-[#2a2a2a] p-3 text-center">
+              <div className="text-xl font-bold text-white">{wlStats.total}</div>
+              <div className="text-xs text-[#888]">بانتظار المشاهدة</div>
+            </div>
+            <div className="rounded-lg bg-[#0f0f0f] border border-[#2a2a2a] p-3 text-center">
+              <div className="text-xl font-bold text-white">{wlStats.thisMonth}</div>
+              <div className="text-xs text-[#888]">أضيف هذا الشهر</div>
+            </div>
+            <div className="rounded-lg bg-[#0f0f0f] border border-[#2a2a2a] p-3 text-center">
+              <div className="text-xl font-bold text-white truncate">{wlStats.topGenre}</div>
+              <div className="text-xs text-[#888]">أكثر تصنيف</div>
+            </div>
+            <div className="rounded-lg bg-[#0f0f0f] border border-[#2a2a2a] p-3 text-center">
+              <div className="text-xl font-bold text-white truncate">{wlStats.oldestTitle}</div>
+              <div className="text-xs text-[#888]">أقدم عنصر</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* By Type */}
       <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 space-y-3">

@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { useDeviceType } from '@/hooks/use-device-type'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -191,7 +190,6 @@ const GameCard = React.memo(function GameCard({ item, onClick, onDelete, onQuick
 
 // ==================== Main Component ====================
 export default function GamesPage() {
-  const isMobile = useIsMobile()
   const deviceType = useDeviceType()
   const useDrawer = deviceType === 'mobile'
   const isAuthChecked = useAuth()
@@ -199,8 +197,6 @@ export default function GamesPage() {
   // Data
   const [games, setGames] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
   const [totalGames, setTotalGames] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
 
@@ -258,7 +254,7 @@ export default function GamesPage() {
     try {
       const params = new URLSearchParams()
       params.set('type', 'game')
-      params.set('limit', '50')
+      params.set('limit', '200')
       params.set('page', String(pageNum))
       params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
@@ -274,8 +270,6 @@ export default function GamesPage() {
         })
       }
       setTotalGames(data.total || 0)
-      setHasMore(data.hasMore || false)
-      setPage(pageNum)
       // Auto-load next page if there are more items
       if (data.hasMore) {
         setTimeout(() => fetchGames(pageNum + 1), 100)
@@ -290,7 +284,6 @@ export default function GamesPage() {
 
   useEffect(() => {
     if (!isAuthChecked) return
-    setPage(1)
     fetchGames(1, true)
   }, [isAuthChecked, fetchGames])
 
@@ -653,11 +646,10 @@ export default function GamesPage() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const { imported, duplicates } = await importDataFromFile(file, 'game')
-      toast.success(`تم استيراد ${imported} لعبة (${duplicates} مكرر)`)
+      const { imported, duplicates, skipped } = await importDataFromFile(file, 'game')
+      toast.success(`تم استيراد ${imported} لعبة (${duplicates} مكرر، ${skipped} غير صالح)`)
       fetchGames(1, true)
-      setPage(1)
-    } catch {
+      } catch {
       toast.error('خطأ في استيراد الملف')
     }
     if (importInputRef.current) importInputRef.current.value = ''
@@ -688,7 +680,7 @@ export default function GamesPage() {
   }
 
   // ==================== Form Component ====================
-  const renderForm = (_isEdit: boolean) => (
+  const renderForm = () => (
     <div className="space-y-4 p-1" dir="rtl">
       {/* Metadata Search */}
       <div className="space-y-2">
@@ -1500,7 +1492,7 @@ export default function GamesPage() {
               </DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-              {renderForm(false)}
+              {renderForm()}
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
@@ -1531,7 +1523,7 @@ export default function GamesPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {renderForm(false)}
+              {renderForm()}
             </div>
             <div className="shrink-0 flex gap-2 pt-2">
               <Button
@@ -1565,7 +1557,7 @@ export default function GamesPage() {
               </DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-              {renderForm(true)}
+              {renderForm()}
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
@@ -1596,7 +1588,7 @@ export default function GamesPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {renderForm(true)}
+              {renderForm()}
             </div>
             <div className="shrink-0 flex gap-2 pt-2">
               <Button

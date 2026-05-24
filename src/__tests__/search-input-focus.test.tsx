@@ -35,13 +35,11 @@ function ResponsiveModal({
   onOpenChange,
   title,
   children,
-  isMobile = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   children: React.ReactNode
-  isMobile?: boolean
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,7 +62,7 @@ function FixedAddForm() {
   const [title, setTitle] = useState('')
 
   return (
-    <ResponsiveModal open={true} onOpenChange={() => {}} title="إضافة عمل جديد" isMobile={false}>
+    <ResponsiveModal open={true} onOpenChange={() => {}} title="إضافة عمل جديد">
       <div className="space-y-5 overflow-y-auto p-1 max-h-[70vh]">
         <div className="space-y-2">
           <label className="text-xs font-bold text-[#d4af37]">بحث تلقائي</label>
@@ -235,7 +233,7 @@ describe('ResponsiveModal - Stable Reference', () => {
           <button onClick={() => setCount(n => n + 1)} data-testid="force-rerender">
             Re-render ({count})
           </button>
-          <ResponsiveModal open={true} onOpenChange={() => {}} title="Test" isMobile={false}>
+          <ResponsiveModal open={true} onOpenChange={() => {}} title="Test">
             <Input
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}

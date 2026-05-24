@@ -10,7 +10,7 @@
  */
 
 import React, { useState } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -27,8 +27,6 @@ window.IntersectionObserver = MockIntersectionObserver as unknown as typeof Inte
 // ==================== Test Component: Simulating the Add Form ====================
 function TestAddForm({ isOpen = true, onClose = () => {} }) {
   const [metaQuery, setMetaQuery] = useState('')
-  const [title, setTitle] = useState('')
-  const [year, setYear] = useState('')
   const [formData, setFormData] = useState({
     title: '', year: '', type: 'movie', poster: '',
   })

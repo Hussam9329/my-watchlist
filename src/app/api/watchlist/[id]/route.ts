@@ -11,7 +11,7 @@ export async function GET(
     const item = await prisma.mediaItem.findUnique({ where: { id } })
     if (!item) return NextResponse.json({ error: 'العنصر غير موجود' }, { status: 404 })
     return NextResponse.json(formatItem(item))
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في جلب البيانات' }, { status: 500 })
   }
 }
@@ -78,7 +78,7 @@ export async function PUT(
     })
 
     return NextResponse.json(formatItem(item))
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }
 }
@@ -91,7 +91,7 @@ export async function DELETE(
     const { id } = await params
     await prisma.mediaItem.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في الحذف' }, { status: 500 })
   }
 }
@@ -149,7 +149,7 @@ export async function PATCH(
     })
 
     return NextResponse.json(formatItem(item))
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'خطأ في التحديث' }, { status: 500 })
   }
 }
