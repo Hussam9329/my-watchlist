@@ -5,40 +5,89 @@ import { formatItem, normalizeType, normalizeListField, parseOptionalInt } from 
 // Only allow explicit _asc/_desc sort directions — bare field names removed to prevent silent fallback
 const ALLOWED_SORT_FIELDS = new Set([
   'title_asc', 'title_desc',
+  'originalTitle_asc', 'originalTitle_desc',
   'year_asc', 'year_desc',
   'addedAt_asc', 'addedAt_desc',
+  'updatedAt_asc', 'updatedAt_desc',
   'userRating_asc', 'userRating_desc',
-  'originalTitle_asc', 'originalTitle_desc',
-  'rating_asc', 'rating_desc'
+  'rating_asc', 'rating_desc',
+  'runtime_asc', 'runtime_desc',
+  'pages_asc', 'pages_desc',
+  'episodes_asc', 'episodes_desc',
+  'seasons_asc', 'seasons_desc',
+  'author_asc', 'author_desc',
+  'status_asc', 'status_desc',
+  'ratingStatus_asc', 'ratingStatus_desc',
 ])
+
+function parseCsv(value: string | null): string[] {
+  return (value || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+function parseNumber(value: string | null): number | null {
+  if (!value) return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function buildTypeFilters(searchParams: URLSearchParams) {
+  const type = searchParams.get('type')
+  const types = uniqueValues([
+    ...(type ? [type] : []),
+    ...parseCsv(searchParams.get('types')),
+  ].map(normalizeType))
+  const excludedTypes = uniqueValues(parseCsv(searchParams.get('excludeTypes')).map(normalizeType))
+  return { types, excludedTypes }
+}
+
+function buildMultiFilters(searchParams: URLSearchParams) {
+  return {
+    years: uniqueValues([
+      ...parseCsv(searchParams.get('year')),
+      ...parseCsv(searchParams.get('years')),
+    ]),
+    genres: uniqueValues([
+      ...parseCsv(searchParams.get('genre')),
+      ...parseCsv(searchParams.get('genres')),
+    ]),
+    ratingStatuses: uniqueValues([
+      ...parseCsv(searchParams.get('ratingStatus')),
+      ...parseCsv(searchParams.get('ratingStatuses')),
+    ]),
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type')
-    const excludeTypes = searchParams.get('excludeTypes')
-    const search = searchParams.get('search')
+    const search = searchParams.get('search')?.trim() || ''
     const hasRating = searchParams.get('hasRating')
     let sortBy = searchParams.get('sortBy') || 'addedAt_desc'
-    const filterGenre = searchParams.get('genre')
-    const filterYear = searchParams.get('year')
     const filterRatingMin = searchParams.get('ratingMin')
     const filterRatingMax = searchParams.get('ratingMax')
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '20')))
     const skip = (page - 1) * limit
 
+    const { types, excludedTypes } = buildTypeFilters(searchParams)
+    const { years, genres, ratingStatuses } = buildMultiFilters(searchParams)
+
     const where: any = {}
+    const andConditions: any[] = []
 
-    if (type) {
-      where.type = normalizeType(type)
-    }
-
-    if (excludeTypes) {
-      const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
-      if (excluded.length > 0 && !where.type) {
-        where.type = { notIn: excluded }
-      }
+    if (types.length === 1) {
+      where.type = types[0]
+    } else if (types.length > 1) {
+      where.type = { in: types }
+    } else if (excludedTypes.length > 0) {
+      where.type = { notIn: excludedTypes }
     }
 
     if (hasRating === 'true') {
@@ -48,29 +97,50 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { originalTitle: { contains: search, mode: 'insensitive' } }
-      ]
+      andConditions.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { originalTitle: { contains: search, mode: 'insensitive' } },
+          { year: { contains: search, mode: 'insensitive' } },
+          { genres: { contains: search, mode: 'insensitive' } },
+          { author: { contains: search, mode: 'insensitive' } },
+        ],
+      })
     }
 
-    if (filterYear) {
-      where.year = filterYear
+    if (years.length === 1) {
+      where.year = years[0]
+    } else if (years.length > 1) {
+      where.year = { in: years }
     }
 
-    if (filterGenre) {
-      where.genres = { contains: filterGenre }
+    if (genres.length > 0) {
+      andConditions.push({
+        OR: genres.map((genre) => ({ genres: { contains: genre, mode: 'insensitive' } })),
+      })
     }
 
-    if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
+    if (ratingStatuses.length === 1) {
+      where.ratingStatus = ratingStatuses[0]
+    } else if (ratingStatuses.length > 1) {
+      where.ratingStatus = { in: ratingStatuses }
+    }
+
+    const ratingMin = parseNumber(filterRatingMin)
+    const ratingMax = parseNumber(filterRatingMax)
+    if ((ratingMin != null || ratingMax != null) && hasRating !== 'false') {
       const ratingFilter: any = {}
-      if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)
-      if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)
+      if (ratingMin != null) ratingFilter.gte = ratingMin
+      if (ratingMax != null) ratingFilter.lte = ratingMax
       if (where.userRating && typeof where.userRating === 'object') {
         where.userRating = { ...where.userRating, ...ratingFilter }
       } else {
         where.userRating = { not: null, ...ratingFilter }
       }
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions
     }
 
     if (!ALLOWED_SORT_FIELDS.has(sortBy)) {
@@ -92,16 +162,17 @@ export async function GET(request: NextRequest) {
       const params: any[] = []
       let paramIndex = 1
 
-      if (type) {
+      if (types.length === 1) {
         conditions.push(`"type" = $${paramIndex++}`)
-        params.push(normalizeType(type))
-      } else if (excludeTypes) {
-        const excluded = excludeTypes.split(',').map(t => t.trim()).filter(Boolean)
-        if (excluded.length > 0) {
-          const placeholders = excluded.map(() => `$${paramIndex++}`).join(', ')
-          conditions.push(`"type" NOT IN (${placeholders})`)
-          params.push(...excluded)
-        }
+        params.push(types[0])
+      } else if (types.length > 1) {
+        const placeholders = types.map(() => `$${paramIndex++}`).join(', ')
+        conditions.push(`"type" IN (${placeholders})`)
+        params.push(...types)
+      } else if (excludedTypes.length > 0) {
+        const placeholders = excludedTypes.map(() => `$${paramIndex++}`).join(', ')
+        conditions.push(`"type" NOT IN (${placeholders})`)
+        params.push(...excludedTypes)
       }
 
       if (hasRating === 'true') {
@@ -111,28 +182,43 @@ export async function GET(request: NextRequest) {
       }
 
       if (search) {
-        conditions.push(`("title" ILIKE $${paramIndex++} OR "originalTitle" ILIKE $${paramIndex++})`)
-        params.push(`%${search}%`, `%${search}%`)
+        conditions.push(`("title" ILIKE $${paramIndex} OR "originalTitle" ILIKE $${paramIndex} OR "year" ILIKE $${paramIndex} OR "genres" ILIKE $${paramIndex} OR "author" ILIKE $${paramIndex})`)
+        params.push(`%${search}%`)
+        paramIndex++
       }
 
-      if (filterYear) {
+      if (years.length === 1) {
         conditions.push(`"year" = $${paramIndex++}`)
-        params.push(filterYear)
+        params.push(years[0])
+      } else if (years.length > 1) {
+        const placeholders = years.map(() => `$${paramIndex++}`).join(', ')
+        conditions.push(`"year" IN (${placeholders})`)
+        params.push(...years)
       }
 
-      if (filterGenre) {
-        conditions.push(`"genres" LIKE $${paramIndex++}`)
-        params.push(`%${filterGenre}%`)
+      if (genres.length > 0) {
+        const genreConditions = genres.map(() => `"genres" ILIKE $${paramIndex++}`)
+        conditions.push(`(${genreConditions.join(' OR ')})`)
+        params.push(...genres.map((genre) => `%${genre}%`))
       }
 
-      if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
-        if (filterRatingMin) {
+      if (ratingStatuses.length === 1) {
+        conditions.push(`"ratingStatus" = $${paramIndex++}`)
+        params.push(ratingStatuses[0])
+      } else if (ratingStatuses.length > 1) {
+        const placeholders = ratingStatuses.map(() => `$${paramIndex++}`).join(', ')
+        conditions.push(`"ratingStatus" IN (${placeholders})`)
+        params.push(...ratingStatuses)
+      }
+
+      if ((ratingMin != null || ratingMax != null) && hasRating !== 'false') {
+        if (ratingMin != null) {
           conditions.push(`"userRating" >= $${paramIndex++}`)
-          params.push(parseFloat(filterRatingMin))
+          params.push(ratingMin)
         }
-        if (filterRatingMax) {
+        if (ratingMax != null) {
           conditions.push(`"userRating" <= $${paramIndex++}`)
-          params.push(parseFloat(filterRatingMax))
+          params.push(ratingMax)
         }
       }
 
@@ -142,12 +228,11 @@ export async function GET(request: NextRequest) {
       if (sortField === 'year') {
         orderClause = `ORDER BY CASE WHEN "year" ~ '^[0-9]+$' THEN CAST("year" AS INTEGER) ELSE 0 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else if (sortField === 'rating') {
-        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
+        orderClause = `ORDER BY CASE WHEN "rating" ~ '^[0-9]+\.?[0-9]*$' THEN CAST("rating" AS FLOAT) ELSE -1 END ${direction.toUpperCase()}, "addedAt" DESC`
       } else {
         orderClause = `ORDER BY "addedAt" DESC`
       }
 
-      // ✅ دمج count + data في Promise.all — طلب واحد بدل اثنين متسلسلين
       const limitIndex = paramIndex++
       const skipIndex = paramIndex++
       const dataParams = [...params, limit, skip]
@@ -178,13 +263,28 @@ export async function GET(request: NextRequest) {
         case 'userRating':
           orderBy = [{ userRating: { sort: direction, nulls: 'last' } }, { addedAt: 'desc' as const }]
           break
+        case 'runtime':
+        case 'pages':
+        case 'episodes':
+        case 'seasons':
+          orderBy = [{ [sortField]: { sort: direction, nulls: 'last' } }, { addedAt: 'desc' as const }]
+          break
+        case 'author':
+        case 'status':
+          orderBy = [{ [sortField]: { sort: direction, nulls: 'last' } }, { addedAt: 'desc' as const }]
+          break
+        case 'ratingStatus':
+          orderBy = [{ ratingStatus: direction }, { addedAt: 'desc' as const }]
+          break
+        case 'updatedAt':
+          orderBy = [{ updatedAt: direction }, { addedAt: 'desc' as const }]
+          break
         case 'addedAt':
         default:
           orderBy = { addedAt: direction }
           break
       }
 
-      // ✅ هذا كان موجود وصح — يشتغلان بالتوازي
       ;[items, total] = await Promise.all([
         prisma.mediaItem.findMany({
           where,

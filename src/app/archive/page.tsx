@@ -25,7 +25,8 @@ import { compressImage } from '@/lib/image'
 import { formatRating, getRatingColor, getRatingBg } from '@/lib/rating'
 import { normalizeGenres } from '@/lib/format'
 import { WL_SORT_OPTIONS, RT_SORT_OPTIONS, RATING_STATUSES } from '@/lib/constants'
-import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile, addMetadataResultsToWatchlist, metadataResultKey } from '@/lib/crud'
+import { filterMediaItems, toggleSelection } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 import { ResponsiveModal } from '@/components/shared/ResponsiveModal'
 
@@ -273,10 +274,14 @@ export default function ArchivePage() {
   const [rtSortBy, setRtSortBy] = useState('addedAt_desc')
   const [wlShowSortFilter, setWlShowSortFilter] = useState(false)
   const [rtShowSortFilter, setRtShowSortFilter] = useState(false)
-  const [wlFilterGenre, setWlFilterGenre] = useState('')
-  const [rtFilterGenre, setRtFilterGenre] = useState('')
-  const [wlFilterYear, setWlFilterYear] = useState('')
-  const [rtFilterYear, setRtFilterYear] = useState('')
+  const [wlFilterTypes, setWlFilterTypes] = useState<string[]>([])
+  const [rtFilterTypes, setRtFilterTypes] = useState<string[]>([])
+  const [wlFilterGenres, setWlFilterGenres] = useState<string[]>([])
+  const [rtFilterGenres, setRtFilterGenres] = useState<string[]>([])
+  const [wlFilterYears, setWlFilterYears] = useState<string[]>([])
+  const [rtFilterYears, setRtFilterYears] = useState<string[]>([])
+  const [wlFilterRatingStatuses, setWlFilterRatingStatuses] = useState<string[]>([])
+  const [rtFilterRatingStatuses, setRtFilterRatingStatuses] = useState<string[]>([])
   const [wlFilterRatingMin, setWlFilterRatingMin] = useState('')
   const [rtFilterRatingMin, setRtFilterRatingMin] = useState('')
   const [wlFilterRatingMax, setWlFilterRatingMax] = useState('')
@@ -303,6 +308,7 @@ export default function ArchivePage() {
   const [metaResults, setMetaResults] = useState<MetadataResult[]>([])
   const [metaLoading, setMetaLoading] = useState(false)
   const [metaError, setMetaError] = useState(false)
+  const [selectedMetaKeys, setSelectedMetaKeys] = useState<string[]>([])
   const metaInputRef = useRef<HTMLInputElement>(null)
   const MIN_SEARCH_CHARS = 2
 
@@ -327,13 +333,17 @@ const fetchWatchlist = useCallback(async (page: number, reset = false) => {
     // فلتر النوع يعمل بالتوازي مع فلتر السنة
     // المشكلة القديمة: لما نختار نوع كان يحذف excludeTypes
     // الحل: نرسل النوع كـ param منفصل والـ API يتعامل معهم معاً
-    if (wlType !== 'all') {
-      params.set('type', wlType)
+    const effectiveWlTypes = wlFilterTypes.length > 0 ? wlFilterTypes : (wlType !== 'all' ? [wlType] : [])
+    if (effectiveWlTypes.length === 1) {
+      params.set('type', effectiveWlTypes[0])
+    } else if (effectiveWlTypes.length > 1) {
+      params.set('types', effectiveWlTypes.join(','))
     }
     if (debouncedSearch) params.set('search', debouncedSearch)
     params.set('sortBy', wlSortBy)
-    if (wlFilterGenre) params.set('genre', wlFilterGenre)
-    if (wlFilterYear) params.set('year', wlFilterYear)
+    if (wlFilterGenres.length > 0) params.set('genres', wlFilterGenres.join(','))
+    if (wlFilterYears.length > 0) params.set('years', wlFilterYears.join(','))
+    if (wlFilterRatingStatuses.length > 0) params.set('ratingStatuses', wlFilterRatingStatuses.join(','))
     if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
     if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
     params.set('page', String(page))
@@ -376,20 +386,23 @@ const fetchWatchlist = useCallback(async (page: number, reset = false) => {
   } finally {
     setWlLoading(false)
   }
-}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
+}, [wlType, debouncedSearch, wlSortBy, wlFilterTypes, wlFilterGenres, wlFilterYears, wlFilterRatingStatuses, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
 const fetchRatings = useCallback(async (page: number, reset = false) => {
   if (page === 1) setRtLoading(true)
   try {
     const params = new URLSearchParams()
-    if (rtType !== 'all') params.set('type', rtType)
+    const effectiveRtTypes = rtFilterTypes.length > 0 ? rtFilterTypes : (rtType !== 'all' ? [rtType] : [])
+    if (effectiveRtTypes.length === 1) params.set('type', effectiveRtTypes[0])
+    if (effectiveRtTypes.length > 1) params.set('types', effectiveRtTypes.join(','))
     params.set('hasRating', 'true')
-    if (rtType === 'all') params.set('excludeTypes', 'book,game')
+    if (effectiveRtTypes.length === 0) params.set('excludeTypes', 'book,game')
     if (debouncedSearch) params.set('search', debouncedSearch)
     params.set('sortBy', rtSortBy)
-    if (rtFilterGenre) params.set('genre', rtFilterGenre)
-    if (rtFilterYear) params.set('year', rtFilterYear)
+    if (rtFilterGenres.length > 0) params.set('genres', rtFilterGenres.join(','))
+    if (rtFilterYears.length > 0) params.set('years', rtFilterYears.join(','))
+    if (rtFilterRatingStatuses.length > 0) params.set('ratingStatuses', rtFilterRatingStatuses.join(','))
     if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
     if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
     params.set('page', String(page))
@@ -420,7 +433,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   } finally {
     if (page === 1) setRtLoading(false)
   }
-}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])
+}, [rtType, debouncedSearch, rtSortBy, rtFilterTypes, rtFilterGenres, rtFilterYears, rtFilterRatingStatuses, rtFilterRatingMin, rtFilterRatingMax])
 
   // ==================== Fetch Stats ====================
   const fetchStats = useCallback(async () => {
@@ -447,31 +460,33 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   useEffect(() => {
     if (!isAuthChecked) return
     fetchWatchlist(1, true)
-  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
+  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterTypes, wlFilterGenres, wlFilterYears, wlFilterRatingStatuses, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
   // Fetch all available years & genres from database (exclude books & games for archive)
   useEffect(() => {
     if (!isAuthChecked) return
-    // For watchlist tab: use wlType to filter years by selected type
-    // For ratings tab: use rtType to filter years by selected type
-    const typeParam = mainTab === 'ratings' ? rtType : (wlType !== 'all' ? wlType : '')
+    const activeTypes = mainTab === 'ratings'
+      ? (rtFilterTypes.length > 0 ? rtFilterTypes : (rtType !== 'all' ? [rtType] : []))
+      : (wlFilterTypes.length > 0 ? wlFilterTypes : (wlType !== 'all' ? [wlType] : []))
     const hasRatingParam = mainTab === 'ratings' ? 'true' : 'false'
-    // Always exclude books & games from archive page filters
-    const excludeParam = mainTab === 'ratings' ? (rtType === 'all' || !typeParam ? '&excludeTypes=book,game' : '') : (wlType === 'all' ? '&excludeTypes=book,game' : '')
-    fetch(`/api/years?type=${typeParam}&hasRating=${hasRatingParam}${excludeParam}`)
+    const filterParams = new URLSearchParams({ hasRating: hasRatingParam })
+    if (activeTypes.length === 1) filterParams.set('type', activeTypes[0])
+    if (activeTypes.length > 1) filterParams.set('types', activeTypes.join(','))
+    if (activeTypes.length === 0) filterParams.set('excludeTypes', 'book,game')
+    fetch(`/api/years?${filterParams}`)
       .then(r => r.json())
       .then(data => { if (data.years) setDbYears(data.years) })
       .catch(() => {})
-    fetch(`/api/genres?type=${typeParam}&hasRating=${hasRatingParam}${excludeParam}`)
+    fetch(`/api/genres?${filterParams}`)
       .then(r => r.json())
       .then(data => { if (data.genres) setDbGenres(data.genres) })
       .catch(() => {})
-  }, [isAuthChecked, mainTab, wlType, rtType])
+  }, [isAuthChecked, mainTab, wlType, rtType, wlFilterTypes, rtFilterTypes])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'ratings') return
     fetchRatings(1, true)
-  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
+  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterTypes, rtFilterGenres, rtFilterYears, rtFilterRatingStatuses, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'stats') return
@@ -630,7 +645,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
       setRtType(itemType || 'movie')
       // If a genre was selected, set it as filter so the item is visible
       if (genres && genres.length > 0) {
-        setRtFilterGenre(genres[0])
+        setRtFilterGenres([genres[0]])
       }
       setMainTab('ratings')
       fetchWatchlist(1, true)
@@ -658,6 +673,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
       })
       const data = await res.json()
       setMetaResults(data.results || [])
+      setSelectedMetaKeys([])
     } catch {
       setMetaError(true)
       setMetaResults([])
@@ -681,6 +697,34 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     }, 600)
     return () => { if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current) }
   }, [metaQuery, searchMetadata, MIN_SEARCH_CHARS])
+
+  const selectedMetaResults = metaResults.filter((result) => selectedMetaKeys.includes(metadataResultKey(result)))
+
+  const toggleMetadataSelection = (result: MetadataResult) => {
+    const key = metadataResultKey(result)
+    setSelectedMetaKeys(prev => toggleSelection(prev, key))
+  }
+
+  const createSelectedMetadataItems = async () => {
+    if (selectedMetaResults.length === 0) {
+      await createItem()
+      return
+    }
+    setFormSubmitting(true)
+    try {
+      const { imported, duplicates, skipped } = await addMetadataResultsToWatchlist(selectedMetaResults, formData.type || 'movie')
+      toast.success(`تمت إضافة ${imported} عنصر (${duplicates} مكرر، ${skipped} غير صالح)`)
+      setShowAddForm(false)
+      resetForm()
+      setMainTab('watchlist')
+      fetchWatchlist(1, true)
+      fetchRatings(1, true)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة الجماعية')
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
 
   const selectMetadata = (result: MetadataResult) => {
     // IMPORTANT: Auto-set the type based on the actual search result type
@@ -718,6 +762,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
       runtime: result.runtime != null ? String(result.runtime) : prev.runtime,
     }))
     setMetaResults([])
+    setSelectedMetaKeys([])
     setMetaQuery('')
     if (!result.typeMismatch) {
       toast.success('تم استيراد البيانات')
@@ -749,6 +794,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
       userRating: '', rewatch: 'false', runtime: '', ratingStatus: 'watched',
     })
     setMetaResults([])
+    setSelectedMetaKeys([])
     setMetaQuery('')
     setMetaError(false)
   }
@@ -822,15 +868,49 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
 
   // ==================== Unique genres/years from database ====================
 
-  // ==================== Watchlist Sort & Filter Content (shared between Drawer/Popover) ====================
-  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
+  // ==================== Smart Sort & Filter Content ====================
+  const mediaTypeFilterOptions = Object.entries(TYPE_CONFIG).filter(([key]) => key !== 'all')
+
+  const handleWlTypeFilterToggle = (type: string) => {
+    const next = toggleSelection(wlFilterTypes, type)
+    setWlFilterTypes(next)
+    setWlType(next.length === 1 ? next[0] : 'all')
+  }
+
+  const handleRtTypeFilterToggle = (type: string) => {
+    const next = toggleSelection(rtFilterTypes, type)
+    setRtFilterTypes(next)
+    setRtType(next.length === 1 ? next[0] : 'all')
+  }
+
+  const wlActiveFilterCount = wlFilterTypes.length + wlFilterGenres.length + wlFilterYears.length + wlFilterRatingStatuses.length + [wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
+  const rtActiveFilterCount = rtFilterTypes.length + rtFilterGenres.length + rtFilterYears.length + rtFilterRatingStatuses.length + [rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length
+
+  const clearWlFilters = () => {
+    setWlFilterTypes([])
+    setWlFilterGenres([])
+    setWlFilterYears([])
+    setWlFilterRatingStatuses([])
+    setWlFilterRatingMin('')
+    setWlFilterRatingMax('')
+    setWlType('all')
+  }
+
+  const clearRtFilters = () => {
+    setRtFilterTypes([])
+    setRtFilterGenres([])
+    setRtFilterYears([])
+    setRtFilterRatingStatuses([])
+    setRtFilterRatingMin('')
+    setRtFilterRatingMax('')
+    setRtType('all')
+  }
 
   const wlSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
-      {/* Sort Section */}
       <div>
-        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب</h4>
-        <div className="grid grid-cols-2 gap-1.5">
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب ذكي</h4>
+        <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
           {WL_SORT_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -847,15 +927,43 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         </div>
       </div>
 
-      {/* Year Filter */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">الأنواع</h4>
+        <div className="flex gap-1.5 flex-wrap">
+          <button
+            onClick={() => { setWlFilterTypes([]); setWlType('all') }}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              wlFilterTypes.length === 0
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            الكل
+          </button>
+          {mediaTypeFilterOptions.map(([key, conf]) => (
+            <button
+              key={key}
+              onClick={() => handleWlTypeFilterToggle(key)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                wlFilterTypes.includes(key)
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {conf.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {dbYears.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنوات - اختيار متعدد</h4>
           <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
             <button
-              onClick={() => setWlFilterYear('')}
+              onClick={() => setWlFilterYears([])}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                !wlFilterYear
+                wlFilterYears.length === 0
                   ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
                   : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
               }`}
@@ -865,9 +973,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             {dbYears.map(y => (
               <button
                 key={y}
-                onClick={() => setWlFilterYear(y === wlFilterYear ? '' : y)}
+                onClick={() => setWlFilterYears(prev => toggleSelection(prev, y))}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  y === wlFilterYear
+                  wlFilterYears.includes(y)
                     ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
                     : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
                 }`}
@@ -879,23 +987,62 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         </div>
       )}
 
-      {/* Genre Filter */}
       <div>
-        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيف</h4>
-        <Select value={wlFilterGenre || '__all__'} onValueChange={v => setWlFilterGenre(v === '__all__' ? '' : v)}>
-          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
-            <SelectValue placeholder="كل التصنيفات" />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-            <SelectItem value="__all__">كل التصنيفات</SelectItem>
-            {dbGenres.map(g => (
-              <SelectItem key={g} value={g}>{g}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيفات - اختيار متعدد</h4>
+        <div className="flex gap-1.5 flex-wrap max-h-40 overflow-y-auto">
+          <button
+            onClick={() => setWlFilterGenres([])}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              wlFilterGenres.length === 0
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            الكل
+          </button>
+          {dbGenres.map(g => (
+            <button
+              key={g}
+              onClick={() => setWlFilterGenres(prev => toggleSelection(prev, g))}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                wlFilterGenres.includes(g)
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* View Mode */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">حالة التقييم</h4>
+        <div className="flex gap-1.5 flex-wrap">
+          {RATING_STATUSES.map(status => (
+            <button
+              key={status.value}
+              onClick={() => setWlFilterRatingStatuses(prev => toggleSelection(prev, status.value))}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                wlFilterRatingStatuses.includes(status.value)
+                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+              }`}
+            >
+              {status.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">نطاق تقييمي</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <Input value={wlFilterRatingMin} onChange={e => setWlFilterRatingMin(e.target.value)} placeholder="من" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
+          <Input value={wlFilterRatingMax} onChange={e => setWlFilterRatingMax(e.target.value)} placeholder="إلى" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
+        </div>
+      </div>
+
       <div>
         <h4 className="text-xs font-bold text-[#d4af37] mb-2">طريقة العرض</h4>
         <div className="flex gap-1.5">
@@ -924,14 +1071,8 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         </div>
       </div>
 
-      {/* Clear All */}
       {wlActiveFilterCount > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
-          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
-        >
+        <Button variant="ghost" size="sm" onClick={clearWlFilters} className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20">
           <X className="w-3.5 h-3.5 ml-1" />
           مسح الفلاتر ({wlActiveFilterCount})
         </Button>
@@ -939,87 +1080,70 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     </div>
   )
 
-  // ==================== Ratings Sort & Filter Content (shared between Drawer/Popover) ====================
-  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length
-
   const rtSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
-      {/* Sort Section */}
       <div>
-        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب</h4>
-        <div className="grid grid-cols-2 gap-1.5">
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">ترتيب ذكي</h4>
+        <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
           {RT_SORT_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setRtSortBy(opt.value)}
-              className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-colors active:scale-[0.97] ${
-                rtSortBy === opt.value
-                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                  : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:text-[#ccc]'
-              }`}
-            >
+            <button key={opt.value} onClick={() => setRtSortBy(opt.value)} className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-colors active:scale-[0.97] ${rtSortBy === opt.value ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:text-[#ccc]'}`}>
               {opt.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Year Filter */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">الأنواع</h4>
+        <div className="flex gap-1.5 flex-wrap">
+          <button onClick={() => { setRtFilterTypes([]); setRtType('all') }} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterTypes.length === 0 ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>الكل</button>
+          {mediaTypeFilterOptions.map(([key, conf]) => (
+            <button key={key} onClick={() => handleRtTypeFilterToggle(key)} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterTypes.includes(key) ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>{conf.label}</button>
+          ))}
+        </div>
+      </div>
+
       {dbYears.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنة</h4>
+          <h4 className="text-xs font-bold text-[#d4af37] mb-2">السنوات - اختيار متعدد</h4>
           <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
-            <button
-              onClick={() => setRtFilterYear('')}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                !rtFilterYear
-                  ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-              }`}
-            >
-              الكل
-            </button>
+            <button onClick={() => setRtFilterYears([])} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterYears.length === 0 ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>الكل</button>
             {dbYears.map(y => (
-              <button
-                key={y}
-                onClick={() => setRtFilterYear(y === rtFilterYear ? '' : y)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  y === rtFilterYear
-                    ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
-                    : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-                }`}
-              >
-                {y}
-              </button>
+              <button key={y} onClick={() => setRtFilterYears(prev => toggleSelection(prev, y))} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterYears.includes(y) ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>{y}</button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Genre Filter */}
       <div>
-        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيف</h4>
-        <Select value={rtFilterGenre || '__all__'} onValueChange={v => setRtFilterGenre(v === '__all__' ? '' : v)}>
-          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
-            <SelectValue placeholder="كل التصنيفات" />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
-            <SelectItem value="__all__">كل التصنيفات</SelectItem>
-            {dbGenres.map(g => (
-              <SelectItem key={g} value={g}>{g}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">التصنيفات - اختيار متعدد</h4>
+        <div className="flex gap-1.5 flex-wrap max-h-40 overflow-y-auto">
+          <button onClick={() => setRtFilterGenres([])} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterGenres.length === 0 ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>الكل</button>
+          {dbGenres.map(g => (
+            <button key={g} onClick={() => setRtFilterGenres(prev => toggleSelection(prev, g))} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterGenres.includes(g) ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>{g}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Clear All */}
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">حالة التقييم</h4>
+        <div className="flex gap-1.5 flex-wrap">
+          {RATING_STATUSES.map(status => (
+            <button key={status.value} onClick={() => setRtFilterRatingStatuses(prev => toggleSelection(prev, status.value))} className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${rtFilterRatingStatuses.includes(status.value) ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'}`}>{status.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-xs font-bold text-[#d4af37] mb-2">نطاق تقييمي</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <Input value={rtFilterRatingMin} onChange={e => setRtFilterRatingMin(e.target.value)} placeholder="من" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
+          <Input value={rtFilterRatingMax} onChange={e => setRtFilterRatingMax(e.target.value)} placeholder="إلى" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
+        </div>
+      </div>
+
       {rtActiveFilterCount > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
-          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
-        >
+        <Button variant="ghost" size="sm" onClick={clearRtFilters} className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20">
           <X className="w-3.5 h-3.5 ml-1" />
           مسح الفلاتر ({rtActiveFilterCount})
         </Button>
@@ -1249,53 +1373,70 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         )}
         {/* Search results */}
         {metaResults.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
-            {metaResults.map((result, idx) => {
-              const normalizedResultType = result.type === 'tv' ? 'series' : (result.type || 'movie')
-              const rTypeConf = TYPE_CONFIG[normalizedResultType] || TYPE_CONFIG.movie
-              const RTypeIcon = rTypeConf.icon
-              const isMismatch = result.typeMismatch
-              return (
-              <button
-                key={idx}
-                onClick={() => selectMetadata(result)}
-                className={`flex items-center gap-3 p-2.5 rounded-xl bg-[#1a1a1a] border hover:bg-[#1a1a1a]/80 transition-all text-right active:scale-[0.98] ${
-                  isMismatch ? 'border-orange-500/40 hover:border-orange-400/60' : 'border-[#2a2a2a] hover:border-[#d4af37]/50'
-                }`}
-              >
-                {result.poster ? (
-                  <img src={result.poster} alt="" className="w-11 h-16 rounded-lg object-cover shrink-0 shadow-md" />
-                ) : (
-                  <div className="w-11 h-16 rounded-lg bg-[#2a2a2a] flex items-center justify-center shrink-0">
-                    <RTypeIcon className="w-4 h-4 text-[#555]" />
-                  </div>
+          <div className="space-y-2">
+            {!isEdit && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-[#d4af37]/20 bg-[#d4af37]/5 px-3 py-2 text-xs text-[#d4af37]">
+                <span>حدد أكثر من نتيجة ثم اضغط زر الإضافة لإضافتها دفعة واحدة.</span>
+                {selectedMetaResults.length > 0 && (
+                  <button type="button" onClick={() => setSelectedMetaKeys([])} className="text-red-300 hover:text-red-200">
+                    مسح التحديد ({selectedMetaResults.length})
+                  </button>
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-white truncate">{result.title}</div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0 rounded bg-gradient-to-l ${rTypeConf.color} text-black`}>
-                      <RTypeIcon className="w-2 h-2" />
-                      {rTypeConf.label}
-                    </span>
-                    <span className="text-xs text-[#888]">{result.year}</span>
-                    {/* Type mismatch warning badge */}
-                    {isMismatch && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
-                        ⚠️ نوع مختلف
-                      </span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
+              {metaResults.map((result, idx) => {
+                const normalizedResultType = result.type === 'tv' ? 'series' : (result.type || 'movie')
+                const rTypeConf = TYPE_CONFIG[normalizedResultType] || TYPE_CONFIG.movie
+                const RTypeIcon = rTypeConf.icon
+                const isMismatch = result.typeMismatch
+                const isSelected = selectedMetaKeys.includes(metadataResultKey(result))
+                return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl bg-[#1a1a1a] border hover:bg-[#1a1a1a]/80 transition-all text-right ${
+                    isSelected
+                      ? 'border-[#d4af37]/70 ring-1 ring-[#d4af37]/30'
+                      : isMismatch ? 'border-orange-500/40 hover:border-orange-400/60' : 'border-[#2a2a2a] hover:border-[#d4af37]/50'
+                  }`}
+                >
+                  {!isEdit && (
+                    <button
+                      type="button"
+                      onClick={() => toggleMetadataSelection(result)}
+                      className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-[#d4af37] border-[#d4af37] text-black' : 'border-[#444] text-[#777] hover:border-[#d4af37] hover:text-[#d4af37]'}`}
+                      title="تحديد للإضافة الجماعية"
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => selectMetadata(result)} className="flex items-center gap-3 min-w-0 flex-1 text-right active:scale-[0.98] transition-transform">
+                    {result.poster ? (
+                      <img src={result.poster} alt="" className="w-11 h-16 rounded-lg object-cover shrink-0 shadow-md" />
+                    ) : (
+                      <div className="w-11 h-16 rounded-lg bg-[#2a2a2a] flex items-center justify-center shrink-0">
+                        <RTypeIcon className="w-4 h-4 text-[#555]" />
+                      </div>
                     )}
-                    {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-white truncate">{result.title}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0 rounded bg-gradient-to-l ${rTypeConf.color} text-black`}>
+                          <RTypeIcon className="w-2 h-2" />
+                          {rTypeConf.label}
+                        </span>
+                        <span className="text-xs text-[#888]">{result.year}</span>
+                        {isMismatch && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">⚠️ نوع مختلف</span>}
+                        {result.rating && <span className="text-xs text-[#d4af37]">⭐ {result.rating}</span>}
+                      </div>
+                    </div>
+                  </button>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-[#d4af37]/10 flex items-center justify-center shrink-0">
-                  <Check className="w-3.5 h-3.5 text-[#d4af37]" />
-                </div>
-              </button>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        )}      </div>
 
       {/* Title - read-only, auto-filled from TMDB */}
       <div className="space-y-1.5">
@@ -1937,7 +2078,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
                 return (
                   <button
                     key={tab.key}
-                    onClick={() => setWlType(tab.key)}
+                    onClick={() => { setWlType(tab.key); setWlFilterTypes(tab.key === 'all' ? [] : [tab.key]) }}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shrink-0 ${
                       isActive
                         ? `bg-gradient-to-l ${tab.color} text-black shadow-lg`
@@ -1961,9 +2102,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             {dbYears.length > 0 && (
               <div className="hidden md:flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
                 <button
-                  onClick={() => setWlFilterYear('')}
+                  onClick={() => setWlFilterYears([])}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                    !wlFilterYear
+                    wlFilterYears.length === 0
                       ? 'bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black'
                       : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
                   }`}
@@ -1974,9 +2115,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
                 {dbYears.map(y => (
                   <button
                     key={y}
-                    onClick={() => setWlFilterYear(y === wlFilterYear ? '' : y)}
+                    onClick={() => setWlFilterYears(prev => toggleSelection(prev, y))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                      y === wlFilterYear
+                      wlFilterYears.includes(y)
                         ? 'bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black'
                         : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
                     }`}
@@ -2045,30 +2186,27 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             {/* Active filter badges */}
             {wlActiveFilterCount > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                {wlFilterYear && (
-                  <Badge
-                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                    onClick={() => setWlFilterYear('')}
-                  >
+                {wlFilterTypes.map(type => (
+                  <Badge key={`type-${type}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => handleWlTypeFilterToggle(type)}>
+                    {TYPE_CONFIG[type]?.label || type}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                ))}
+                {wlFilterYears.map(year => (
+                  <Badge key={`year-${year}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => setWlFilterYears(prev => prev.filter(y => y !== year))}>
                     <CalendarDays className="w-3 h-3" />
-                    {wlFilterYear}
+                    {year}
                     <X className="w-3 h-3" />
                   </Badge>
-                )}
-                {wlFilterGenre && (
-                  <Badge
-                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                    onClick={() => setWlFilterGenre('')}
-                  >
-                    {wlFilterGenre}
+                ))}
+                {wlFilterGenres.map(genre => (
+                  <Badge key={`genre-${genre}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => setWlFilterGenres(prev => prev.filter(g => g !== genre))}>
+                    {genre}
                     <X className="w-3 h-3" />
                   </Badge>
-                )}
+                ))}
                 {isMobile && wlActiveFilterCount > 1 && (
-                  <button
-                    onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
-                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
-                  >
+                  <button onClick={clearWlFilters} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">
                     مسح الكل
                   </button>
                 )}
@@ -2169,7 +2307,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
                 return (
                   <button
                     key={type}
-                    onClick={() => setRtType(type)}
+                    onClick={() => { setRtType(type); setRtFilterTypes([type]) }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                       rtType === type
                         ? `bg-gradient-to-l ${conf.color} text-black`
@@ -2188,9 +2326,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             {dbYears.length > 0 && (
               <div className="hidden md:flex items-center gap-1.5 flex-nowrap overflow-x-auto mobile-tabs-scroll pb-1">
                 <button
-                  onClick={() => setRtFilterYear('')}
+                  onClick={() => setRtFilterYears([])}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                    !rtFilterYear
+                    rtFilterYears.length === 0
                       ? 'bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black'
                       : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
                   }`}
@@ -2201,9 +2339,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
                 {dbYears.map(y => (
                   <button
                     key={y}
-                    onClick={() => setRtFilterYear(y === rtFilterYear ? '' : y)}
+                    onClick={() => setRtFilterYears(prev => toggleSelection(prev, y))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                      y === rtFilterYear
+                      rtFilterYears.includes(y)
                         ? 'bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black'
                         : 'bg-[#1a1a1a] text-[#888] border border-[#2a2a2a] hover:border-[#d4af37]/30'
                     }`}
@@ -2273,30 +2411,27 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
             {/* Active filter badges */}
             {rtActiveFilterCount > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                {rtFilterYear && (
-                  <Badge
-                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                    onClick={() => setRtFilterYear('')}
-                  >
+                {rtFilterTypes.map(type => (
+                  <Badge key={`rt-type-${type}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => handleRtTypeFilterToggle(type)}>
+                    {TYPE_CONFIG[type]?.label || type}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                ))}
+                {rtFilterYears.map(year => (
+                  <Badge key={`rt-year-${year}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => setRtFilterYears(prev => prev.filter(y => y !== year))}>
                     <CalendarDays className="w-3 h-3" />
-                    {rtFilterYear}
+                    {year}
                     <X className="w-3 h-3" />
                   </Badge>
-                )}
-                {rtFilterGenre && (
-                  <Badge
-                    className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1"
-                    onClick={() => setRtFilterGenre('')}
-                  >
-                    {rtFilterGenre}
+                ))}
+                {rtFilterGenres.map(genre => (
+                  <Badge key={`rt-genre-${genre}`} className="bg-[#d4af37]/15 text-[#d4af37] border-[#d4af37]/30 text-xs cursor-pointer hover:bg-[#d4af37]/25 gap-1" onClick={() => setRtFilterGenres(prev => prev.filter(g => g !== genre))}>
+                    {genre}
                     <X className="w-3 h-3" />
                   </Badge>
-                )}
+                ))}
                 {isMobile && rtActiveFilterCount > 1 && (
-                  <button
-                    onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
-                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
-                  >
+                  <button onClick={clearRtFilters} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">
                     مسح الكل
                   </button>
                 )}
@@ -2445,11 +2580,11 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         deviceType={deviceType}
         footerContent={
           <Button
-            onClick={createItem}
+            onClick={createSelectedMetadataItems}
             disabled={formSubmitting}
             className="w-full bg-gradient-to-l from-[#d4af37] to-[#b8960f] text-black font-bold h-12 text-base rounded-xl min-h-[44px]"
           >
-            {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'إضافة'}
+            {formSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : selectedMetaResults.length > 0 ? `إضافة المحدد (${selectedMetaResults.length})` : 'إضافة'}
           </Button>
         }
       >
