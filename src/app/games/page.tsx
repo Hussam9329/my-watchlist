@@ -22,9 +22,9 @@ import { MediaItem, MetadataResult } from '@/lib/types'
 import { normalizeGenres, normalizeTags } from '@/lib/format'
 import { compressImage } from '@/lib/image'
 import { getRatingColor } from '@/lib/rating'
-import { GAME_SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
-import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile, addMetadataResultsToWatchlist, metadataResultKey } from '@/lib/crud'
-import { sortMediaItems, itemMatchesTab, getPlatformBadge, filterMediaItems, toggleSelection } from '@/lib/sort'
+import { RT_SORT_OPTIONS, PLATFORM_OPTIONS } from '@/lib/constants'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { sortMediaItems, itemMatchesTab, getPlatformBadge } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 
 
@@ -207,11 +207,8 @@ export default function GamesPage() {
   const [sortBy, setSortBy] = useState('addedAt_desc')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showSortFilter, setShowSortFilter] = useState(false)
-  const [filterGenres, setFilterGenres] = useState<string[]>([])
-  const [filterYears, setFilterYears] = useState<string[]>([])
-  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([])
-  const [filterRatingMin, setFilterRatingMin] = useState('')
-  const [filterRatingMax, setFilterRatingMax] = useState('')
+  const [filterGenre, setFilterGenre] = useState('')
+  const [filterYear, setFilterYear] = useState('')
 
   // Modals
   const [showDetails, setShowDetails] = useState(false)
@@ -236,7 +233,6 @@ export default function GamesPage() {
   const [metaResults, setMetaResults] = useState<MetadataResult[]>([])
   const [metaLoading, setMetaLoading] = useState(false)
   const [metaError, setMetaError] = useState(false)
-  const [selectedMetaKeys, setSelectedMetaKeys] = useState<string[]>([])
   const metaInputRef = useRef<HTMLInputElement>(null)
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const MIN_SEARCH_CHARS = 2
@@ -262,10 +258,6 @@ export default function GamesPage() {
       params.set('page', String(pageNum))
       params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
-      if (filterGenres.length > 0) params.set('genres', filterGenres.join(','))
-      if (filterYears.length > 0) params.set('years', filterYears.join(','))
-      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
-      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
       if (reset || pageNum === 1) {
@@ -288,7 +280,7 @@ export default function GamesPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [debouncedSearch, sortBy, filterGenres, filterYears, filterRatingMin, filterRatingMax])
+  }, [debouncedSearch, sortBy])
 
   useEffect(() => {
     if (!isAuthChecked) return
@@ -383,7 +375,6 @@ export default function GamesPage() {
       })
       const data = await res.json()
       setMetaResults(data.results || [])
-      setSelectedMetaKeys([])
     } catch {
       setMetaError(true)
       setMetaResults([])
@@ -419,36 +410,9 @@ export default function GamesPage() {
       genres: result.genres && result.genres.length > 0 ? result.genres.join(', ') : prev.genres,
       author: result.platform || prev.author,
     }))
-    setSelectedMetaKeys([])
     setMetaResults([])
     setMetaQuery('')
     toast.success('تم استيراد البيانات')
-  }
-
-  const selectedMetaResults = metaResults.filter((result) => selectedMetaKeys.includes(metadataResultKey(result)))
-
-  const toggleMetadataSelection = (result: MetadataResult) => {
-    const key = metadataResultKey(result)
-    setSelectedMetaKeys(prev => toggleSelection(prev, key))
-  }
-
-  const createSelectedMetadataItems = async () => {
-    if (selectedMetaResults.length === 0) {
-      await createItem()
-      return
-    }
-    setFormSubmitting(true)
-    try {
-      const { imported, duplicates, skipped } = await addMetadataResultsToWatchlist(selectedMetaResults, 'game', 'game')
-      toast.success(`تمت إضافة ${imported} لعبة (${duplicates} مكرر، ${skipped} غير صالح)`)
-      setShowAddForm(false)
-      resetForm()
-      fetchGames(1, true)
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة الجماعية')
-    } finally {
-      setFormSubmitting(false)
-    }
   }
 
   // ==================== Image Upload ====================
@@ -475,7 +439,6 @@ export default function GamesPage() {
       userRating: '',
       rewatch: 'false', ratingStatus: 'watched',
     })
-    setSelectedMetaKeys([])
     setMetaResults([])
     setMetaQuery('')
     setMetaError(false)
@@ -504,14 +467,13 @@ export default function GamesPage() {
 
   // ==================== Sort & Filter ====================
   const processedItems = useMemo(() => {
-    return filterMediaItems(sortMediaItems(games, sortBy), {
-      filterGenres,
-      filterYears,
-      filterRatingMin,
-      filterRatingMax,
-    }).filter(item => itemMatchesTab(item, activeTab, TAB_CONFIG))
-      .filter(item => filterPlatforms.length === 0 || filterPlatforms.some(platform => itemMatchesTab(item, platform.toLowerCase(), TAB_CONFIG)))
-  }, [games, sortBy, filterGenres, filterYears, filterPlatforms, filterRatingMin, filterRatingMax, activeTab])
+    return sortMediaItems(games, sortBy).filter(item => {
+      if (!itemMatchesTab(item, activeTab, TAB_CONFIG)) return false
+      if (filterGenre && !normalizeGenres(item.genres).some(g => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
+      if (filterYear && item.year !== filterYear) return false
+      return true
+    })
+  }, [games, sortBy, filterGenre, filterYear, activeTab])
 
   // ==================== Unique genres/years for filters ====================
   const allGenres = useMemo(() => {
@@ -528,15 +490,15 @@ export default function GamesPage() {
   }, [games])
 
   // ==================== Sort & Filter Content (shared between Drawer/Popover) ====================
-  const activeFilterCount = filterGenres.length + filterYears.length + filterPlatforms.length + [filterRatingMin, filterRatingMax].filter(Boolean).length
+  const activeFilterCount = [filterGenre, filterYear].filter(Boolean).length
 
   const sortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
       {/* Sort Section */}
       <div>
-        <h4 className="text-xs font-bold text-teal-400 mb-2">ترتيب ذكي</h4>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">ترتيب</h4>
         <div className="grid grid-cols-2 gap-1.5">
-          {GAME_SORT_OPTIONS.map(opt => (
+          {RT_SORT_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setSortBy(opt.value)}
@@ -552,17 +514,14 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {/* Year Filter as Multi Chips */}
+      {/* Year Filter as Chips */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-bold text-teal-400">السنوات</h4>
-          {filterYears.length > 0 && <button type="button" onClick={() => setFilterYears([])} className="text-[10px] text-red-400 hover:text-red-300">مسح</button>}
-        </div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">السنة</h4>
         <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
           <button
-            onClick={() => setFilterYears([])}
+            onClick={() => setFilterYear('')}
             className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filterYears.length === 0
+              !filterYear
                 ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
                 : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
             }`}
@@ -572,9 +531,9 @@ export default function GamesPage() {
           {allYears.map(y => (
             <button
               key={y}
-              onClick={() => setFilterYears(prev => toggleSelection(prev, y))}
+              onClick={() => setFilterYear(y)}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                filterYears.includes(y)
+                filterYear === y
                   ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
                   : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
               }`}
@@ -585,79 +544,20 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {/* Platform Filter */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-bold text-teal-400">المنصات - اختيار متعدد</h4>
-          {filterPlatforms.length > 0 && <button type="button" onClick={() => setFilterPlatforms([])} className="text-[10px] text-red-400 hover:text-red-300">مسح</button>}
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
-          <button
-            onClick={() => setFilterPlatforms([])}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filterPlatforms.length === 0
-                ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-            }`}
-          >
-            الكل
-          </button>
-          {PLATFORM_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setFilterPlatforms(prev => toggleSelection(prev, opt.value))}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                filterPlatforms.includes(opt.value)
-                  ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Genre Filter */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-bold text-teal-400">الأنواع/التصنيفات</h4>
-          {filterGenres.length > 0 && <button type="button" onClick={() => setFilterGenres([])} className="text-[10px] text-red-400 hover:text-red-300">مسح</button>}
-        </div>
-        <div className="flex gap-1.5 flex-wrap max-h-40 overflow-y-auto">
-          <button
-            onClick={() => setFilterGenres([])}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filterGenres.length === 0
-                ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-            }`}
-          >
-            الكل
-          </button>
-          {allGenres.map(g => (
-            <button
-              key={g}
-              onClick={() => setFilterGenres(prev => toggleSelection(prev, g))}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                filterGenres.includes(g)
-                  ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Rating range */}
-      <div>
-        <h4 className="text-xs font-bold text-teal-400 mb-2">نطاق تقييمي</h4>
-        <div className="grid grid-cols-2 gap-2">
-          <Input value={filterRatingMin} onChange={e => setFilterRatingMin(e.target.value)} placeholder="من" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
-          <Input value={filterRatingMax} onChange={e => setFilterRatingMax(e.target.value)} placeholder="إلى" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
-        </div>
+        <h4 className="text-xs font-bold text-teal-400 mb-2">التصنيف</h4>
+        <Select value={filterGenre || '__all__'} onValueChange={v => setFilterGenre(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
+            <SelectValue placeholder="كل التصنيفات" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectItem value="__all__">كل التصنيفات</SelectItem>
+            {allGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* View Mode */}
@@ -694,7 +594,7 @@ export default function GamesPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setFilterGenres([]); setFilterYears([]); setFilterPlatforms([]); setFilterRatingMin(''); setFilterRatingMax('') }}
+          onClick={() => { setFilterGenre(''); setFilterYear('') }}
           className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
@@ -810,7 +710,7 @@ export default function GamesPage() {
             {metaQuery && !metaLoading && (
               <button
                 type="button"
-                onClick={() => { setMetaQuery(''); setMetaResults([]); setSelectedMetaKeys([]); setMetaError(false); metaInputRef.current?.focus() }}
+                onClick={() => { setMetaQuery(''); setMetaResults([]); setMetaError(false); metaInputRef.current?.focus() }}
                 className="text-[#666] hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -862,47 +762,28 @@ export default function GamesPage() {
         {/* Search results */}
         {metaResults.length > 0 && (
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            <div className="flex items-center justify-between text-[10px] text-[#777] px-1">
-              <span>حدد أكثر من نتيجة للإضافة الجماعية أو اضغط على العنوان للتعبئة اليدوية.</span>
-              {selectedMetaResults.length > 0 && (
-                <button type="button" onClick={() => setSelectedMetaKeys([])} className="text-red-300 hover:text-red-200">مسح ({selectedMetaResults.length})</button>
-              )}
-            </div>
-            {metaResults.map((result, i) => {
-              const key = metadataResultKey(result)
-              const checked = selectedMetaKeys.includes(key)
-              return (
-                <div
-                  key={key || i}
-                  className={`w-full flex items-center gap-3 p-2 rounded-lg bg-[#111] border transition-colors text-right ${checked ? 'border-teal-500/70' : 'border-[#333] hover:border-teal-500/50'}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleMetadataSelection(result)}
-                    className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 ${checked ? 'bg-teal-500 border-teal-400 text-black' : 'border-[#444] text-[#666]'}`}
-                    title="تحديد للإضافة الجماعية"
-                  >
-                    {checked ? '✓' : ''}
-                  </button>
-                  <button type="button" onClick={() => selectMetadata(result)} className="flex flex-1 items-center gap-3 min-w-0 text-right active:scale-[0.97] transition-transform">
-                    {result.poster ? (
-                      <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
-                    ) : (
-                      <div className="w-10 h-14 rounded bg-[#2a2a2a] flex items-center justify-center shrink-0">
-                        <Gamepad2 className="w-4 h-4 text-[#555]" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-white truncate">{result.title}</div>
-                      <div className="text-xs text-[#888]">
-                        {result.platform && <span>{result.platform}</span>}
-                        {result.year && <span> • {result.year}</span>}
-                      </div>
-                    </div>
-                  </button>
+            {metaResults.map((result, i) => (
+              <button
+                key={i}
+                onClick={() => selectMetadata(result)}
+                className="w-full flex items-center gap-3 p-2 rounded-lg bg-[#111] border border-[#333] hover:border-teal-500/50 transition-colors active:scale-[0.97] text-right"
+              >
+                {result.poster ? (
+                  <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
+                ) : (
+                  <div className="w-10 h-14 rounded bg-[#2a2a2a] flex items-center justify-center shrink-0">
+                    <Gamepad2 className="w-4 h-4 text-[#555]" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-white truncate">{result.title}</div>
+                  <div className="text-xs text-[#888]">
+                    {result.platform && <span>{result.platform}</span>}
+                    {result.year && <span> • {result.year}</span>}
+                  </div>
                 </div>
-              )
-            })}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -1476,7 +1357,7 @@ export default function GamesPage() {
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{GAME_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                    <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                     {activeFilterCount > 0 && (
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-500 text-white text-[10px] font-bold shrink-0">{activeFilterCount}</span>
                     )}
@@ -1492,51 +1373,27 @@ export default function GamesPage() {
           {/* Active filter badges */}
           {activeFilterCount > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {filterYears.map(year => (
+              {filterYear && (
                 <Badge
-                  key={`year-${year}`}
                   className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
-                  onClick={() => setFilterYears(prev => prev.filter(y => y !== year))}
+                  onClick={() => setFilterYear('')}
                 >
-                  {year}
-                  <X className="w-3 h-3" />
-                </Badge>
-              ))}
-              {filterPlatforms.map(platform => (
-                <Badge
-                  key={`platform-${platform}`}
-                  className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
-                  onClick={() => setFilterPlatforms(prev => prev.filter(p => p !== platform))}
-                >
-                  {PLATFORM_OPTIONS.find(opt => opt.value === platform)?.label || platform}
-                  <X className="w-3 h-3" />
-                </Badge>
-              ))}
-              {filterGenres.map(genre => (
-                <Badge
-                  key={`genre-${genre}`}
-                  className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
-                  onClick={() => setFilterGenres(prev => prev.filter(g => g !== genre))}
-                >
-                  {genre}
-                  <X className="w-3 h-3" />
-                </Badge>
-              ))}
-              {filterRatingMin && (
-                <Badge className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1" onClick={() => setFilterRatingMin('')}>
-                  من {filterRatingMin}
+                  {filterYear}
                   <X className="w-3 h-3" />
                 </Badge>
               )}
-              {filterRatingMax && (
-                <Badge className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1" onClick={() => setFilterRatingMax('')}>
-                  إلى {filterRatingMax}
+              {filterGenre && (
+                <Badge
+                  className="bg-teal-500/15 text-teal-400 border-teal-500/30 text-xs cursor-pointer hover:bg-teal-500/25 gap-1"
+                  onClick={() => setFilterGenre('')}
+                >
+                  {filterGenre}
                   <X className="w-3 h-3" />
                 </Badge>
               )}
               {useDrawer && activeFilterCount > 1 && (
                 <button
-                  onClick={() => { setFilterGenres([]); setFilterYears([]); setFilterPlatforms([]); setFilterRatingMin(''); setFilterRatingMax('') }}
+                  onClick={() => { setFilterGenre(''); setFilterYear('') }}
                   className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
                 >
                   مسح الكل
@@ -1577,11 +1434,11 @@ export default function GamesPage() {
         ) : processedItems.length === 0 ? (
           <div className="text-center py-20">
             <Gamepad2 className="w-16 h-16 text-[#333] mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-[#666]">{debouncedSearch || activeFilterCount > 0 ? 'لا توجد نتائج' : 'لا توجد ألعاب'}</h3>
+            <h3 className="text-xl font-bold text-[#666]">لا توجد ألعاب</h3>
             <p className="text-sm text-[#555] mt-1">
-              {debouncedSearch || activeFilterCount > 0 ? 'جرّب تعديل البحث أو الفلاتر الذكية' : 'أضف ألعابك للعبها لاحقاً'}
+              {debouncedSearch ? 'لم يتم العثور على نتائج' : 'أضف ألعابك للعبها لاحقاً'}
             </p>
-            {!debouncedSearch && activeFilterCount === 0 && (
+            {!debouncedSearch && (
               <Button
                 onClick={openAddForm}
                 className="mt-4 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white active:scale-[0.97] transition-transform"
@@ -1639,16 +1496,16 @@ export default function GamesPage() {
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
-                onClick={createSelectedMetadataItems}
+                onClick={createItem}
                 disabled={formSubmitting}
                 className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-                {selectedMetaResults.length > 0 ? `إضافة المحدد (${selectedMetaResults.length})` : 'إضافة اللعبة'}
+                إضافة اللعبة
               </Button>
               <Button
                 variant="outline"
-                onClick={() => { setShowAddForm(false); resetForm() }}
+                onClick={() => setShowAddForm(false)}
                 className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
               >
                 <X className="w-4 h-4" />
@@ -1670,16 +1527,16 @@ export default function GamesPage() {
             </div>
             <div className="shrink-0 flex gap-2 pt-2">
               <Button
-                onClick={createSelectedMetadataItems}
+                onClick={createItem}
                 disabled={formSubmitting}
                 className="flex-1 bg-gradient-to-l from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-                {selectedMetaResults.length > 0 ? `إضافة المحدد (${selectedMetaResults.length})` : 'إضافة اللعبة'}
+                إضافة اللعبة
               </Button>
               <Button
                 variant="outline"
-                onClick={() => { setShowAddForm(false); resetForm() }}
+                onClick={() => setShowAddForm(false)}
                 className="border-[#333] text-[#999] hover:text-white min-h-[44px]"
               >
                 <X className="w-4 h-4" />

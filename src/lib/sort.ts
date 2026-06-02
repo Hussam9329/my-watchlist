@@ -1,36 +1,7 @@
 // ==================== Shared Sort & Filter Utilities ====================
 
 import { MediaItem } from './types'
-import { normalizeGenres, normalizeType } from './format'
-
-export interface SmartFilterOptions {
-  filterGenre?: string
-  filterGenres?: string[]
-  filterYear?: string
-  filterYears?: string[]
-  filterTypes?: string[]
-  filterRatingStatuses?: string[]
-  filterRatingMin?: string
-  filterRatingMax?: string
-}
-
-export function toSelectionList(value?: string | string[]): string[] {
-  if (!value) return []
-  if (Array.isArray(value)) return value.filter(Boolean)
-  return value.split(',').map((v) => v.trim()).filter(Boolean)
-}
-
-export function toggleSelection(current: string[], value: string): string[] {
-  return current.includes(value)
-    ? current.filter((item) => item !== value)
-    : [...current, value]
-}
-
-function parseNumeric(value: string | number | null | undefined, fallback = 0): number {
-  if (value == null || value === '') return fallback
-  const num = Number(value)
-  return Number.isFinite(num) ? num : fallback
-}
+import { normalizeGenres } from './format'
 
 /** Sort media items by a sort string like 'addedAt_desc' or 'userRating_asc' */
 export function sortMediaItems(items: MediaItem[], sortBy: string): MediaItem[] {
@@ -48,48 +19,22 @@ export function sortMediaItems(items: MediaItem[], sortBy: string): MediaItem[] 
         aVal = a.addedAt
         bVal = b.addedAt
         break
-      case 'updatedAt':
-        aVal = a.updatedAt
-        bVal = b.updatedAt
-        break
       case 'title':
         aVal = a.title
         bVal = b.title
         break
-      case 'originalTitle':
-        aVal = a.originalTitle || ''
-        bVal = b.originalTitle || ''
-        break
-      case 'author':
-        aVal = a.author || ''
-        bVal = b.author || ''
-        break
-      case 'status':
-        aVal = a.status || ''
-        bVal = b.status || ''
-        break
-      case 'ratingStatus':
-        aVal = a.ratingStatus || ''
-        bVal = b.ratingStatus || ''
-        break
       case 'year':
-        aVal = parseNumeric(a.year, 0)
-        bVal = parseNumeric(b.year, 0)
+        // Parse year as integer for numeric comparison (not alphabetical)
+        aVal = a.year ? parseInt(a.year, 10) || 0 : 0
+        bVal = b.year ? parseInt(b.year, 10) || 0 : 0
         break
       case 'userRating':
         aVal = a.userRating ?? -1
         bVal = b.userRating ?? -1
         break
       case 'rating':
-        aVal = parseNumeric(a.rating, -1)
-        bVal = parseNumeric(b.rating, -1)
-        break
-      case 'runtime':
-      case 'pages':
-      case 'episodes':
-      case 'seasons':
-        aVal = parseNumeric(a[field as keyof MediaItem] as string | number | null | undefined, -1)
-        bVal = parseNumeric(b[field as keyof MediaItem] as string | number | null | undefined, -1)
+        aVal = a.rating ? parseFloat(a.rating) : -1
+        bVal = b.rating ? parseFloat(b.rating) : -1
         break
       default:
         aVal = a.addedAt
@@ -107,35 +52,15 @@ export function sortMediaItems(items: MediaItem[], sortBy: string): MediaItem[] 
   return sorted
 }
 
-/** Filter media items by type, genres, years, status, and rating range. */
+/** Filter media items by genre and year */
 export function filterMediaItems(
   items: MediaItem[],
-  options: SmartFilterOptions,
+  options: { filterGenre?: string; filterYear?: string },
 ): MediaItem[] {
-  const genres = [
-    ...toSelectionList(options.filterGenre),
-    ...toSelectionList(options.filterGenres),
-  ]
-  const years = [
-    ...toSelectionList(options.filterYear),
-    ...toSelectionList(options.filterYears),
-  ]
-  const types = toSelectionList(options.filterTypes).map(normalizeType)
-  const ratingStatuses = toSelectionList(options.filterRatingStatuses)
-  const ratingMin = options.filterRatingMin ? Number(options.filterRatingMin) : null
-  const ratingMax = options.filterRatingMax ? Number(options.filterRatingMax) : null
-
+  const { filterGenre, filterYear } = options
   return items.filter((item) => {
-    if (types.length > 0 && !types.includes(normalizeType(item.type))) return false
-    if (genres.length > 0) {
-      const itemGenres = normalizeGenres(item.genres).map((g) => g.toLowerCase())
-      const hasGenre = genres.some((filterGenre) => itemGenres.some((g) => g.includes(filterGenre.toLowerCase())))
-      if (!hasGenre) return false
-    }
-    if (years.length > 0 && !years.includes(item.year)) return false
-    if (ratingStatuses.length > 0 && !ratingStatuses.includes(item.ratingStatus)) return false
-    if (ratingMin != null && Number.isFinite(ratingMin) && (item.userRating == null || item.userRating < ratingMin)) return false
-    if (ratingMax != null && Number.isFinite(ratingMax) && (item.userRating == null || item.userRating > ratingMax)) return false
+    if (filterGenre && !normalizeGenres(item.genres).some((g) => g.toLowerCase().includes(filterGenre.toLowerCase()))) return false
+    if (filterYear && item.year !== filterYear) return false
     return true
   })
 }

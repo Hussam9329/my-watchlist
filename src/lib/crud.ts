@@ -1,6 +1,6 @@
 // ==================== Shared CRUD Helpers ====================
 
-import { MediaItem, MetadataResult } from './types'
+import { MediaItem } from './types'
 import { normalizeType, parseOptionalInt, normalizeListField } from './format'
 
 /** Build request body for create/update operations from form data */
@@ -116,78 +116,6 @@ export async function importDataFromFile(
   if (!res.ok) {
     const errorData = await res.json().catch(() => null)
     throw new Error(errorData?.error || 'تعذر استيراد البيانات')
-  }
-
-  const data = await res.json()
-  return {
-    imported: Number(data.imported || 0),
-    duplicates: Number(data.duplicates || 0),
-    skipped: Number(data.skipped || 0),
-  }
-}
-
-
-
-/** Build a stable key for selecting multiple metadata search results. */
-export function metadataResultKey(result: MetadataResult): string {
-  return [result.type || result.mediaType || '', result.title || '', result.originalTitle || '', result.year || '']
-    .map((part) => String(part).trim().toLowerCase())
-    .join('|')
-}
-
-/** Convert a metadata search result into an import-compatible item payload. */
-export function metadataResultToImportItem(
-  result: MetadataResult,
-  fallbackType = 'movie',
-): Record<string, unknown> {
-  const resolvedType = normalizeType(result.type || result.mediaType || fallbackType)
-  return {
-    title: result.title || '',
-    originalTitle: result.originalTitle || null,
-    year: result.year || '',
-    type: resolvedType,
-    poster: result.poster || null,
-    rating: result.rating || null,
-    overview: result.overview || null,
-    genres: Array.isArray(result.genres) ? result.genres.join(', ') : '',
-    episodes: parseOptionalInt(result.episodes),
-    seasons: parseOptionalInt(result.seasons),
-    duration: result.duration || null,
-    status: result.status || null,
-    author: result.author || result.platform || null,
-    pages: parseOptionalInt(result.pages),
-    tags: '',
-    notes: '',
-    userRating: null,
-    rewatch: false,
-    runtime: parseOptionalInt(result.runtime),
-    ratingStatus: 'watched',
-  }
-}
-
-/** Add many metadata results at once using the bulk import endpoint. */
-export async function addMetadataResultsToWatchlist(
-  results: MetadataResult[],
-  fallbackType = 'movie',
-  forcedType?: string,
-): Promise<{ imported: number; duplicates: number; skipped: number }> {
-  const items = results
-    .map((result) => metadataResultToImportItem(result, fallbackType))
-    .filter((item) => String(item.title || '').trim())
-
-  if (items.length === 0) {
-    return { imported: 0, duplicates: 0, skipped: results.length }
-  }
-
-  const res = await fetch('/api/watchlist/import', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, type: forcedType }),
-  })
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null)
-    throw new Error(errorData?.error || 'تعذر إضافة العناصر المحددة')
   }
 
   const data = await res.json()

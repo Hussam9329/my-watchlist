@@ -22,9 +22,9 @@ import { MediaItem, MetadataResult } from '@/lib/types'
 import { compressImage } from '@/lib/image'
 import { getRatingColor, getRatingBg } from '@/lib/rating'
 import { normalizeGenres } from '@/lib/format'
-import { BOOK_SORT_OPTIONS } from '@/lib/constants'
-import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile, addMetadataResultsToWatchlist, metadataResultKey } from '@/lib/crud'
-import { sortMediaItems, filterMediaItems, toggleSelection } from '@/lib/sort'
+import { RT_SORT_OPTIONS } from '@/lib/constants'
+import { buildItemBody, itemToFormData, exportDataToFile, importDataFromFile } from '@/lib/crud'
+import { sortMediaItems, filterMediaItems } from '@/lib/sort'
 import { SkeletonGrid } from '@/components/shared/SkeletonGrid'
 
 
@@ -187,10 +187,8 @@ export default function BooksPage() {
   const [sortBy, setSortBy] = useState('addedAt_desc')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showSortFilter, setShowSortFilter] = useState(false)
-  const [filterGenres, setFilterGenres] = useState<string[]>([])
-  const [filterYears, setFilterYears] = useState<string[]>([])
-  const [filterRatingMin, setFilterRatingMin] = useState('')
-  const [filterRatingMax, setFilterRatingMax] = useState('')
+  const [filterGenre, setFilterGenre] = useState('')
+  const [filterYear, setFilterYear] = useState('')
 
   // Modals
   const [showDetails, setShowDetails] = useState(false)
@@ -215,7 +213,6 @@ export default function BooksPage() {
   const [metaResults, setMetaResults] = useState<MetadataResult[]>([])
   const [metaLoading, setMetaLoading] = useState(false)
   const [metaError, setMetaError] = useState(false)
-  const [selectedMetaKeys, setSelectedMetaKeys] = useState<string[]>([])
   const metaInputRef = useRef<HTMLInputElement>(null)
   const metaSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const MIN_SEARCH_CHARS = 2
@@ -241,10 +238,6 @@ export default function BooksPage() {
       params.set('page', String(pageNum))
       params.set('sortBy', sortBy)
       if (debouncedSearch) params.set('search', debouncedSearch)
-      if (filterGenres.length > 0) params.set('genres', filterGenres.join(','))
-      if (filterYears.length > 0) params.set('years', filterYears.join(','))
-      if (filterRatingMin) params.set('ratingMin', filterRatingMin)
-      if (filterRatingMax) params.set('ratingMax', filterRatingMax)
       const res = await fetch(`/api/watchlist?${params}`)
       const data = await res.json()
       if (reset || pageNum === 1) {
@@ -267,7 +260,7 @@ export default function BooksPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [debouncedSearch, sortBy, filterGenres, filterYears, filterRatingMin, filterRatingMax])
+  }, [debouncedSearch, sortBy])
 
   useEffect(() => {
     if (!isAuthChecked) return
@@ -366,7 +359,6 @@ export default function BooksPage() {
       })
       const data = await res.json()
       setMetaResults(data.results || [])
-      setSelectedMetaKeys([])
     } catch {
       setMetaError(true)
       setMetaResults([])
@@ -390,32 +382,6 @@ export default function BooksPage() {
     return () => { if (metaSearchTimerRef.current) clearTimeout(metaSearchTimerRef.current) }
   }, [metaQuery, searchMetadata, MIN_SEARCH_CHARS])
 
-  const selectedMetaResults = metaResults.filter((result) => selectedMetaKeys.includes(metadataResultKey(result)))
-
-  const toggleMetadataSelection = (result: MetadataResult) => {
-    const key = metadataResultKey(result)
-    setSelectedMetaKeys(prev => toggleSelection(prev, key))
-  }
-
-  const createSelectedMetadataItems = async () => {
-    if (selectedMetaResults.length === 0) {
-      await createItem()
-      return
-    }
-    setFormSubmitting(true)
-    try {
-      const { imported, duplicates, skipped } = await addMetadataResultsToWatchlist(selectedMetaResults, 'book', 'book')
-      toast.success(`تمت إضافة ${imported} كتاب (${duplicates} مكرر، ${skipped} غير صالح)`)
-      setShowAddForm(false)
-      resetForm()
-      fetchBooks(1, true)
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'خطأ في الإضافة الجماعية')
-    } finally {
-      setFormSubmitting(false)
-    }
-  }
-
   const selectMetadata = (result: MetadataResult) => {
     setFormData(prev => ({
       ...prev,
@@ -430,7 +396,6 @@ export default function BooksPage() {
       pages: result.pages != null ? String(result.pages) : prev.pages,
     }))
     setMetaResults([])
-    setSelectedMetaKeys([])
     setMetaQuery('')
     toast.success('تم استيراد البيانات')
   }
@@ -460,7 +425,6 @@ export default function BooksPage() {
       rewatch: 'false', ratingStatus: 'watched',
     })
     setMetaResults([])
-    setSelectedMetaKeys([])
     setMetaQuery('')
     setMetaError(false)
   }
@@ -488,8 +452,8 @@ export default function BooksPage() {
 
   // ==================== Sort & Filter ====================
   const processedItems = useMemo(() => {
-    return filterMediaItems(sortMediaItems(books, sortBy), { filterGenres, filterYears, filterRatingMin, filterRatingMax })
-  }, [books, sortBy, filterGenres, filterYears, filterRatingMin, filterRatingMax])
+    return filterMediaItems(sortMediaItems(books, sortBy), { filterGenre, filterYear })
+  }, [books, sortBy, filterGenre, filterYear])
 
   // ==================== Unique genres/years for filters ====================
   const allGenres = useMemo(() => {
@@ -511,20 +475,15 @@ export default function BooksPage() {
   }, [books])
 
   // ==================== Sort & Filter Content (shared between Drawer/Popover) ====================
-  const activeFilterCount = filterGenres.length + filterYears.length + [filterRatingMin, filterRatingMax].filter(Boolean).length
-  const clearFilters = () => {
-    setFilterGenres([])
-    setFilterYears([])
-    setFilterRatingMin('')
-    setFilterRatingMax('')
-  }
+  const activeFilterCount = [filterGenre, filterYear].filter(Boolean).length
 
   const sortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
+      {/* Sort Section */}
       <div>
-        <h4 className="text-xs font-bold text-emerald-400 mb-2">ترتيب ذكي</h4>
-        <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
-          {BOOK_SORT_OPTIONS.map(opt => (
+        <h4 className="text-xs font-bold text-emerald-400 mb-2">ترتيب</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {RT_SORT_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setSortBy(opt.value)}
@@ -540,13 +499,14 @@ export default function BooksPage() {
         </div>
       </div>
 
+      {/* Year Filter as Chips */}
       <div>
-        <h4 className="text-xs font-bold text-emerald-400 mb-2">السنوات - اختيار متعدد</h4>
+        <h4 className="text-xs font-bold text-emerald-400 mb-2">السنة</h4>
         <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
           <button
-            onClick={() => setFilterYears([])}
+            onClick={() => setFilterYear('')}
             className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filterYears.length === 0
+              !filterYear
                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                 : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
             }`}
@@ -556,9 +516,9 @@ export default function BooksPage() {
           {allYears.map(y => (
             <button
               key={y}
-              onClick={() => setFilterYears(prev => toggleSelection(prev, y))}
+              onClick={() => setFilterYear(y)}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                filterYears.includes(y)
+                filterYear === y
                   ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                   : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
               }`}
@@ -569,59 +529,59 @@ export default function BooksPage() {
         </div>
       </div>
 
+      {/* Genre Filter */}
       <div>
-        <h4 className="text-xs font-bold text-emerald-400 mb-2">التصنيفات - اختيار متعدد</h4>
-        <div className="flex gap-1.5 flex-wrap max-h-40 overflow-y-auto">
-          <button
-            onClick={() => setFilterGenres([])}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filterGenres.length === 0
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-            }`}
-          >
-            الكل
-          </button>
-          {allGenres.map(g => (
-            <button
-              key={g}
-              onClick={() => setFilterGenres(prev => toggleSelection(prev, g))}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                filterGenres.includes(g)
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
+        <h4 className="text-xs font-bold text-emerald-400 mb-2">التصنيف</h4>
+        <Select value={filterGenre || '__all__'} onValueChange={v => setFilterGenre(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10">
+            <SelectValue placeholder="كل التصنيفات" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            <SelectItem value="__all__">كل التصنيفات</SelectItem>
+            {allGenres.map(g => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div>
-        <h4 className="text-xs font-bold text-emerald-400 mb-2">نطاق تقييمي</h4>
-        <div className="grid grid-cols-2 gap-2">
-          <Input value={filterRatingMin} onChange={e => setFilterRatingMin(e.target.value)} placeholder="من" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
-          <Input value={filterRatingMax} onChange={e => setFilterRatingMax(e.target.value)} placeholder="إلى" inputMode="decimal" className="bg-[#0a0a0a] border-[#2a2a2a] text-xs h-10" />
-        </div>
-      </div>
-
+      {/* View Mode */}
       <div>
         <h4 className="text-xs font-bold text-emerald-400 mb-2">طريقة العرض</h4>
         <div className="flex gap-1.5">
-          <button onClick={() => setViewMode('grid')} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'grid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'}`}>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
             <Grid3X3 className="w-3.5 h-3.5" />
             شبكة
           </button>
-          <button onClick={() => setViewMode('list')} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'list' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'}`}>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-[#0a0a0a] text-[#999] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
             <List className="w-3.5 h-3.5" />
             قائمة
           </button>
         </div>
       </div>
 
+      {/* Clear All */}
       {activeFilterCount > 0 && (
-        <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => { setFilterGenre(''); setFilterYear('') }}
+          className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
+        >
           <X className="w-3.5 h-3.5 ml-1" />
           مسح الفلاتر ({activeFilterCount})
         </Button>
@@ -718,7 +678,7 @@ export default function BooksPage() {
             {metaQuery && !metaLoading && (
               <button
                 type="button"
-                onClick={() => { setMetaQuery(''); setMetaResults([]); setSelectedMetaKeys([]); setMetaError(false); metaInputRef.current?.focus() }}
+                onClick={() => { setMetaQuery(''); setMetaResults([]); setMetaError(false); metaInputRef.current?.focus() }}
                 className="text-[#666] hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -769,38 +729,28 @@ export default function BooksPage() {
         )}
         {/* Search results */}
         {metaResults.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-300">
-              <span>يمكنك تحديد أكثر من كتاب لإضافتها دفعة واحدة.</span>
-              {selectedMetaResults.length > 0 && (
-                <button type="button" onClick={() => setSelectedMetaKeys([])} className="text-red-300 hover:text-red-200">مسح ({selectedMetaResults.length})</button>
-              )}
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {metaResults.map((result, i) => {
-                const isSelected = selectedMetaKeys.includes(metadataResultKey(result))
-                return (
-                <div key={i} className={`w-full flex items-center gap-3 p-2 rounded-lg bg-[#111] border transition-colors text-right ${isSelected ? 'border-emerald-500/70 ring-1 ring-emerald-500/30' : 'border-[#333] hover:border-emerald-500/50'}`}>
-                  <button type="button" onClick={() => toggleMetadataSelection(result)} className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[#444] text-[#777] hover:border-emerald-500 hover:text-emerald-400'}`} title="تحديد للإضافة الجماعية">
-                    {isSelected && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                  <button type="button" onClick={() => selectMetadata(result)} className="flex items-center gap-3 min-w-0 flex-1 text-right active:scale-[0.97] transition-transform">
-                    {result.poster ? (
-                      <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
-                    ) : (
-                      <div className="w-10 h-14 rounded bg-[#2a2a2a] flex items-center justify-center shrink-0">
-                        <BookOpen className="w-4 h-4 text-[#555]" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-white truncate">{result.title}</div>
-                      <div className="text-xs text-[#888]">{result.author} {result.year && `• ${result.year}`}</div>
-                    </div>
-                  </button>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {metaResults.map((result, i) => (
+              <button
+                key={i}
+                onClick={() => selectMetadata(result)}
+                className="w-full flex items-center gap-3 p-2 rounded-lg bg-[#111] border border-[#333] hover:border-emerald-500/50 transition-colors active:scale-[0.97] text-right"
+              >
+                {result.poster ? (
+                  <img src={result.poster} alt="" className="w-10 h-14 rounded object-cover shrink-0" />
+                ) : (
+                  <div className="w-10 h-14 rounded bg-[#2a2a2a] flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4 text-[#555]" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-white truncate">{result.title}</div>
+                  <div className="text-xs text-[#888]">
+                    {result.author} {result.year && `• ${result.year}`}
+                  </div>
                 </div>
-                )
-              })}
-            </div>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -1262,7 +1212,7 @@ export default function BooksPage() {
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{BOOK_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
+                    <span>{RT_SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'ترتيب'}</span>
                     {activeFilterCount > 0 && (
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold shrink-0">{activeFilterCount}</span>
                     )}
@@ -1278,20 +1228,29 @@ export default function BooksPage() {
           {/* Active filter badges */}
           {activeFilterCount > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {filterYears.map(year => (
-                <Badge key={`year-${year}`} className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-xs cursor-pointer hover:bg-emerald-500/25 gap-1" onClick={() => setFilterYears(prev => prev.filter(y => y !== year))}>
-                  {year}
+              {filterYear && (
+                <Badge
+                  className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-xs cursor-pointer hover:bg-emerald-500/25 gap-1"
+                  onClick={() => setFilterYear('')}
+                >
+                  {filterYear}
                   <X className="w-3 h-3" />
                 </Badge>
-              ))}
-              {filterGenres.map(genre => (
-                <Badge key={`genre-${genre}`} className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-xs cursor-pointer hover:bg-emerald-500/25 gap-1" onClick={() => setFilterGenres(prev => prev.filter(g => g !== genre))}>
-                  {genre}
+              )}
+              {filterGenre && (
+                <Badge
+                  className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-xs cursor-pointer hover:bg-emerald-500/25 gap-1"
+                  onClick={() => setFilterGenre('')}
+                >
+                  {filterGenre}
                   <X className="w-3 h-3" />
                 </Badge>
-              ))}
+              )}
               {useDrawer && activeFilterCount > 1 && (
-                <button onClick={clearFilters} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">
+                <button
+                  onClick={() => { setFilterGenre(''); setFilterYear('') }}
+                  className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                >
                   مسح الكل
                 </button>
               )}
@@ -1330,14 +1289,14 @@ export default function BooksPage() {
           <div className="text-center py-20">
             <BookOpen className="w-16 h-16 text-[#333] mx-auto mb-4" />
             <h3 className="text-xl font-bold text-[#555] mb-2">
-              {debouncedSearch || activeFilterCount > 0 ? 'لا توجد نتائج' : 'لا توجد كتب'}
+              {debouncedSearch || filterGenre || filterYear ? 'لا توجد نتائج' : 'لا توجد كتب'}
             </h3>
             <p className="text-sm text-[#444] mb-6">
-              {debouncedSearch || activeFilterCount > 0
+              {debouncedSearch || filterGenre || filterYear
                 ? 'جرّب تعديل معايير البحث أو الفلترة'
                 : 'ابدأ بإضافة الكتب التي تريد قراءتها'}
             </p>
-            {!debouncedSearch && activeFilterCount === 0 && (
+            {!debouncedSearch && !filterGenre && !filterYear && (
               <Button
                 onClick={openAddForm}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -1428,12 +1387,12 @@ export default function BooksPage() {
             </div>
             <DrawerFooter className="border-t border-[#2a2a2a] shrink-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
               <Button
-                onClick={createSelectedMetadataItems}
+                onClick={createItem}
                 disabled={formSubmitting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white w-full min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}
-                {selectedMetaResults.length > 0 ? `إضافة المحدد (${selectedMetaResults.length})` : 'إضافة الكتاب'}
+                إضافة الكتاب
               </Button>
               <Button
                 variant="outline"
@@ -1456,12 +1415,12 @@ export default function BooksPage() {
             </div>
             <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-[#2a2a2a]">
               <Button
-                onClick={createSelectedMetadataItems}
+                onClick={createItem}
                 disabled={formSubmitting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 min-h-[44px]"
               >
                 {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}
-                {selectedMetaResults.length > 0 ? `إضافة المحدد (${selectedMetaResults.length})` : 'إضافة الكتاب'}
+                إضافة الكتاب
               </Button>
               <Button
                 variant="outline"
