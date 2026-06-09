@@ -1,0 +1,75 @@
+name: Fix filter input focus runner
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'trigger-filter-focus.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-filter-input-focus:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stabilize filter input components
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const path = 'src/app/archive/page.tsx'
+          let content = fs.readFileSync(path, 'utf8')
+
+          function replaceOnce(from, to, label) {
+            if (content.includes(to)) {
+              console.log(`skip ${label}: already applied`)
+              return
+            }
+            if (!content.includes(from)) {
+              throw new Error(`Missing expected block for ${label}`)
+            }
+            content = content.replace(from, to)
+            console.log(`applied ${label}`)
+          }
+
+          replaceOnce(
+            `  const RatingRangeFilter = ({`,
+            `  const RatingRangeFilter = useCallback(({`,
+            'wrap RatingRangeFilter with useCallback'
+          )
+
+          replaceOnce(
+            `  )\n\n  const YearRangeFilter = ({`,
+            `  ), [])\n\n  const YearRangeFilter = useCallback(({`,
+            'close RatingRangeFilter useCallback and wrap YearRangeFilter'
+          )
+
+          replaceOnce(
+            `      </div>\n    </div>\n  )\n\n  const wlActiveFilterCount =`,
+            `      </div>\n    </div>\n  ), [])\n\n  const wlActiveFilterCount =`,
+            'close YearRangeFilter useCallback'
+          )
+
+          fs.writeFileSync(path, content)
+          NODE
+
+      - name: Commit focus fix and remove workflow
+        run: |
+          rm -f .github/workflows/fix-filter-input-focus-runner.yml trigger-filter-focus.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/archive/page.tsx .github/workflows/fix-filter-input-focus-runner.yml trigger-filter-focus.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Fix archive filter input focus"
+          git push
