@@ -879,7 +879,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     </div>
   )
 
-  const RatingRangeFilter = ({
+  const RatingRangeFilter = useCallback(({
     min,
     max,
     onMinChange,
@@ -919,9 +919,9 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         />
       </div>
     </div>
-  )
+  ), [])
 
-  const YearRangeFilter = ({
+  const YearRangeFilter = useCallback(({
     from,
     to,
     onFromChange,
@@ -957,7 +957,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         />
       </div>
     </div>
-  )
+  ), [])
 
   const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterYearFrom, wlFilterYearTo, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
 
