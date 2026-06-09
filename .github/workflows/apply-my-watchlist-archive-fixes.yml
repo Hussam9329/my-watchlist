@@ -1,0 +1,264 @@
+name: Apply my-watchlist archive fixes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/apply-my-watchlist-archive-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply requested code changes
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+
+          function read(path) {
+            return fs.readFileSync(path, 'utf8')
+          }
+
+          function write(path, content) {
+            fs.writeFileSync(path, content)
+          }
+
+          function replaceOnce(path, from, to, label) {
+            let content = read(path)
+            if (content.includes(to)) {
+              console.log(`skip ${label}: already applied`)
+              return
+            }
+            if (!content.includes(from)) {
+              throw new Error(`Missing expected block for ${label} in ${path}`)
+            }
+            write(path, content.replace(from, to))
+            console.log(`applied ${label}`)
+          }
+
+          // 1) Clear watch state when rating removed
+          const idRoute = 'src/app/api/watchlist/[id]/route.ts'
+          replaceOnce(
+            idRoute,
+            `])\n\nexport async function PUT`,
+            `])\n\nfunction clearWatchStateWhenRatingRemoved(data: Record<string, any>) {\n  if (!Object.prototype.hasOwnProperty.call(data, 'userRating') || data.userRating !== null) return\n\n  data.watched = false\n  data.watchedAt = null\n}\n\nexport async function PUT`,
+            'clearWatchStateWhenRatingRemoved helper'
+          )
+          replaceOnce(
+            idRoute,
+            `    if (data.ratingStatus !== undefined) data.ratingStatus = data.ratingStatus || 'watched'\n\n    const item = await prisma.mediaItem.update({`,
+            `    if (data.ratingStatus !== undefined) data.ratingStatus = data.ratingStatus || 'watched'\n\n    clearWatchStateWhenRatingRemoved(data)\n\n    const item = await prisma.mediaItem.update({`,
+            'PUT clear watch state call'
+          )
+          replaceOnce(
+            idRoute,
+            `    if (updateData.rating !== undefined) {\n      updateData.rating = updateData.rating ? String(updateData.rating) : null\n    }\n\n    const item = await prisma.mediaItem.update({`,
+            `    if (updateData.rating !== undefined) {\n      updateData.rating = updateData.rating ? String(updateData.rating) : null\n    }\n\n    clearWatchStateWhenRatingRemoved(updateData)\n\n    const item = await prisma.mediaItem.update({`,
+            'PATCH clear watch state call'
+          )
+
+          // 2) Ratings stats this_month based on watchedAt
+          const statsRoute = 'src/app/api/ratings-stats/route.ts'
+          replaceOnce(
+            statsRoute,
+            `      COUNT(*) FILTER (WHERE\n        EXTRACT(YEAR FROM "addedAt") = EXTRACT(YEAR FROM NOW()) AND\n        EXTRACT(MONTH FROM "addedAt") = EXTRACT(MONTH FROM NOW())\n      ) as this_month`,
+            `      COUNT(*) FILTER (WHERE\n        "watchedAt" IS NOT NULL AND\n        "watchedAt" != '' AND\n        "watchedAt" LIKE TO_CHAR(NOW(), 'YYYY-MM') || '%'\n      ) as this_month`,
+            'ratings this_month watchedAt'
+          )
+
+          // 3) Watchlist API filters
+          const watchlistRoute = 'src/app/api/watchlist/route.ts'
+          replaceOnce(
+            watchlistRoute,
+            `    const filterYear = searchParams.get('year')\n    const filterRatingMin = searchParams.get('ratingMin')\n    const filterRatingMax = searchParams.get('ratingMax')\n    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))`,
+            `    const filterYear = searchParams.get('year')\n    const filterRatingMin = searchParams.get('ratingMin')\n    const filterRatingMax = searchParams.get('ratingMax')\n    const firstLetter = searchParams.get('firstLetter')?.trim()\n    const ratingSource = searchParams.get('ratingSource') || (hasRating === 'true' ? 'userRating' : 'rating')\n    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))`,
+            'read firstLetter/ratingSource params'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `    if (search) {\n      where.OR = [\n        { title: { contains: search, mode: 'insensitive' } },\n        { originalTitle: { contains: search, mode: 'insensitive' } }\n      ]\n    }\n\n    if (filterYear) {`,
+            `    if (search) {\n      where.OR = [\n        { title: { contains: search, mode: 'insensitive' } },\n        { originalTitle: { contains: search, mode: 'insensitive' } }\n      ]\n    }\n\n    if (firstLetter) {\n      where.AND = [\n        ...(where.AND || []),\n        {\n          OR: [\n            { title: { startsWith: firstLetter, mode: 'insensitive' } },\n            { originalTitle: { startsWith: firstLetter, mode: 'insensitive' } },\n          ],\n        },\n      ]\n    }\n\n    if (filterYear) {`,
+            'prisma firstLetter filter'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `    if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {\n      const ratingFilter: any = {}\n      if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)\n      if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)\n      if (where.userRating && typeof where.userRating === 'object') {\n        where.userRating = { ...where.userRating, ...ratingFilter }\n      } else {\n        where.userRating = { not: null, ...ratingFilter }\n      }\n    }`,
+            `    const hasRatingRange = Boolean(filterRatingMin || filterRatingMax)\n    const usePublicRatingRange = hasRatingRange && ratingSource === 'rating'\n\n    if (hasRatingRange && ratingSource === 'userRating' && hasRating !== 'false') {\n      const ratingFilter: any = {}\n      if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)\n      if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)\n      if (where.userRating && typeof where.userRating === 'object') {\n        where.userRating = { ...where.userRating, ...ratingFilter }\n      } else {\n        where.userRating = { not: null, ...ratingFilter }\n      }\n    }`,
+            'rating source prisma filter'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `    const needsRawSort = sortField === 'year' || sortField === 'rating'\n\n    let items: any[]`,
+            `    const needsRawSort = sortField === 'year' || sortField === 'rating'\n    const needsRawQuery = needsRawSort || usePublicRatingRange\n\n    let items: any[]`,
+            'needsRawQuery flag'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `    if (needsRawSort) {`,
+            `    if (needsRawQuery) {`,
+            'use raw query when needed'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `      if (search) {\n        conditions.push(\`("title" ILIKE $\${paramIndex++} OR "originalTitle" ILIKE $\${paramIndex++})\`)\n        params.push(\`%\${search}%\`, \`%\${search}%\`)\n      }\n\n      if (filterYear) {`,
+            `      if (search) {\n        conditions.push(\`("title" ILIKE $\${paramIndex++} OR "originalTitle" ILIKE $\${paramIndex++})\`)\n        params.push(\`%\${search}%\`, \`%\${search}%\`)\n      }\n\n      if (firstLetter) {\n        conditions.push(\`("title" ILIKE $\${paramIndex} OR COALESCE("originalTitle", '') ILIKE $\${paramIndex})\`)\n        params.push(\`\${firstLetter}%\`)\n        paramIndex++\n      }\n\n      if (filterYear) {`,
+            'raw firstLetter filter'
+          )
+          replaceOnce(
+            watchlistRoute,
+            `      if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {\n        if (filterRatingMin) {\n          conditions.push(\`"userRating" >= $\${paramIndex++}\`)\n          params.push(parseFloat(filterRatingMin))\n        }\n        if (filterRatingMax) {\n          conditions.push(\`"userRating" <= $\${paramIndex++}\`)\n          params.push(parseFloat(filterRatingMax))\n        }\n      }`,
+            `      if (hasRatingRange) {\n        if (ratingSource === 'rating') {\n          conditions.push(\`"rating" ~ '^[0-9]+\\\\.?[0-9]*$'\`)\n          if (filterRatingMin) {\n            conditions.push(\`CAST("rating" AS FLOAT) >= $\${paramIndex++}\`)\n            params.push(parseFloat(filterRatingMin))\n          }\n          if (filterRatingMax) {\n            conditions.push(\`CAST("rating" AS FLOAT) <= $\${paramIndex++}\`)\n            params.push(parseFloat(filterRatingMax))\n          }\n        } else if (hasRating !== 'false') {\n          if (filterRatingMin) {\n            conditions.push(\`"userRating" >= $\${paramIndex++}\`)\n            params.push(parseFloat(filterRatingMin))\n          }\n          if (filterRatingMax) {\n            conditions.push(\`"userRating" <= $\${paramIndex++}\`)\n            params.push(parseFloat(filterRatingMax))\n          }\n        }\n      }`,
+            'raw rating range filter'
+          )
+
+          // 4) Archive page UI filters
+          const archivePage = 'src/app/archive/page.tsx'
+          replaceOnce(
+            archivePage,
+            `  // Note: books & games are NOT in the archive — they have their own dedicated pages\n}\n\n// ==================== Memoized Card ====================`,
+            `  // Note: books & games are NOT in the archive — they have their own dedicated pages\n}\n\nconst FIRST_LETTER_OPTIONS = [\n  'أ', 'ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي',\n  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'\n]\n\n// ==================== Memoized Card ====================`,
+            'first letter options'
+          )
+          replaceOnce(
+            archivePage,
+            `  const [wlFilterYear, setWlFilterYear] = useState('')\n  const [rtFilterYear, setRtFilterYear] = useState('')\n  const [wlFilterRatingMin, setWlFilterRatingMin] = useState('')`,
+            `  const [wlFilterYear, setWlFilterYear] = useState('')\n  const [rtFilterYear, setRtFilterYear] = useState('')\n  const [wlFilterFirstLetter, setWlFilterFirstLetter] = useState('')\n  const [rtFilterFirstLetter, setRtFilterFirstLetter] = useState('')\n  const [wlFilterRatingMin, setWlFilterRatingMin] = useState('')`,
+            'first letter states'
+          )
+          replaceOnce(
+            archivePage,
+            `    if (wlFilterYear) params.set('year', wlFilterYear)\n    if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)`,
+            `    if (wlFilterYear) params.set('year', wlFilterYear)\n    if (wlFilterFirstLetter) params.set('firstLetter', wlFilterFirstLetter)\n    if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)`,
+            'watchlist firstLetter param'
+          )
+          replaceOnce(
+            archivePage,
+            `    if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)`,
+            `    if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)\n    if (wlFilterRatingMin || wlFilterRatingMax) params.set('ratingSource', 'rating')`,
+            'watchlist rating source param'
+          )
+          replaceOnce(
+            archivePage,
+            `}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])`,
+            `}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax])`,
+            'watchlist callback deps'
+          )
+          replaceOnce(
+            archivePage,
+            `    if (rtFilterYear) params.set('year', rtFilterYear)\n    if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)`,
+            `    if (rtFilterYear) params.set('year', rtFilterYear)\n    if (rtFilterFirstLetter) params.set('firstLetter', rtFilterFirstLetter)\n    if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)`,
+            'ratings firstLetter param'
+          )
+          replaceOnce(
+            archivePage,
+            `    if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)`,
+            `    if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)\n    if (rtFilterRatingMin || rtFilterRatingMax) params.set('ratingSource', 'userRating')`,
+            'ratings rating source param'
+          )
+          replaceOnce(
+            archivePage,
+            `}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])`,
+            `}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax])`,
+            'ratings callback deps'
+          )
+          replaceOnce(
+            archivePage,
+            `  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])`,
+            `  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])`,
+            'watchlist effect deps'
+          )
+          replaceOnce(
+            archivePage,
+            `  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])`,
+            `  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])`,
+            'ratings effect deps'
+          )
+
+          const helperComponents = `  const LetterFilter = ({\n    value,\n    onChange,\n  }: {\n    value: string\n    onChange: (value: string) => void\n  }) => (\n    <div>\n      <h4 className="text-xs font-bold text-[#d4af37] mb-2">الحرف الأول</h4>\n      <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">\n        <button\n          onClick={() => onChange('')}\n          className={\`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors \${\n            !value\n              ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'\n              : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'\n          }\`}\n        >\n          الكل\n        </button>\n        {FIRST_LETTER_OPTIONS.map(letter => (\n          <button\n            key={letter}\n            onClick={() => onChange(letter === value ? '' : letter)}\n            className={\`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors \${\n              letter === value\n                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'\n                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'\n            }\`}\n          >\n            {letter}\n          </button>\n        ))}\n      </div>\n    </div>\n  )\n\n  const RatingRangeFilter = ({\n    min,\n    max,\n    onMinChange,\n    onMaxChange,\n    maxValue,\n  }: {\n    min: string\n    max: string\n    onMinChange: (value: string) => void\n    onMaxChange: (value: string) => void\n    maxValue: number\n  }) => (\n    <div>\n      <h4 className="text-xs font-bold text-[#d4af37] mb-2">التقييم</h4>\n      <div className="grid grid-cols-2 gap-2">\n        <Input\n          type="number"\n          min="0"\n          max={maxValue}\n          step="0.1"\n          value={min}\n          onChange={(e) => onMinChange(e.target.value)}\n          placeholder="من"\n          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"\n          dir="ltr"\n        />\n        <Input\n          type="number"\n          min="0"\n          max={maxValue}\n          step="0.1"\n          value={max}\n          onChange={(e) => onMaxChange(e.target.value)}\n          placeholder="إلى"\n          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"\n          dir="ltr"\n        />\n      </div>\n    </div>\n  )\n\n`
+          replaceOnce(
+            archivePage,
+            `  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length`,
+            `${helperComponents}  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length`,
+            'filter helper components and wl count'
+          )
+          replaceOnce(
+            archivePage,
+            `\n      {/* Year Filter */}\n      {dbYears.length > 0 && (`,
+            `\n      <LetterFilter value={wlFilterFirstLetter} onChange={setWlFilterFirstLetter} />\n\n      {/* Year Filter */}\n      {dbYears.length > 0 && (`,
+            'watchlist letter filter UI'
+          )
+          replaceOnce(
+            archivePage,
+            `\n      {/* View Mode */}\n      <div>`,
+            `\n      <RatingRangeFilter\n        min={wlFilterRatingMin}\n        max={wlFilterRatingMax}\n        onMinChange={setWlFilterRatingMin}\n        onMaxChange={setWlFilterRatingMax}\n        maxValue={10}\n      />\n\n      {/* View Mode */}\n      <div>`,
+            'watchlist rating range UI'
+          )
+          replaceOnce(
+            archivePage,
+            `onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}`,
+            `onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterFirstLetter(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}`,
+            'watchlist clear firstLetter'
+          )
+          replaceOnce(
+            archivePage,
+            `  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length`,
+            `  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length`,
+            'ratings filter count'
+          )
+          replaceOnce(
+            archivePage,
+            `\n      {/* Year Filter */}\n      {dbYears.length > 0 && (`,
+            `\n      <LetterFilter value={rtFilterFirstLetter} onChange={setRtFilterFirstLetter} />\n\n      {/* Year Filter */}\n      {dbYears.length > 0 && (`,
+            'ratings letter filter UI'
+          )
+          replaceOnce(
+            archivePage,
+            `\n      {/* Clear All */}\n      {rtActiveFilterCount > 0 && (`,
+            `\n      <RatingRangeFilter\n        min={rtFilterRatingMin}\n        max={rtFilterRatingMax}\n        onMinChange={setRtFilterRatingMin}\n        onMaxChange={setRtFilterRatingMax}\n        maxValue={100}\n      />\n\n      {/* Clear All */}\n      {rtActiveFilterCount > 0 && (`,
+            'ratings rating range UI'
+          )
+          replaceOnce(
+            archivePage,
+            `onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}`,
+            `onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterFirstLetter(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}`,
+            'ratings clear firstLetter'
+          )
+          NODE
+
+      - name: Install dependencies
+        run: npm install --include=dev
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Commit applied changes and remove workflow
+        run: |
+          rm -f .github/workflows/apply-my-watchlist-archive-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/watchlist/[id]/route.ts src/app/api/ratings-stats/route.ts src/app/api/watchlist/route.ts src/app/archive/page.tsx .github/workflows/apply-my-watchlist-archive-fixes.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Fix archive rating stats and filters"
+          git push
