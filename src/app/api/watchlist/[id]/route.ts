@@ -25,6 +25,13 @@ const ALLOWED_FIELDS = new Set([
   'runtime', 'ratingStatus'
 ])
 
+function clearWatchStateWhenRatingRemoved(data: Record<string, any>) {
+  if (!Object.prototype.hasOwnProperty.call(data, 'userRating') || data.userRating !== null) return
+
+  data.watched = false
+  data.watchedAt = null
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -71,6 +78,8 @@ export async function PUT(
     if (data.watchedAt !== undefined) data.watchedAt = data.watchedAt ? String(data.watchedAt) : null
     if (data.rewatch !== undefined) data.rewatch = data.rewatch || false
     if (data.ratingStatus !== undefined) data.ratingStatus = data.ratingStatus || 'watched'
+
+    clearWatchStateWhenRatingRemoved(data)
 
     const item = await prisma.mediaItem.update({
       where: { id },
@@ -142,6 +151,8 @@ export async function PATCH(
     if (updateData.rating !== undefined) {
       updateData.rating = updateData.rating ? String(updateData.rating) : null
     }
+
+    clearWatchStateWhenRatingRemoved(updateData)
 
     const item = await prisma.mediaItem.update({
       where: { id },
