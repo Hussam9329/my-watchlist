@@ -1,0 +1,166 @@
+name: Apply year range UI filters
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/apply-year-range-ui-filters.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-year-range-ui-filters:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply archive year range UI filters
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const path = 'src/app/archive/page.tsx'
+
+          function replaceOnce(content, from, to, label) {
+            if (content.includes(to)) {
+              console.log(`skip ${label}: already applied`)
+              return content
+            }
+            if (!content.includes(from)) {
+              throw new Error(`Missing expected block for ${label}`)
+            }
+            console.log(`applied ${label}`)
+            return content.replace(from, to)
+          }
+
+          function replaceInSection(content, startMarker, endMarker, from, to, label) {
+            const start = content.indexOf(startMarker)
+            if (start === -1) throw new Error(`Missing section start for ${label}`)
+            const end = content.indexOf(endMarker, start)
+            if (end === -1) throw new Error(`Missing section end for ${label}`)
+            const before = content.slice(0, start)
+            const section = content.slice(start, end)
+            const after = content.slice(end)
+            return before + replaceOnce(section, from, to, label) + after
+          }
+
+          let content = fs.readFileSync(path, 'utf8')
+
+          content = replaceOnce(
+            content,
+            `  const [wlFilterYear, setWlFilterYear] = useState('')\n  const [rtFilterYear, setRtFilterYear] = useState('')\n  const [wlFilterFirstLetter, setWlFilterFirstLetter] = useState('')`,
+            `  const [wlFilterYear, setWlFilterYear] = useState('')\n  const [rtFilterYear, setRtFilterYear] = useState('')\n  const [wlFilterYearFrom, setWlFilterYearFrom] = useState('')\n  const [wlFilterYearTo, setWlFilterYearTo] = useState('')\n  const [rtFilterYearFrom, setRtFilterYearFrom] = useState('')\n  const [rtFilterYearTo, setRtFilterYearTo] = useState('')\n  const [wlFilterFirstLetter, setWlFilterFirstLetter] = useState('')`,
+            'year range states'
+          )
+
+          content = replaceOnce(
+            content,
+            `    if (wlFilterYear) params.set('year', wlFilterYear)\n    if (wlFilterFirstLetter) params.set('firstLetter', wlFilterFirstLetter)`,
+            `    if (wlFilterYear) params.set('year', wlFilterYear)\n    if (wlFilterYearFrom) params.set('yearFrom', wlFilterYearFrom)\n    if (wlFilterYearTo) params.set('yearTo', wlFilterYearTo)\n    if (wlFilterFirstLetter) params.set('firstLetter', wlFilterFirstLetter)`,
+            'watchlist year range params'
+          )
+
+          content = replaceOnce(
+            content,
+            `}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax])`,
+            `}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterYearFrom, wlFilterYearTo, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax])`,
+            'watchlist callback deps'
+          )
+
+          content = replaceOnce(
+            content,
+            `    if (rtFilterYear) params.set('year', rtFilterYear)\n    if (rtFilterFirstLetter) params.set('firstLetter', rtFilterFirstLetter)`,
+            `    if (rtFilterYear) params.set('year', rtFilterYear)\n    if (rtFilterYearFrom) params.set('yearFrom', rtFilterYearFrom)\n    if (rtFilterYearTo) params.set('yearTo', rtFilterYearTo)\n    if (rtFilterFirstLetter) params.set('firstLetter', rtFilterFirstLetter)`,
+            'ratings year range params'
+          )
+
+          content = replaceOnce(
+            content,
+            `}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax])`,
+            `}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterYearFrom, rtFilterYearTo, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax])`,
+            'ratings callback deps'
+          )
+
+          content = replaceOnce(
+            content,
+            `  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])`,
+            `  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterYearFrom, wlFilterYearTo, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])`,
+            'watchlist effect deps'
+          )
+
+          content = replaceOnce(
+            content,
+            `  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])`,
+            `  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterYearFrom, rtFilterYearTo, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])`,
+            'ratings effect deps'
+          )
+
+          const YearRangeFilter = `  const YearRangeFilter = ({\n    from,\n    to,\n    onFromChange,\n    onToChange,\n  }: {\n    from: string\n    to: string\n    onFromChange: (value: string) => void\n    onToChange: (value: string) => void\n  }) => (\n    <div>\n      <h4 className="text-xs font-bold text-[#d4af37] mb-2">مدى السنة</h4>\n      <div className="grid grid-cols-2 gap-2">\n        <Input\n          type="number"\n          min="1900"\n          max="2100"\n          value={from}\n          onChange={(e) => onFromChange(e.target.value)}\n          placeholder="من سنة"\n          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"\n          dir="ltr"\n        />\n        <Input\n          type="number"\n          min="1900"\n          max="2100"\n          value={to}\n          onChange={(e) => onToChange(e.target.value)}\n          placeholder="إلى سنة"\n          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"\n          dir="ltr"\n        />\n      </div>\n    </div>\n  )\n\n`
+
+          content = replaceOnce(
+            content,
+            `  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length`,
+            `${YearRangeFilter}  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterYearFrom, wlFilterYearTo, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length`,
+            'year range helper and watchlist count'
+          )
+
+          content = replaceInSection(
+            content,
+            `  const wlSortFilterContent = (`,
+            `  // ==================== Ratings Sort & Filter Content`,
+            `\n      {/* Genre Filter */}\n      <div>`,
+            `\n      <YearRangeFilter\n        from={wlFilterYearFrom}\n        to={wlFilterYearTo}\n        onFromChange={setWlFilterYearFrom}\n        onToChange={setWlFilterYearTo}\n      />\n\n      {/* Genre Filter */}\n      <div>`,
+            'watchlist year range UI'
+          )
+
+          content = replaceOnce(
+            content,
+            `onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterFirstLetter(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}`,
+            `onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterYearFrom(''); setWlFilterYearTo(''); setWlFilterFirstLetter(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}`,
+            'watchlist clear year range'
+          )
+
+          content = replaceOnce(
+            content,
+            `  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length`,
+            `  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterYearFrom, rtFilterYearTo, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length`,
+            'ratings count year range'
+          )
+
+          content = replaceInSection(
+            content,
+            `  const rtSortFilterContent = (`,
+            `  // ==================== Auth Loading`,
+            `\n      {/* Genre Filter */}\n      <div>`,
+            `\n      <YearRangeFilter\n        from={rtFilterYearFrom}\n        to={rtFilterYearTo}\n        onFromChange={setRtFilterYearFrom}\n        onToChange={setRtFilterYearTo}\n      />\n\n      {/* Genre Filter */}\n      <div>`,
+            'ratings year range UI'
+          )
+
+          content = replaceOnce(
+            content,
+            `onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterFirstLetter(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}`,
+            `onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterYearFrom(''); setRtFilterYearTo(''); setRtFilterFirstLetter(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}`,
+            'ratings clear year range'
+          )
+
+          fs.writeFileSync(path, content)
+          NODE
+
+      - name: Commit applied changes and remove workflow
+        run: |
+          rm -f .github/workflows/apply-year-range-ui-filters.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/archive/page.tsx .github/workflows/apply-year-range-ui-filters.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Add archive year range filters"
+          git push
