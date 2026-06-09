@@ -38,6 +38,11 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bookmark; label: string; plural
   // Note: books & games are NOT in the archive — they have their own dedicated pages
 }
 
+const FIRST_LETTER_OPTIONS = [
+  'أ', 'ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي',
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+]
+
 // ==================== Memoized Card ====================
 interface MediaCardProps {
   item: MediaItem
@@ -277,6 +282,8 @@ export default function ArchivePage() {
   const [rtFilterGenre, setRtFilterGenre] = useState('')
   const [wlFilterYear, setWlFilterYear] = useState('')
   const [rtFilterYear, setRtFilterYear] = useState('')
+  const [wlFilterFirstLetter, setWlFilterFirstLetter] = useState('')
+  const [rtFilterFirstLetter, setRtFilterFirstLetter] = useState('')
   const [wlFilterRatingMin, setWlFilterRatingMin] = useState('')
   const [rtFilterRatingMin, setRtFilterRatingMin] = useState('')
   const [wlFilterRatingMax, setWlFilterRatingMax] = useState('')
@@ -334,8 +341,10 @@ const fetchWatchlist = useCallback(async (page: number, reset = false) => {
     params.set('sortBy', wlSortBy)
     if (wlFilterGenre) params.set('genre', wlFilterGenre)
     if (wlFilterYear) params.set('year', wlFilterYear)
+    if (wlFilterFirstLetter) params.set('firstLetter', wlFilterFirstLetter)
     if (wlFilterRatingMin) params.set('ratingMin', wlFilterRatingMin)
     if (wlFilterRatingMax) params.set('ratingMax', wlFilterRatingMax)
+    if (wlFilterRatingMin || wlFilterRatingMax) params.set('ratingSource', 'rating')
     params.set('page', String(page))
     params.set('limit', '200')
     const res = await fetch(`/api/watchlist?${params}`)
@@ -376,7 +385,7 @@ const fetchWatchlist = useCallback(async (page: number, reset = false) => {
   } finally {
     setWlLoading(false)
   }
-}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax])
+}, [wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax])
 
   // ==================== Fetch Ratings ====================
 const fetchRatings = useCallback(async (page: number, reset = false) => {
@@ -390,8 +399,10 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
     params.set('sortBy', rtSortBy)
     if (rtFilterGenre) params.set('genre', rtFilterGenre)
     if (rtFilterYear) params.set('year', rtFilterYear)
+    if (rtFilterFirstLetter) params.set('firstLetter', rtFilterFirstLetter)
     if (rtFilterRatingMin) params.set('ratingMin', rtFilterRatingMin)
     if (rtFilterRatingMax) params.set('ratingMax', rtFilterRatingMax)
+    if (rtFilterRatingMin || rtFilterRatingMax) params.set('ratingSource', 'userRating')
     params.set('page', String(page))
     params.set('limit', '200')
     const res = await fetch(`/api/watchlist?${params}`)
@@ -420,7 +431,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   } finally {
     if (page === 1) setRtLoading(false)
   }
-}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax])
+}, [rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax])
 
   // ==================== Fetch Stats ====================
   const fetchStats = useCallback(async () => {
@@ -447,7 +458,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   useEffect(() => {
     if (!isAuthChecked) return
     fetchWatchlist(1, true)
-  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
+  }, [isAuthChecked, wlType, debouncedSearch, wlSortBy, wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax, fetchWatchlist])
 
   // Fetch all available years & genres from database (exclude books & games for archive)
   useEffect(() => {
@@ -471,7 +482,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'ratings') return
     fetchRatings(1, true)
-  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
+  }, [isAuthChecked, mainTab, rtType, debouncedSearch, rtSortBy, rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax, fetchRatings])
 
   useEffect(() => {
     if (!isAuthChecked || mainTab !== 'stats') return
@@ -823,7 +834,86 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   // ==================== Unique genres/years from database ====================
 
   // ==================== Watchlist Sort & Filter Content (shared between Drawer/Popover) ====================
-  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
+  const LetterFilter = ({
+    value,
+    onChange,
+  }: {
+    value: string
+    onChange: (value: string) => void
+  }) => (
+    <div>
+      <h4 className="text-xs font-bold text-[#d4af37] mb-2">الحرف الأول</h4>
+      <div className="flex gap-1.5 flex-wrap max-h-32 overflow-y-auto">
+        <button
+          onClick={() => onChange('')}
+          className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            !value
+              ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+              : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+          }`}
+        >
+          الكل
+        </button>
+        {FIRST_LETTER_OPTIONS.map(letter => (
+          <button
+            key={letter}
+            onClick={() => onChange(letter === value ? '' : letter)}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              letter === value
+                ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'
+                : 'bg-[#0a0a0a] text-[#888] border border-[#2a2a2a] hover:text-[#ccc]'
+            }`}
+          >
+            {letter}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
+  const RatingRangeFilter = ({
+    min,
+    max,
+    onMinChange,
+    onMaxChange,
+    maxValue,
+  }: {
+    min: string
+    max: string
+    onMinChange: (value: string) => void
+    onMaxChange: (value: string) => void
+    maxValue: number
+  }) => (
+    <div>
+      <h4 className="text-xs font-bold text-[#d4af37] mb-2">التقييم</h4>
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          type="number"
+          min="0"
+          max={maxValue}
+          step="0.1"
+          value={min}
+          onChange={(e) => onMinChange(e.target.value)}
+          placeholder="من"
+          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+          dir="ltr"
+        />
+        <Input
+          type="number"
+          min="0"
+          max={maxValue}
+          step="0.1"
+          value={max}
+          onChange={(e) => onMaxChange(e.target.value)}
+          placeholder="إلى"
+          className="bg-[#0a0a0a] border-[#2a2a2a] text-sm h-10"
+          dir="ltr"
+        />
+      </div>
+    </div>
+  )
+
+  const wlActiveFilterCount = [wlFilterGenre, wlFilterYear, wlFilterFirstLetter, wlFilterRatingMin, wlFilterRatingMax].filter(Boolean).length
 
   const wlSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
@@ -846,6 +936,8 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
           ))}
         </div>
       </div>
+
+      <LetterFilter value={wlFilterFirstLetter} onChange={setWlFilterFirstLetter} />
 
       {/* Year Filter */}
       {dbYears.length > 0 && (
@@ -895,6 +987,14 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         </Select>
       </div>
 
+      <RatingRangeFilter
+        min={wlFilterRatingMin}
+        max={wlFilterRatingMax}
+        onMinChange={setWlFilterRatingMin}
+        onMaxChange={setWlFilterRatingMax}
+        maxValue={10}
+      />
+
       {/* View Mode */}
       <div>
         <h4 className="text-xs font-bold text-[#d4af37] mb-2">طريقة العرض</h4>
@@ -929,7 +1029,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
+          onClick={() => { setWlFilterGenre(''); setWlFilterYear(''); setWlFilterFirstLetter(''); setWlFilterRatingMin(''); setWlFilterRatingMax('') }}
           className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
@@ -940,7 +1040,7 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
   )
 
   // ==================== Ratings Sort & Filter Content (shared between Drawer/Popover) ====================
-  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length
+  const rtActiveFilterCount = [rtFilterGenre, rtFilterYear, rtFilterFirstLetter, rtFilterRatingMin, rtFilterRatingMax].filter(Boolean).length
 
   const rtSortFilterContent = (
     <div className="space-y-4 p-4" dir="rtl">
@@ -963,6 +1063,8 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
           ))}
         </div>
       </div>
+
+      <LetterFilter value={rtFilterFirstLetter} onChange={setRtFilterFirstLetter} />
 
       {/* Year Filter */}
       {dbYears.length > 0 && (
@@ -1012,12 +1114,20 @@ const fetchRatings = useCallback(async (page: number, reset = false) => {
         </Select>
       </div>
 
+      <RatingRangeFilter
+        min={rtFilterRatingMin}
+        max={rtFilterRatingMax}
+        onMinChange={setRtFilterRatingMin}
+        onMaxChange={setRtFilterRatingMax}
+        maxValue={100}
+      />
+
       {/* Clear All */}
       {rtActiveFilterCount > 0 && (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
+          onClick={() => { setRtFilterGenre(''); setRtFilterYear(''); setRtFilterFirstLetter(''); setRtFilterRatingMin(''); setRtFilterRatingMax('') }}
           className="w-full text-red-400 text-xs hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
         >
           <X className="w-3.5 h-3.5 ml-1" />
