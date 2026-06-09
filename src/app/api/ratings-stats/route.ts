@@ -26,8 +26,9 @@ async function getRatingsStats() {
       AVG("userRating") FILTER (WHERE "type" = 'anime') as avg_anime_rating,
       MAX("userRating") as max_rating,
       COUNT(*) FILTER (WHERE
-        EXTRACT(YEAR FROM "addedAt") = EXTRACT(YEAR FROM NOW()) AND
-        EXTRACT(MONTH FROM "addedAt") = EXTRACT(MONTH FROM NOW())
+        "watchedAt" IS NOT NULL AND
+        "watchedAt" != '' AND
+        "watchedAt" LIKE TO_CHAR(NOW(), 'YYYY-MM') || '%'
       ) as this_month
     FROM "MediaItem"
     WHERE "type" IN ('movie', 'series', 'anime') AND "userRating" IS NOT NULL
