@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const filterYear = searchParams.get('year')
     const filterRatingMin = searchParams.get('ratingMin')
     const filterRatingMax = searchParams.get('ratingMax')
+    const firstLetter = searchParams.get('firstLetter')?.trim()
+    const ratingSource = searchParams.get('ratingSource') || (hasRating === 'true' ? 'userRating' : 'rating')
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '20')))
     const skip = (page - 1) * limit
@@ -54,6 +56,18 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    if (firstLetter) {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { title: { startsWith: firstLetter, mode: 'insensitive' } },
+            { originalTitle: { startsWith: firstLetter, mode: 'insensitive' } },
+          ],
+        },
+      ]
+    }
+
     if (filterYear) {
       where.year = filterYear
     }
@@ -62,7 +76,10 @@ export async function GET(request: NextRequest) {
       where.genres = { contains: filterGenre }
     }
 
-    if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
+    const hasRatingRange = Boolean(filterRatingMin || filterRatingMax)
+    const usePublicRatingRange = hasRatingRange && ratingSource === 'rating'
+
+    if (hasRatingRange && ratingSource === 'userRating' && hasRating !== 'false') {
       const ratingFilter: any = {}
       if (filterRatingMin) ratingFilter.gte = parseFloat(filterRatingMin)
       if (filterRatingMax) ratingFilter.lte = parseFloat(filterRatingMax)
@@ -83,11 +100,12 @@ export async function GET(request: NextRequest) {
     const direction = sortDir === 'asc' ? 'asc' : 'desc'
 
     const needsRawSort = sortField === 'year' || sortField === 'rating'
+    const needsRawQuery = needsRawSort || usePublicRatingRange
 
     let items: any[]
     let total: number
 
-    if (needsRawSort) {
+    if (needsRawQuery) {
       const conditions: string[] = []
       const params: any[] = []
       let paramIndex = 1
@@ -115,6 +133,12 @@ export async function GET(request: NextRequest) {
         params.push(`%${search}%`, `%${search}%`)
       }
 
+      if (firstLetter) {
+        conditions.push(`("title" ILIKE $${paramIndex} OR COALESCE("originalTitle", '') ILIKE $${paramIndex})`)
+        params.push(`${firstLetter}%`)
+        paramIndex++
+      }
+
       if (filterYear) {
         conditions.push(`"year" = $${paramIndex++}`)
         params.push(filterYear)
@@ -125,14 +149,26 @@ export async function GET(request: NextRequest) {
         params.push(`%${filterGenre}%`)
       }
 
-      if ((filterRatingMin || filterRatingMax) && hasRating !== 'false') {
-        if (filterRatingMin) {
-          conditions.push(`"userRating" >= $${paramIndex++}`)
-          params.push(parseFloat(filterRatingMin))
-        }
-        if (filterRatingMax) {
-          conditions.push(`"userRating" <= $${paramIndex++}`)
-          params.push(parseFloat(filterRatingMax))
+      if (hasRatingRange) {
+        if (ratingSource === 'rating') {
+          conditions.push(`"rating" ~ '^[0-9]+\\.?[0-9]*$'`)
+          if (filterRatingMin) {
+            conditions.push(`CAST("rating" AS FLOAT) >= $${paramIndex++}`)
+            params.push(parseFloat(filterRatingMin))
+          }
+          if (filterRatingMax) {
+            conditions.push(`CAST("rating" AS FLOAT) <= $${paramIndex++}`)
+            params.push(parseFloat(filterRatingMax))
+          }
+        } else if (hasRating !== 'false') {
+          if (filterRatingMin) {
+            conditions.push(`"userRating" >= $${paramIndex++}`)
+            params.push(parseFloat(filterRatingMin))
+          }
+          if (filterRatingMax) {
+            conditions.push(`"userRating" <= $${paramIndex++}`)
+            params.push(parseFloat(filterRatingMax))
+          }
         }
       }
 
@@ -259,12 +295,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (existing) {
+      const existingFormatted = formatItem(existing)
       return NextResponse.json(
-        {
-          error: 'هذا العمل موجود مسبقاً في الأرشيف!',
-          duplicate: true,
-          existingItem: formatItem(existing)
-        },
+        { error: 'العنصر موجود مسبقاً', duplicate: existingFormatted },
         { status: 409 }
       )
     }
@@ -273,33 +306,32 @@ export async function POST(request: NextRequest) {
       data: {
         title: body.title,
         originalTitle: body.originalTitle || null,
-        year: body.year || '',
         type: normalizedType,
+        year: body.year || null,
         poster: body.poster || null,
-        rating: body.rating ? String(body.rating) : null,
-        overview: body.overview || null,
         genres: normalizeListField(body.genres),
+        overview: body.overview || '',
+        rating: body.rating ? String(body.rating) : null,
+        userRating: body.userRating || null,
+        notes: body.notes || '',
+        status: body.status || 'planned',
+        addedAt: body.addedAt ? new Date(body.addedAt) : new Date(),
         episodes: parseOptionalInt(body.episodes),
         seasons: parseOptionalInt(body.seasons),
         duration: body.duration || null,
-        status: body.status || null,
         author: body.author || null,
         pages: parseOptionalInt(body.pages),
         tags: normalizeListField(body.tags),
-        notes: body.notes || '',
         watched: body.watched || false,
         watchedAt: body.watchedAt ? String(body.watchedAt) : null,
-        userRating: body.userRating != null && !isNaN(Number(body.userRating)) ? parseFloat(String(body.userRating)) : null,
         rewatch: body.rewatch || false,
         runtime: parseOptionalInt(body.runtime),
-        ratingStatus: body.ratingStatus || 'watched',
+        ratingStatus: body.ratingStatus || 'watched'
       }
     })
-
-    return NextResponse.json(formatItem(item))
-
+    return NextResponse.json(formatItem(item), { status: 201 })
   } catch (error) {
     console.error('Create error:', error)
-    return NextResponse.json({ error: 'خطأ في إضافة العنصر' }, { status: 500 })
+    return NextResponse.json({ error: 'خطأ في الإضافة' }, { status: 500 })
   }
 }
