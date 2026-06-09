@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     let sortBy = searchParams.get('sortBy') || 'addedAt_desc'
     const filterGenre = searchParams.get('genre')
     const filterYear = searchParams.get('year')
+    const filterYearFrom = searchParams.get('yearFrom') || searchParams.get('yearMin')
+    const filterYearTo = searchParams.get('yearTo') || searchParams.get('yearMax')
     const filterRatingMin = searchParams.get('ratingMin')
     const filterRatingMax = searchParams.get('ratingMax')
     const firstLetter = searchParams.get('firstLetter')?.trim()
@@ -77,6 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     const hasRatingRange = Boolean(filterRatingMin || filterRatingMax)
+    const hasYearRange = Boolean(filterYearFrom || filterYearTo)
     const usePublicRatingRange = hasRatingRange && ratingSource === 'rating'
 
     if (hasRatingRange && ratingSource === 'userRating' && hasRating !== 'false') {
@@ -100,7 +103,7 @@ export async function GET(request: NextRequest) {
     const direction = sortDir === 'asc' ? 'asc' : 'desc'
 
     const needsRawSort = sortField === 'year' || sortField === 'rating'
-    const needsRawQuery = needsRawSort || usePublicRatingRange
+    const needsRawQuery = needsRawSort || usePublicRatingRange || hasYearRange
 
     let items: any[]
     let total: number
@@ -142,6 +145,18 @@ export async function GET(request: NextRequest) {
       if (filterYear) {
         conditions.push(`"year" = $${paramIndex++}`)
         params.push(filterYear)
+      }
+
+      if (hasYearRange) {
+        conditions.push(`"year" ~ '^[0-9]+$'`)
+        if (filterYearFrom) {
+          conditions.push(`CAST("year" AS INTEGER) >= $${paramIndex++}`)
+          params.push(parseInt(filterYearFrom, 10))
+        }
+        if (filterYearTo) {
+          conditions.push(`CAST("year" AS INTEGER) <= $${paramIndex++}`)
+          params.push(parseInt(filterYearTo, 10))
+        }
       }
 
       if (filterGenre) {
